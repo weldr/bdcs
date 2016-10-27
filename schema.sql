@@ -61,22 +61,21 @@ create table files (
     symlink_target text
 );
 
-
-create table file_tags (
+-- Extra information about a file, including information that may be a list
+-- examples: type (doc, ELF binary, devel), xattr
+-- heavily used types (like tag and xattr) should be indexed
+create table file_attributes (
     file_id references files(id) not null,
-    tag_value text not null
+    attribute_type text not null,
+    attribute_value text
 );
-
+create index file_attributes_file_id on file_attributes (file_id);
+create index file_attributes_type on file_attributes (file_id, attribute_type, attribute_value) where attribute_type == "type";
+create index file_attributes_xattr on file_attributes (file_id, attribute_type, attribute_value) where attribute_type == "xattr";
 
 create table build_files (
     build_id integer references build(id) not null,
     file_id integer references files(id) not null
-);
-
-create table file_attrs (
-    file_id integer references file(id) not null,
-    attr_name text not null,
-    attr_value text not null
 );
 
 create table key_val (
