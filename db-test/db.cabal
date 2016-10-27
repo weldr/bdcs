@@ -1,0 +1,22 @@
+name:                db
+version:             0.1.0.0
+author:              Chris Lumens
+maintainer:          clumens@redhat.com
+build-type:          Simple
+cabal-version:       >=1.10
+
+library
+  exposed-modules:     DB,
+                       FileType
+  other-extensions:    EmptyDataDecls, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, OverloadedStrings, QuasiQuotes, TemplateHaskell, TypeFamilies
+  build-depends:       base >=4.8 && <4.9,
+                       bytestring,
+                       directory,
+                       esqueleto,
+                       filepath,
+                       persistent,
+                       persistent-sqlite,
+                       persistent-template,
+                       text,
+                       time
+  default-language:    Haskell2010
