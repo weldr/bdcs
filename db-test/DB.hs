@@ -29,7 +29,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     description String
     homepage String
     upstream_vcs String
-    Name name
+    NameKey name
     deriving Eq Show
  Sources
     project_id ProjectsId
@@ -64,18 +64,17 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     mtime Int
     symlink_target String Maybe
     deriving Eq Show
- FileTags
+ FileAttributes
     file_id FilesId
-    tag_value String
+    attribute_type String
+    attribute_value String
+    FileIdKey file_id
+    TypeKey file_id attribute_type attribute_value
+    XattrKey file_id attribute_type attribute_value
     deriving Eq Show
  BuildFiles
     build_id BuildsId
     file_id FilesId
-    deriving Eq Show
- FileAttrs
-    file_id FilesId
-    attr_name String
-    attr_value String
     deriving Eq Show
  KeyVal
     key_value String
