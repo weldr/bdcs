@@ -8,7 +8,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     DB,
                        FileType
-  other-extensions:    EmptyDataDecls, FlexibleContexts, GADTs, GeneralizedNewtypeDeriving, MultiParamTypeClasses, OverloadedStrings, QuasiQuotes, TemplateHaskell, TypeFamilies
+
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
                        directory,
@@ -20,3 +20,32 @@ library
                        text,
                        time
   default-language:    Haskell2010
+
+executable test
+  main-is:             Main.hs
+
+  build-depends:       attoparsec >= 0.12.1.4,
+                       attoparsec-binary,
+                       base >= 4.7 && < 4.9,
+                       bytestring >= 0.10 && < 0.11,
+                       conduit,
+                       conduit-combinators,
+                       conduit-extra,
+                       db,
+                       directory,
+                       esqueleto,
+                       filepath,
+                       mtl >= 2.2.1,
+                       persistent,
+                       persistent-sqlite,
+                       persistent-template,
+                       pretty >= 1.1.2.0,
+                       rpm,
+                       text,
+                       time,
+                       transformers,
+                       unix
+
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall
