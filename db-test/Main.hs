@@ -233,7 +233,7 @@ associateFilesWithPackage files package =
 -- KEY/VALUE
 --
 
-insertKeyValue :: MonadIO m => String -> String -> SqlPersistT m KeyValId
+insertKeyValue :: MonadIO m => String -> String -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v =
     insert (KeyVal k v)
 
