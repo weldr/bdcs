@@ -175,8 +175,7 @@ insertBuild rpm sourceId =
 insertBuildSignature :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m (Maybe (Key BuildSignatures))
 insertBuildSignature sigs buildId =
     case mkBuildSignature sigs of
-        Just sig -> do i <- insert sig
-                       return $ Just i
+        Just sig -> insert sig >>= return . Just
         Nothing  -> return Nothing
  where
     mkBuildSignature :: [Tag] -> Maybe BuildSignatures
@@ -189,9 +188,9 @@ insertBuildSignature sigs buildId =
 --
 
 insertFiles :: MonadIO m => [Tag] -> SqlPersistT m [Key Files]
-insertFiles rpm = do
-    let zipped = zipFiles rpm
-    mapM (insert . mkOneFiles) zipped
+insertFiles rpm =
+    mapM (insert . mkOneFiles)
+         (zipFiles rpm)
  where
     mkOneFiles :: (String, String, Int, String, String, Int, Maybe String) -> Files
     mkOneFiles (path, digest, mode, user, group, mtime, target) =
@@ -220,19 +219,17 @@ insertFiles rpm = do
         mtimes  = maybeToList $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         targets = maybeToList $ findTag "FileLinkTos" tags   >>= \t -> (tagValue t :: Maybe [String]) >>= Just . map strToMaybe
      in
-        if not (null paths)
-        then zip7 paths digests modes users groups mtimes targets
-        else []
+        zip7 paths digests modes users groups mtimes targets
 
-associateFilesWithBuild :: MonadIO m => Key Builds -> [Key Files] -> SqlPersistT m [Key BuildFiles]
-associateFilesWithBuild build files = do
-    let zipped = zip (repeat build) files
-    mapM (\(bID, fID) -> insert $ BuildFiles bID fID) zipped
+associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
+associateFilesWithBuild files build =
+    mapM (\(fID, bID) -> insert $ BuildFiles bID fID)
+         (zip files $ repeat build)
 
-associateFilesWithPackage :: MonadIO m => Key KeyVal -> [Key Files] -> SqlPersistT m [Key FileKeyValues]
-associateFilesWithPackage package files = do
-    let zipped = zip (repeat package) files
-    mapM (\(pID, fID) -> insert $ FileKeyValues fID pID) zipped
+associateFilesWithPackage :: MonadIO m => [Key Files] -> Key KeyVal -> SqlPersistT m [Key FileKeyValues]
+associateFilesWithPackage files package =
+    mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
+         (zip files $ repeat package)
 
 --
 -- KEY/VALUE
@@ -287,8 +284,8 @@ loadRPM RPM{..} = runSqlite "test.db" $ do
     void $ insertBuildSignature sigs buildId
     filesIds  <- insertFiles tags
 
-    void $ associateFilesWithBuild buildId filesIds
-    void $ insertPackageName tags >>= \keyValId -> associateFilesWithPackage keyValId filesIds
+    void $ associateFilesWithBuild filesIds buildId
+    void $ insertPackageName tags >>= associateFilesWithPackage filesIds
 
     -- FIXME:  The following lines are just an example to show that things are working.
     -- This should be removed before really using this code.
@@ -328,4 +325,4 @@ main = do
     mapM_ processOne argv
  where
     processOne path = catch (processRPM path)
-                            (\(e :: DBException) -> void $ hPutStrLn stderr ("Error importing RPM: " ++ path))
+                            (\(_ :: DBException) -> void $ hPutStrLn stderr ("Error importing RPM: " ++ path))
