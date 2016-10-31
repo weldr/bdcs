@@ -36,6 +36,14 @@ data DBException = DBException
 
 instance Exception DBException
 
+throwIfNothing :: Exception e => Maybe a -> e -> a
+throwIfNothing (Just v) _   = v
+throwIfNothing _        exn = throw exn
+
+throwIfNothingOtherwise :: Exception e => Maybe a -> e -> (a -> b) -> b
+throwIfNothingOtherwise (Just v) _   fn = fn v
+throwIfNothingOtherwise _        exn _  = throw exn
+
 findTag :: String -> [Tag] -> Maybe Tag
 findTag name = find (\t -> name == showConstr (toConstr t))
 
@@ -65,13 +73,10 @@ findProject name = do
 
 insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
 insertProject rpm =
-    case projectName of
-        Nothing -> throw DBException
-        Just n  -> findProject n >>= \case
-                       Nothing   -> case mkProject rpm of
-                                        Nothing   -> throw DBException
-                                        Just proj -> insert proj
-                       Just proj -> return proj
+    throwIfNothingOtherwise projectName DBException $ \n ->
+        findProject n >>= \case
+            Nothing   -> insert $ mkProject rpm `throwIfNothing` DBException
+            Just proj -> return proj
  where
     mkProject :: [Tag] -> Maybe Projects
     mkProject tags = do
@@ -105,13 +110,10 @@ findSource version projectId = do
 
 insertSource :: MonadIO m => [Tag] -> Key Projects -> SqlPersistT m (Key Sources)
 insertSource rpm projectId =
-    case sourceVersion of
-        Nothing -> throw DBException
-        Just v  -> findSource v projectId >>= \case
-                       Nothing  -> case mkSource rpm of
-                                       Nothing  -> throw DBException
-                                       Just src -> insert src
-                       Just src -> return src
+    throwIfNothingOtherwise sourceVersion DBException $ \v ->
+        findSource v projectId >>= \case
+            Nothing  -> insert $ mkSource rpm `throwIfNothing` DBException
+            Just src -> return src
  where
     mkSource :: [Tag] -> Maybe Sources
     mkSource tags = do
@@ -129,12 +131,12 @@ insertSource rpm projectId =
 -- BUILDS
 --
 
-findBuild :: MonadIO m => Maybe Int -> String -> String -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
+findBuild :: MonadIO m => Int -> String -> String -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
 findBuild epoch release arch sourceId = do
     -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
     ndx <- select $ from $ \build -> do
            where_ (build ^. BuildsSource_id ==. val sourceId &&.
-                   build ^. BuildsEpoch ==. val (fromMaybe 0 epoch) &&.
+                   build ^. BuildsEpoch ==. val epoch &&.
                    build ^. BuildsRelease ==. val release &&.
                    build ^. BuildsArch ==. val arch)
            limit 1
@@ -143,19 +145,14 @@ findBuild epoch release arch sourceId = do
 
 insertBuild :: MonadIO m => [Tag] -> Key Sources -> SqlPersistT m (Key Builds)
 insertBuild rpm sourceId =
-    case (buildEpoch rpm, buildRelease, buildArch) of
-        (e, Just r, Just a) -> findBuild e r a sourceId >>= \case
-                                   Nothing  -> case mkBuild rpm of
-                                                   Nothing  -> throw DBException
-                                                   Just bld -> insert bld
-                                   Just bld -> return bld
-        _                   -> throw DBException 
+    throwIfNothingOtherwise (era rpm) DBException $ \(e, r, a) ->
+        findBuild e r a sourceId >>= \case
+            Nothing  -> insert $ mkBuild rpm `throwIfNothing` DBException
+            Just bld -> return bld
  where
     mkBuild :: [Tag] -> Maybe Builds
     mkBuild tags = do
-        epoch      <- buildEpoch tags
-        release    <- buildRelease
-        arch       <- buildArch
+        (epoch, release, arch) <- era tags
         build_time <- findTag "BuildTime"     tags >>= \t -> (tagValue t :: Maybe Word32)   >>= Just . posixSecondsToUTCTime . realToFrac
         -- FIXME: RPM splits the changelog up into three tag types.  I'm just grabbing the text here for now.
         changelog  <- findTag "ChangeLogText" tags >>= \t -> (tagValue t :: Maybe [String]) >>= Just . head >>= Just . pack
@@ -166,11 +163,12 @@ insertBuild rpm sourceId =
 
         return $ Builds sourceId epoch release arch build_time changelog build_config_ref build_env_ref
 
-    buildEpoch :: [Tag] -> Maybe Int
-    buildEpoch tags = maybe (Just 0) (\t -> (tagValue t :: Maybe Word32) >>= Just . fromIntegral) (findTag "Epoch" tags)
-
-    buildRelease = findStringTag "Release" rpm
-    buildArch    = findStringTag "Arch" rpm
+    era :: [Tag] -> Maybe (Int, String, String)
+    era tags = do
+        epoch   <- maybe (Just 0) (\t -> (tagValue t :: Maybe Word32) >>= Just . fromIntegral) (findTag "Epoch" tags)
+        release <- findStringTag "Release" tags
+        arch    <- findStringTag "Arch" tags
+        return (epoch, release, arch)
 
 insertBuildSignature :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m (Maybe (Key BuildSignatures))
 insertBuildSignature sigs buildId =
@@ -261,11 +259,10 @@ filesInPackage name = do
 
 insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
 insertPackageName rpm =
-    case packageName of
-        Nothing   -> throw DBException
-        Just name -> findPackage name >>= \case
-                         [] -> insertKeyValue "packageName" name
-                         _  -> throw DBException
+    throwIfNothingOtherwise packageName DBException $ \name ->
+        findPackage name >>= \case
+            [] -> insertKeyValue "packageName" name
+            _  -> throw DBException
  where
     packageName = findStringTag "Name" rpm
 
