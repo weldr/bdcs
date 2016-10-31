@@ -39,6 +39,15 @@ instance Exception DBException
 findTag :: String -> [Tag] -> Maybe Tag
 findTag name = find (\t -> name == showConstr (toConstr t))
 
+findByteStringTag :: String -> [Tag] -> Maybe BS.ByteString
+findByteStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe BS.ByteString
+
+findStringTag :: String -> [Tag] -> Maybe String
+findStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe String
+
+findStringListTag :: String -> [Tag] -> [String]
+findStringListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [String]
+
 tagValue :: Typeable a => Tag -> Maybe a
 tagValue = gmapQi 0 cast
 
@@ -56,7 +65,7 @@ findProject name = do
 
 insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
 insertProject rpm =
-    case projectName rpm of
+    case projectName of
         Nothing -> throw DBException
         Just n  -> findProject n >>= \case
                        Nothing   -> case mkProject rpm of
@@ -66,10 +75,10 @@ insertProject rpm =
  where
     mkProject :: [Tag] -> Maybe Projects
     mkProject tags = do
-        name        <- projectName tags
-        summary     <- findTag "Summary"     tags >>= \t -> (tagValue t :: Maybe BS.ByteString) >>= Just . unpack
-        description <- findTag "Description" tags >>= \t -> (tagValue t :: Maybe BS.ByteString) >>= Just . unpack
-        homepage    <- findTag "URL"         tags >>= \t -> tagValue t :: Maybe String
+        name        <- projectName
+        summary     <- findByteStringTag "Summary" tags >>= Just . unpack
+        description <- findByteStringTag "Description" tags >>= Just . unpack
+        homepage    <- findStringTag "URL" tags
 
         -- FIXME:  Where to get this from?
         let upstream_vcs = "UPSTREAM_VCS"
@@ -78,8 +87,7 @@ insertProject rpm =
 
     -- FIXME:  SourceRPM looks like "pykickstart-2.32-1.fc26.src.rpm", but we really just want "pykickstart"
     -- here.  I'll get to that.
-    projectName :: [Tag] -> Maybe String
-    projectName tags = findTag "SourceRPM" tags >>= \t -> tagValue t :: Maybe String
+    projectName = findStringTag "SourceRPM" rpm
 
 --
 -- SOURCES
@@ -97,7 +105,7 @@ findSource version projectId = do
 
 insertSource :: MonadIO m => [Tag] -> Key Projects -> SqlPersistT m (Key Sources)
 insertSource rpm projectId =
-    case sourceVersion rpm of
+    case sourceVersion of
         Nothing -> throw DBException
         Just v  -> findSource v projectId >>= \case
                        Nothing  -> case mkSource rpm of
@@ -107,16 +115,15 @@ insertSource rpm projectId =
  where
     mkSource :: [Tag] -> Maybe Sources
     mkSource tags = do
-        license <- findTag "License" tags >>= \t -> tagValue t :: Maybe String
-        version <- sourceVersion tags
+        license <- findStringTag "License" tags
+        version <- sourceVersion
  
         -- FIXME:  Where to get this from?
         let source_ref = "SOURCE_REF"
 
         return $ Sources projectId license version source_ref
 
-    sourceVersion :: [Tag] -> Maybe String
-    sourceVersion tags = findTag "Version" tags >>= \t -> tagValue t :: Maybe String
+    sourceVersion = findStringTag "Version" rpm
 
 --
 -- BUILDS
@@ -136,7 +143,7 @@ findBuild epoch release arch sourceId = do
 
 insertBuild :: MonadIO m => [Tag] -> Key Sources -> SqlPersistT m (Key Builds)
 insertBuild rpm sourceId =
-    case (buildEpoch rpm, buildRelease rpm, buildArch rpm) of
+    case (buildEpoch rpm, buildRelease, buildArch) of
         (e, Just r, Just a) -> findBuild e r a sourceId >>= \case
                                    Nothing  -> case mkBuild rpm of
                                                    Nothing  -> throw DBException
@@ -147,8 +154,8 @@ insertBuild rpm sourceId =
     mkBuild :: [Tag] -> Maybe Builds
     mkBuild tags = do
         epoch      <- buildEpoch tags
-        release    <- buildRelease tags
-        arch       <- buildArch tags
+        release    <- buildRelease
+        arch       <- buildArch
         build_time <- findTag "BuildTime"     tags >>= \t -> (tagValue t :: Maybe Word32)   >>= Just . posixSecondsToUTCTime . realToFrac
         -- FIXME: RPM splits the changelog up into three tag types.  I'm just grabbing the text here for now.
         changelog  <- findTag "ChangeLogText" tags >>= \t -> (tagValue t :: Maybe [String]) >>= Just . head >>= Just . pack
@@ -162,11 +169,8 @@ insertBuild rpm sourceId =
     buildEpoch :: [Tag] -> Maybe Int
     buildEpoch tags = maybe (Just 0) (\t -> (tagValue t :: Maybe Word32) >>= Just . fromIntegral) (findTag "Epoch" tags)
 
-    buildRelease :: [Tag] -> Maybe String
-    buildRelease tags = findTag "Release" tags >>= \t -> tagValue t :: Maybe String
-
-    buildArch :: [Tag] -> Maybe String
-    buildArch tags = findTag "Arch" tags >>= \t -> tagValue t :: Maybe String
+    buildRelease = findStringTag "Release" rpm
+    buildArch    = findStringTag "Arch" rpm
 
 insertBuildSignature :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m (Maybe (Key BuildSignatures))
 insertBuildSignature sigs buildId =
@@ -196,8 +200,8 @@ insertFiles rpm = do
     filePaths :: [Tag] -> [String]
     filePaths tags = let
         indexes   = fromMaybe [] $ findTag "DirIndexes" tags >>= \t -> tagValue t :: Maybe [Word32]
-        dirnames  = fromMaybe [] $ findTag "DirNames" tags >>= \t -> tagValue t :: Maybe [String]
-        basenames = fromMaybe [] $ findTag "BaseNames" tags >>= \t -> tagValue t :: Maybe [String]
+        dirnames  = findStringListTag "DirNames" tags
+        basenames = findStringListTag "BaseNames" tags
      in
         zipWith (</>) (map (\i -> dirnames !! fromIntegral i) indexes) basenames
 
@@ -209,10 +213,10 @@ insertFiles rpm = do
         maybeToList _        = []
 
         paths   = filePaths tags
-        digests = maybeToList $ findTag "FileMD5s" tags      >>= \t -> tagValue t :: Maybe [String]
+        digests = findStringListTag "FileMD5s" tags
         modes   = maybeToList $ findTag "FileModes" tags     >>= \t -> (tagValue t :: Maybe [Word16]) >>= Just . map fromIntegral
-        users   = maybeToList $ findTag "FileUserName" tags  >>= \t -> tagValue t :: Maybe [String]
-        groups  = maybeToList $ findTag "FileGroupName" tags >>= \t -> tagValue t :: Maybe [String]
+        users   = findStringListTag "FileUserName" tags
+        groups  = findStringListTag "FileGroupName" tags
         mtimes  = maybeToList $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         targets = maybeToList $ findTag "FileLinkTos" tags   >>= \t -> (tagValue t :: Maybe [String]) >>= Just . map strToMaybe
      in
@@ -260,14 +264,13 @@ filesInPackage name = do
 
 insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
 insertPackageName rpm =
-    case packageName rpm of
+    case packageName of
         Nothing   -> throw DBException
         Just name -> findPackage name >>= \case
                          [] -> insertKeyValue "packageName" name
                          _  -> throw DBException
  where
-    packageName :: [Tag] -> Maybe String
-    packageName tags = findTag "Name" tags >>= \t -> tagValue t :: Maybe String
+    packageName = findStringTag "Name" rpm
 
     findPackage :: MonadIO m => String -> SqlPersistT m [Key KeyVal]
     findPackage name = do
@@ -289,7 +292,7 @@ loadRPM RPM{..} = runSqlite "test.db" $ do
 
     -- FIXME:  The following lines are just an example to show that things are working.
     -- This should be removed before really using this code.
-    let name = fromJust (findTag "Name" tags >>= \t -> tagValue t :: Maybe String)
+    let name = fromJust $ findStringTag "Name" tags
     liftIO $ putStrLn $ "Loaded the following files from " ++ name ++ ":"
     filesInPackage name >>= mapM_ (liftIO . putStrLn)
  where
