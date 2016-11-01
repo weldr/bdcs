@@ -7,7 +7,7 @@
 
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
 import           Control.Exception(Exception, catch, throw)
-import           Control.Monad((>=>), liftM, void, when)
+import           Control.Monad((>=>), void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
@@ -183,16 +183,21 @@ insertBuild rpm sourceId =
         arch    <- findStringTag "Arch" tags
         return (epoch, release, arch)
 
-insertBuildSignature :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m (Maybe (Key BuildSignatures))
-insertBuildSignature sigs buildId =
-    case mkBuildSignature sigs of
-        Just sig -> liftM Just (insert sig)
-        Nothing  -> return Nothing
+insertBuildSignatures :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m [Key BuildSignatures]
+insertBuildSignatures sigs buildId = do
+    case (mkRSASignature sigs, mkSHASignature sigs) of
+        (Just rsa, Just sha) -> mapM insert [rsa, sha]
+        _                    -> return []
  where
-    mkBuildSignature :: [Tag] -> Maybe BuildSignatures
-    mkBuildSignature tags = do
+    mkRSASignature :: [Tag] -> Maybe BuildSignatures
+    mkRSASignature tags = do
         rsaSig <- findTag "RSAHeader" tags >>= \t -> tagValue t :: Maybe BS.ByteString
         return $ BuildSignatures buildId "RSA" rsaSig
+
+    mkSHASignature :: [Tag] -> Maybe BuildSignatures
+    mkSHASignature tags = do
+        shaSig <- findTag "SHA1Header" tags >>= \t -> (tagValue t :: Maybe String) >>= Just . pack
+        return $ BuildSignatures buildId "SHA1" shaSig
 
 --
 -- FILES
@@ -295,7 +300,7 @@ loadRPM RPM{..} = runSqlite "test.db" $ do
     projectId <- insertProject tags
     sourceId  <- insertSource tags projectId
     buildId   <- insertBuild tags sourceId
-    void $ insertBuildSignature sigs buildId
+    void $ insertBuildSignatures sigs buildId
     filesIds  <- insertFiles tags
 
     void $ associateFilesWithBuild filesIds buildId
