@@ -27,7 +27,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     name String
     summary String
     description String
-    homepage String
+    homepage String Maybe
     upstream_vcs String
     NameKey name
     deriving Eq Show

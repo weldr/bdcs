@@ -3,7 +3,7 @@ create table projects (
     name text not null unique,
     summary text not null,
     description text not null,
-    homepage text not null,
+    homepage text,
     upstream_vcs text not null
 );
 

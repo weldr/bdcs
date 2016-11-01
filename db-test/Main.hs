@@ -100,7 +100,7 @@ insertProject rpm =
         name        <- projectName
         summary     <- findByteStringTag "Summary" tags >>= Just . unpack
         description <- findByteStringTag "Description" tags >>= Just . unpack
-        homepage    <- findStringTag "URL" tags
+        let homepage = findStringTag "URL" tags
 
         -- FIXME:  Where to get this from?
         let upstream_vcs = "UPSTREAM_VCS"
