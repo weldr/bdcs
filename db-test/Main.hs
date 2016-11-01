@@ -7,7 +7,7 @@
 
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
 import           Control.Exception(Exception, catch, throw)
-import           Control.Monad(void, when)
+import           Control.Monad((>=>), liftM, void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
@@ -31,6 +31,15 @@ import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types
 
+--
+-- EXCEPTION HANDLING
+--
+
+-- A general purpose exception type for dealing with things that go wrong when working
+-- with the database.  This could be broken out into a lot more type constructors to
+-- make for an actually useful exception system.  In general, I dislike Haskell exceptions
+-- but runSqlite will roll back the entire transaction if an exception is raised.  That's
+-- a good reason to use them.
 data DBException = DBException
  deriving(Show, Typeable)
 
@@ -43,6 +52,10 @@ throwIfNothing _        exn = throw exn
 throwIfNothingOtherwise :: Exception e => Maybe a -> e -> (a -> b) -> b
 throwIfNothingOtherwise (Just v) _   fn = fn v
 throwIfNothingOtherwise _        exn _  = throw exn
+
+--
+-- INSPECTING THE RPM TAG TYPE
+--
 
 findTag :: String -> [Tag] -> Maybe Tag
 findTag name = find (\t -> name == showConstr (toConstr t))
@@ -73,8 +86,8 @@ findProject name = do
 
 insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
 insertProject rpm =
-    throwIfNothingOtherwise projectName DBException $ \n ->
-        findProject n >>= \case
+    throwIfNothingOtherwise projectName DBException $
+        findProject >=> \case
             Nothing   -> insert $ mkProject rpm `throwIfNothing` DBException
             Just proj -> return proj
  where
@@ -173,7 +186,7 @@ insertBuild rpm sourceId =
 insertBuildSignature :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m (Maybe (Key BuildSignatures))
 insertBuildSignature sigs buildId =
     case mkBuildSignature sigs of
-        Just sig -> insert sig >>= return . Just
+        Just sig -> liftM Just (insert sig)
         Nothing  -> return Nothing
  where
     mkBuildSignature :: [Tag] -> Maybe BuildSignatures
@@ -238,7 +251,7 @@ insertKeyValue k v =
     insert (KeyVal k v)
 
 --
--- WORKING WITH RPMS
+-- PACKAGES
 --
 
 -- select files.path
@@ -272,6 +285,10 @@ insertPackageName rpm =
                where_ (pkg ^. KeyValKey_value ==. val name)
                return (pkg ^. KeyValId)
         return (map unValue ndx)
+
+--
+-- WORKING WITH RPMS
+--
 
 loadRPM :: RPM -> IO ()
 loadRPM RPM{..} = runSqlite "test.db" $ do
