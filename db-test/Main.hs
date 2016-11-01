@@ -6,6 +6,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
+import           Control.Conditional(notM, whenM)
 import           Control.Exception(Exception, catch, throw)
 import           Control.Monad((>=>), void, when)
 import           Control.Monad.Except(runExceptT)
@@ -296,7 +297,7 @@ insertPackageName rpm =
 --
 
 loadRPM :: RPM -> IO ()
-loadRPM RPM{..} = runSqlite "test.db" $ do
+loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
     projectId <- insertProject tags
     sourceId  <- insertSource tags projectId
     buildId   <- insertBuild tags sourceId
@@ -330,6 +331,16 @@ processRPM path = void $ runExceptT $ runResourceT pipeline
 --
 -- MAIN
 --
+
+buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
+buildImported sigs = do
+    case findStringTag "SHA1Header" sigs of
+        Just sha -> do ndx <- select $ from $ \signatures -> do
+                              where_ (signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
+                                      signatures ^. BuildSignaturesSignature_data ==. val (pack sha))
+                              return (signatures ^. BuildSignaturesId)
+                       return $ not $ null ndx
+        Nothing  -> return False
 
 main :: IO ()
 main = do

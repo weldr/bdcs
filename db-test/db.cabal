@@ -28,6 +28,7 @@ executable test
                        attoparsec-binary,
                        base >= 4.7 && < 4.9,
                        bytestring >= 0.10 && < 0.11,
+                       cond,
                        conduit,
                        conduit-combinators,
                        conduit-extra,
