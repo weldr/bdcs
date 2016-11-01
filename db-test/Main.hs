@@ -41,10 +41,13 @@ import RPM.Types
 -- make for an actually useful exception system.  In general, I dislike Haskell exceptions
 -- but runSqlite will roll back the entire transaction if an exception is raised.  That's
 -- a good reason to use them.
-data DBException = DBException
- deriving(Show, Typeable)
+data DBException = DBException String
+ deriving(Typeable)
 
 instance Exception DBException
+
+instance Show DBException where
+    show (DBException s) = show s
 
 throwIfNothing :: Exception e => Maybe a -> e -> a
 throwIfNothing (Just v) _   = v
@@ -87,9 +90,9 @@ findProject name = do
 
 insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
 insertProject rpm =
-    throwIfNothingOtherwise projectName DBException $
+    throwIfNothingOtherwise projectName (DBException "No SourceRPM tag") $
         findProject >=> \case
-            Nothing   -> insert $ mkProject rpm `throwIfNothing` DBException
+            Nothing   -> insert $ mkProject rpm `throwIfNothing` (DBException "Couldn't make Projects record")
             Just proj -> return proj
  where
     mkProject :: [Tag] -> Maybe Projects
@@ -124,9 +127,9 @@ findSource version projectId = do
 
 insertSource :: MonadIO m => [Tag] -> Key Projects -> SqlPersistT m (Key Sources)
 insertSource rpm projectId =
-    throwIfNothingOtherwise sourceVersion DBException $ \v ->
+    throwIfNothingOtherwise sourceVersion (DBException "No Version tag") $ \v ->
         findSource v projectId >>= \case
-            Nothing  -> insert $ mkSource rpm `throwIfNothing` DBException
+            Nothing  -> insert $ mkSource rpm `throwIfNothing` (DBException "Couldn't make Sources record")
             Just src -> return src
  where
     mkSource :: [Tag] -> Maybe Sources
@@ -159,9 +162,9 @@ findBuild epoch release arch sourceId = do
 
 insertBuild :: MonadIO m => [Tag] -> Key Sources -> SqlPersistT m (Key Builds)
 insertBuild rpm sourceId =
-    throwIfNothingOtherwise (era rpm) DBException $ \(e, r, a) ->
+    throwIfNothingOtherwise (era rpm) (DBException "No Epoch/Release/Arch tag") $ \(e, r, a) ->
         findBuild e r a sourceId >>= \case
-            Nothing  -> insert $ mkBuild rpm `throwIfNothing` DBException
+            Nothing  -> insert $ mkBuild rpm `throwIfNothing` (DBException "Couldn't make Builds record")
             Just bld -> return bld
  where
     mkBuild :: [Tag] -> Maybe Builds
@@ -278,10 +281,10 @@ filesInPackage name = do
 
 insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
 insertPackageName rpm =
-    throwIfNothingOtherwise packageName DBException $ \name ->
+    throwIfNothingOtherwise packageName (DBException "No Name tag") $ \name ->
         findPackage name >>= \case
             [] -> insertKeyValue "packageName" name
-            _  -> throw DBException
+            _  -> throw $ DBException "Package does not exist in database"
  where
     packageName = findStringTag "Name" rpm
 
@@ -355,4 +358,4 @@ main = do
     mapM_ processOne argv
  where
     processOne path = catch (processRPM path)
-                            (\(_ :: DBException) -> void $ hPutStrLn stderr ("Error importing RPM: " ++ path))
+                            (\(e :: DBException) -> void $ hPutStrLn stderr ("Error importing RPM " ++ path ++ ": " ++ show e))
