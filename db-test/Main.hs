@@ -15,7 +15,7 @@ import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack, unpack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Data.Data(Typeable, cast, gmapQi, showConstr, toConstr)
-import           Data.List(find, zip7)
+import           Data.List(find)
 import           Data.Maybe(fromJust, fromMaybe, listToMaybe)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Data.Word(Word16, Word32)
@@ -31,6 +31,8 @@ import FileType(getFileType)
 import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types
+
+type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
 
 --
 -- EXCEPTION HANDLING
@@ -212,9 +214,9 @@ insertFiles rpm =
     mapM (insert . mkOneFiles)
          (zipFiles rpm)
  where
-    mkOneFiles :: (String, String, Int, String, String, Int, Maybe String) -> Files
-    mkOneFiles (path, digest, mode, user, group, mtime, target) =
-        Files path digest (getFileType mode) mode user group Nothing Nothing mtime target
+    mkOneFiles :: FileTuple -> Files
+    mkOneFiles (path, digest, mode, user, group, size, mtime, target) =
+        Files path digest (getFileType mode) mode user group size Nothing Nothing mtime target
 
     filePaths :: [Tag] -> [String]
     filePaths tags = let
@@ -224,8 +226,12 @@ insertFiles rpm =
      in
         zipWith (</>) (map (\i -> dirnames !! fromIntegral i) indexes) basenames
 
-    zipFiles :: [Tag] -> [(String, String, Int, String, String, Int, Maybe String)]
+    zipFiles :: [Tag] -> [FileTuple]
     zipFiles tags = let
+        megazip :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [g] -> [h] -> [(a, b, c, d, e, f, g, h)]
+        megazip (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs) (g:gs) (h:hs) = (a, b, c, d, e, f, g, h) : megazip as bs cs ds es fs gs hs
+        megazip _ _ _ _ _ _ _ _ = []
+
         strToMaybe s = if s == "" then Nothing else Just s
 
         maybeToList (Just l) = l
@@ -236,10 +242,11 @@ insertFiles rpm =
         modes   = maybeToList $ findTag "FileModes" tags     >>= \t -> (tagValue t :: Maybe [Word16]) >>= Just . map fromIntegral
         users   = findStringListTag "FileUserName" tags
         groups  = findStringListTag "FileGroupName" tags
+        sizes   = maybeToList $ findTag "FileSizes" tags     >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         mtimes  = maybeToList $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         targets = maybeToList $ findTag "FileLinkTos" tags   >>= \t -> (tagValue t :: Maybe [String]) >>= Just . map strToMaybe
      in
-        zip7 paths digests modes users groups mtimes targets
+        megazip paths digests modes users groups sizes mtimes targets
 
 associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
 associateFilesWithBuild files build =

@@ -55,6 +55,7 @@ create table files (
     file_mode integer not null,
     file_user text not null,
     file_group text not null,
+    file_size integer not null,
     device_major integer,
     device_minor integer,
     mtime integer not null,
