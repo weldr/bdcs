@@ -313,12 +313,6 @@ loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
 
     void $ associateFilesWithBuild filesIds buildId
     void $ insertPackageName tags >>= associateFilesWithPackage filesIds
-
-    -- FIXME:  The following lines are just an example to show that things are working.
-    -- This should be removed before really using this code.
-    let name = fromJust $ findStringTag "Name" tags
-    liftIO $ putStrLn $ "Loaded the following files from " ++ name ++ ":"
-    filesInPackage name >>= mapM_ (liftIO . putStrLn)
  where
     -- FIXME:  Be less stupid.
     sigs = headerTags $ head rpmHeaders
@@ -361,5 +355,5 @@ main = do
     initDB "test.db"
     mapM_ processOne argv
  where
-    processOne path = catch (processRPM path)
-                            (\(e :: DBException) -> void $ hPutStrLn stderr ("Error importing RPM " ++ path ++ ": " ++ show e))
+    processOne path = catch (processRPM path >> putStrLn ("Imported " ++ path))
+                            (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing RPM " ++ path ++ ": " ++ show e))
