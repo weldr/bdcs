@@ -216,7 +216,7 @@ insertFiles rpm =
  where
     mkOneFiles :: FileTuple -> Files
     mkOneFiles (path, digest, mode, user, group, size, mtime, target) =
-        Files path digest (getFileType mode) mode user group size Nothing Nothing mtime target
+        Files path digest (getFileType mode) mode user group size mtime target
 
     filePaths :: [Tag] -> [String]
     filePaths tags = let

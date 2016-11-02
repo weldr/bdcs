@@ -60,8 +60,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_user String
     file_group String
     file_size Int
-    device_major Int Maybe
-    device_minor Int Maybe
     mtime Int
     symlink_target String Maybe
     deriving Eq Show
