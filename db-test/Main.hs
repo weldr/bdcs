@@ -94,7 +94,7 @@ insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
 insertProject rpm =
     throwIfNothingOtherwise projectName (DBException "No SourceRPM tag") $
         findProject >=> \case
-            Nothing   -> insert $ mkProject rpm `throwIfNothing` (DBException "Couldn't make Projects record")
+            Nothing   -> insert $ mkProject rpm `throwIfNothing` DBException "Couldn't make Projects record"
             Just proj -> return proj
  where
     mkProject :: [Tag] -> Maybe Projects
@@ -131,7 +131,7 @@ insertSource :: MonadIO m => [Tag] -> Key Projects -> SqlPersistT m (Key Sources
 insertSource rpm projectId =
     throwIfNothingOtherwise sourceVersion (DBException "No Version tag") $ \v ->
         findSource v projectId >>= \case
-            Nothing  -> insert $ mkSource rpm `throwIfNothing` (DBException "Couldn't make Sources record")
+            Nothing  -> insert $ mkSource rpm `throwIfNothing` DBException "Couldn't make Sources record"
             Just src -> return src
  where
     mkSource :: [Tag] -> Maybe Sources
@@ -166,7 +166,7 @@ insertBuild :: MonadIO m => [Tag] -> Key Sources -> SqlPersistT m (Key Builds)
 insertBuild rpm sourceId =
     throwIfNothingOtherwise (era rpm) (DBException "No Epoch/Release/Arch tag") $ \(e, r, a) ->
         findBuild e r a sourceId >>= \case
-            Nothing  -> insert $ mkBuild rpm `throwIfNothing` (DBException "Couldn't make Builds record")
+            Nothing  -> insert $ mkBuild rpm `throwIfNothing` DBException "Couldn't make Builds record"
             Just bld -> return bld
  where
     mkBuild :: [Tag] -> Maybe Builds
@@ -190,7 +190,7 @@ insertBuild rpm sourceId =
         return (epoch, release, arch)
 
 insertBuildSignatures :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m [Key BuildSignatures]
-insertBuildSignatures sigs buildId = do
+insertBuildSignatures sigs buildId =
     case (mkRSASignature sigs, mkSHASignature sigs) of
         (Just rsa, Just sha) -> mapM insert [rsa, sha]
         _                    -> return []
@@ -270,9 +270,9 @@ insertKeyValue k v =
 -- select files.path
 -- from files,key_val,file_key_values
 -- on key_val.id == file_key_values.key_val_id and
---    file_key_values.file_id == files.id;
+--    file_key_values.file_id == files.id
 -- where key_val.key_value == "packageName" and
---       key_val.val_value == "python3-kickstart" and
+--       key_val.val_value == "python3-kickstart"
 filesInPackage :: MonadIO m => String -> SqlPersistT m [String]
 filesInPackage name = do
     results <- select $ from $ \(files `InnerJoin` key_val `InnerJoin` file_key_values) -> do
@@ -334,7 +334,7 @@ processRPM path = void $ runExceptT $ runResourceT pipeline
 --
 
 buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
-buildImported sigs = do
+buildImported sigs =
     case findStringTag "SHA1Header" sigs of
         Just sha -> do ndx <- select $ from $ \signatures -> do
                               where_ (signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
