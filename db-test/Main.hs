@@ -255,6 +255,10 @@ associateFilesWithPackage files package =
     mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
          (zip files $ repeat package)
 
+associateBuildWithPackage :: MonadIO m => Key Builds -> Key KeyVal -> SqlPersistT m (Key BuildKeyValues)
+associateBuildWithPackage buildId kvId =
+    insert $ BuildKeyValues buildId kvId
+
 --
 -- KEY/VALUE
 --
@@ -310,9 +314,11 @@ loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
     buildId   <- insertBuild tags sourceId
     void $ insertBuildSignatures sigs buildId
     filesIds  <- insertFiles tags
+    pkgNameId <- insertPackageName tags
 
     void $ associateFilesWithBuild filesIds buildId
-    void $ insertPackageName tags >>= associateFilesWithPackage filesIds
+    void $ associateFilesWithPackage filesIds pkgNameId
+    void $ associateBuildWithPackage buildId pkgNameId
  where
     -- FIXME:  Be less stupid.
     sigs = headerTags $ head rpmHeaders
