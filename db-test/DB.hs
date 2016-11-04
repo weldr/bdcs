@@ -63,14 +63,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     mtime Int
     symlink_target String Maybe
     deriving Eq Show
- FileAttributes
-    file_id FilesId
-    attribute_type String
-    attribute_value String
-    FileIdKey file_id
-    TypeKey file_id attribute_type attribute_value
-    XattrKey file_id attribute_type attribute_value
-    deriving Eq Show
  BuildFiles
     build_id BuildsId
     file_id FilesId
