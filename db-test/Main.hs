@@ -16,7 +16,7 @@ import           Data.ByteString.Char8(pack, unpack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Data.Data(Typeable, cast, gmapQi, showConstr, toConstr)
 import           Data.List(find)
-import           Data.Maybe(fromJust, fromMaybe, listToMaybe)
+import           Data.Maybe(fromMaybe, listToMaybe)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Data.Word(Word16, Word32)
 import           Database.Esqueleto
@@ -291,17 +291,19 @@ insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
 insertPackageName rpm =
     throwIfNothingOtherwise packageName (DBException "No Name tag") $ \name ->
         findPackage name >>= \case
-            [] -> insertKeyValue "packageName" name
-            _  -> throw $ DBException "Package does not exist in database"
+            Nothing -> insertKeyValue "packageName" name
+            Just p  -> return p
  where
     packageName = findStringTag "Name" rpm
 
-    findPackage :: MonadIO m => String -> SqlPersistT m [Key KeyVal]
+    findPackage :: MonadIO m => String -> SqlPersistT m (Maybe (Key KeyVal))
     findPackage name = do
         ndx <- select $ from $ \pkg -> do
-               where_ (pkg ^. KeyValKey_value ==. val name)
+               where_ (pkg ^. KeyValKey_value ==. val "packageName" &&.
+                       pkg ^. KeyValVal_value ==. val name)
+               limit 1
                return (pkg ^. KeyValId)
-        return (map unValue ndx)
+        return $ listToMaybe (map unValue ndx)
 
 --
 -- WORKING WITH RPMS
