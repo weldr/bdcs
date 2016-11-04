@@ -1,0 +1,76 @@
+* List contents of a package given by name.
+
+    select files.path
+    from files, key_val, file_key_values
+    on key_val.id == file_key_values.key_val_id and
+       file_key_values.file_id == files.id
+    where key_val.key_value == "packageName" and
+          key_val.val_value == "python3-kickstart"
+                               ^ YOUR RPM PACKAGE NAME HERE
+
+* List contents of a package given by NEVRA.
+
+    select files.path
+    from projects, sources, builds, files, build_files, key_val, file_key_values
+    on key_val.id == file_key_values.key_val_id and
+       file_key_values.file_id == files.id and
+       sources.project_id == projects.id and
+       builds.source_id == sources.id and
+       build_files.build_id == builds.id and
+       build_files.file_id == files.id
+    where key_val.key_value == "packageName" and
+          key_val.val_value == "pykickstart" and
+          sources.version == "1.99.66.6" and
+          builds.epoch == 0 and
+          builds.release == "1.el7" and
+          builds.arch == "noarch";
+
+* List contents of a build.
+
+    select files.path
+    from files, build_files, builds
+    on files.id == build_files.file_id and
+       builds.id == build_files.build_id
+    where builds.id == 1;
+                       ^ YOUR BUILD ID HERE.
+
+* Find the source package name for a given subpackage.
+
+    select projects.name
+    from projects, sources, builds, build_key_values, key_val
+    on projects.id == sources.project_id and
+       sources.id == builds.source_id and
+       builds.id == build_key_values.build_id and
+       key_val.id == build_key_values.key_val_id
+    where key_val.key_value == "packageName" and
+          key_val.val_value == "anaconda-tui";
+                               ^ YOUR SUBPACKAGE NAME HERE
+
+* Find all packages that contain a given filename.
+
+    select projects.name
+    from builds, files, build_files, sources, projects
+    on builds.id == build_files.build_id and
+       files.id == build_files.file_id and
+       builds.source_id == sources.id and
+       sources.project_id == projects.id
+    where files.path == "/usr/bin/ls";
+                        ^ YOUR FILENAME HERE
+
+* Find all builds that contain a given filename.
+
+    select builds.*
+    from builds, files, build_files
+    on build_files.build_id == builds.id and
+       build_files.file_id == files.id
+    where files.path == "/usr/bin/ksvalidator";
+                        ^ YOUR FILENAME HERE
+
+* Find all builds that match a given package name.
+
+    select builds.*
+    from builds, sources, projects
+    on builds.source_id == sources.id and
+       sources.project_id == projects.id
+    where projects.name == "coreutils-8.22-15.el7.src.rpm";
+                           ^ YOUR PACKAGE NAME HERE
