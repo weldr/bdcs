@@ -21,6 +21,7 @@ import System.Directory(createDirectoryIfMissing)
 import System.FilePath.Posix(takeDirectory)
 
 import FileType
+import ReqType
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects
@@ -86,6 +87,32 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  FileKeyValues
     file_id FilesId
     key_val_id KeyValId
+    deriving Eq Show
+ Groups
+    name String
+    group_type String
+    deriving Eq Show
+ GroupFiles
+    group_id GroupsId
+    file_id FilesId
+    deriving Eq Show
+ GroupGroups
+    parent_group_id GroupsId
+    child_group_id GroupsId
+    deriving Eq Show
+ GroupKeyValues
+    group_id GroupsId
+    key_val_id KeyValId
+    deriving Eq Show
+ Requirements
+    req_language ReqLanguage
+    req_context ReqContext
+    req_strength ReqStrength
+    req_expr String
+    deriving Eq Show
+ GroupRequirements
+    group_id GroupsId
+    req_id RequirementsId
     deriving Eq Show
  |]
 

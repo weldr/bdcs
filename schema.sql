@@ -91,3 +91,42 @@ create table file_key_values (
     key_val_id integer references key_val(id) not null
 );
 
+
+-- Groups of things. e.g., a rpm subpackage, a comps group, a module
+-- This differs from file tags in that a group can contain other groups in
+-- addition to individual files, and a group can be empty.
+create table groups (
+    id integer primary key,
+    name text not null,
+    group_type text not null,
+    constraint unique_name_type unique (name, group_type)
+);
+
+create table group_files (
+    group_id integer references groups(id) not null,
+    file_id integer references files(id) not null
+);
+
+-- FIXME how do you prevent cycles in this thing?
+create table group_groups (
+    parent_group_id references groups(id) not null,
+    child_group_id references groups(id) not null
+);
+
+create table group_key_values (
+    group_id integer references groups(id) not null,
+    key_val_id integer references key_val(id) not null
+);
+
+create table requirements (
+    id integer primary key,
+    req_language text not null,
+    req_context text not null,
+    req_strength text not null,
+    req_expr text not null
+);
+
+create table group_requirements (
+    group_id integer references groups(id) not null,
+    req_id integer references requirements(id) not null
+);
