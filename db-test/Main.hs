@@ -27,6 +27,7 @@ import           System.FilePath.Posix((</>))
 import           System.IO(hPutStrLn, stderr)
 
 import DB
+import qualified ReqType as RT
 import FileType(getFileType)
 import RPM.Parse(parseRPMC)
 import RPM.Tags
@@ -259,6 +260,41 @@ associateBuildWithPackage :: MonadIO m => Key Builds -> Key KeyVal -> SqlPersist
 associateBuildWithPackage buildId kvId =
     insert $ BuildKeyValues buildId kvId
 
+createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
+createGroup fileIds tags = do
+    -- Get the NEVRA so it can be saved as attributes
+    -- FIXME epoch, ignoring right now since it's optional, also using fromMaybe here seems probably bad
+    let name = fromMaybe "" $ findStringTag "Name" tags
+    let version = fromMaybe "" $ findStringTag "Version" tags
+    let release = fromMaybe "" $ findStringTag "Release" tags
+    let arch = fromMaybe "" $ findStringTag "Arch" tags
+
+    -- Create the groups row
+    groupId <- insert $ Groups name "rpm"
+
+    -- Create the group_files rows
+    void $ mapM (\fId -> insert $ GroupFiles groupId fId) fileIds
+
+    -- Create the (E)NVRA attributes
+    -- FIXME could at least deduplicate name and arch real easy
+    void $ insertKeyValue "name" name >>= \kvId -> insert $ GroupKeyValues groupId kvId
+    void $ insertKeyValue "version" version >>= \kvId -> insert $ GroupKeyValues groupId kvId
+    void $ insertKeyValue "release" release >>= \kvId -> insert $ GroupKeyValues groupId kvId
+    void $ insertKeyValue "arch" arch >>= \kvId -> insert $ GroupKeyValues groupId kvId
+
+    -- Create the Provides attributes
+    -- TODO versions, flags
+    void $ mapM (\provide -> insertKeyValue "rpm-provide" provide >>= \kvId -> insert $ GroupKeyValues groupId kvId)
+                (findStringListTag "ProvideName" tags)
+
+    -- Create the requirements
+    -- TODO versions, flags
+    reqIdList <- mapM (\reqName -> insert $ Requirements RT.RPM RT.Runtime RT.Must reqName)
+                      (findStringListTag "RequireName" tags)
+    void $ mapM (\reqId -> insert $ GroupRequirements groupId reqId) reqIdList
+
+    return groupId
+
 --
 -- KEY/VALUE
 --
@@ -321,6 +357,10 @@ loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId
     void $ associateBuildWithPackage buildId pkgNameId
+
+    -- groups and reqs
+    -- groupId <- createGroup filesIds tags
+    void $ createGroup filesIds tags
  where
     -- FIXME:  Be less stupid.
     sigs = headerTags $ head rpmHeaders

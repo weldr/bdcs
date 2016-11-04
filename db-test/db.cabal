@@ -8,6 +8,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     DB,
                        FileType
+                       ReqType
 
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
