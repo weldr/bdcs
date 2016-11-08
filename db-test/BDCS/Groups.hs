@@ -1,9 +1,12 @@
-module BDCS.Groups(createGroup)
+{-# LANGUAGE LambdaCase #-}
+
+module BDCS.Groups(createGroup,
+                   findRequires)
  where
 
-import Control.Monad(void)
+import Control.Monad(forM_, void)
 import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(fromMaybe)
+import Data.Maybe(fromMaybe, listToMaybe)
 import Database.Esqueleto
 
 import           BDCS.DB
@@ -40,8 +43,22 @@ createGroup fileIds tags = do
 
     -- Create the requirements
     -- TODO versions, flags
-    reqIdList <- mapM (\reqName -> insert $ Requirements RT.RPM RT.Runtime RT.Must reqName)
-                      (findStringListTag "RequireName" tags)
-    void $ mapM (\reqId -> insert $ GroupRequirements groupId reqId) reqIdList
+    forM_ (findStringListTag "RequireName" tags) $ \reqName -> do
+        reqId <- findRequires RT.RPM RT.Runtime RT.Must reqName >>= \case
+                     Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must reqName
+                     Just rid -> return rid
+
+        void $ insert $ GroupRequirements groupId reqId
 
     return groupId
+
+findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
+findRequires reqLang reqCtx reqStrength reqName = do
+    ndx <- select $ from $ \r -> do
+           where_ (r ^. RequirementsReq_language ==. val reqLang &&.
+                   r ^. RequirementsReq_context ==. val reqCtx &&.
+                   r ^. RequirementsReq_strength ==. val reqStrength &&.
+                   r ^. RequirementsReq_expr ==. val reqName)
+           limit 1
+           return (r ^. RequirementsId)
+    return $ listToMaybe (map unValue ndx)
