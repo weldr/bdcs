@@ -9,6 +9,7 @@ library
   exposed-modules:     BDCS.Builds,
                        BDCS.DB,
                        BDCS.Exceptions,
+                       BDCS.Files,
                        BDCS.FileType,
                        BDCS.Projects,
                        BDCS.ReqType,
