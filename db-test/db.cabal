@@ -12,6 +12,7 @@ library
                        BDCS.Files,
                        BDCS.FileType,
                        BDCS.KeyValue,
+                       BDCS.Packages,
                        BDCS.Projects,
                        BDCS.ReqType,
                        BDCS.Sources
