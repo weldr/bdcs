@@ -25,9 +25,9 @@ import           System.Exit(exitFailure)
 import           System.FilePath.Posix((</>))
 import           System.IO(hPutStrLn, stderr)
 
-import DB
-import qualified ReqType as RT
-import FileType(getFileType)
+import BDCS.DB
+import qualified BDCS.ReqType as RT
+import BDCS.FileType(getFileType)
 import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types

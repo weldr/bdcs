@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module FileType where
+module BDCS.FileType where
 
 import Data.Bits((.&.))
 import Database.Persist.TH

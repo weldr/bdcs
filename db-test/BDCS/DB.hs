@@ -8,7 +8,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
-module DB where
+module BDCS.DB where
 
 import Control.Monad(void)
 import Data.ByteString(ByteString)
@@ -20,8 +20,8 @@ import Database.Persist.TH
 import System.Directory(createDirectoryIfMissing)
 import System.FilePath.Posix(takeDirectory)
 
-import FileType
-import ReqType
+import BDCS.FileType
+import BDCS.ReqType
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects

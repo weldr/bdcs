@@ -1,6 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 
-module ReqType where
+module BDCS.ReqType where
 
 import Database.Persist.TH
 
