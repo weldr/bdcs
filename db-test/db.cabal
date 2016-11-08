@@ -9,6 +9,7 @@ library
   exposed-modules:     BDCS.DB,
                        BDCS.Exceptions,
                        BDCS.FileType,
+                       BDCS.Projects,
                        BDCS.ReqType
 
   build-depends:       base >=4.8 && <4.9,

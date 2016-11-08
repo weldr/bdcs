@@ -8,11 +8,11 @@
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
 import           Control.Conditional(notM, whenM)
 import           Control.Exception(catch)
-import           Control.Monad((>=>), void, when)
+import           Control.Monad(void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
-import           Data.ByteString.Char8(pack, unpack)
+import           Data.ByteString.Char8(pack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Data.Maybe(fromMaybe, listToMaybe)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
@@ -24,50 +24,16 @@ import           System.Exit(exitFailure)
 import           System.FilePath.Posix((</>))
 import           System.IO(hPutStrLn, stderr)
 
-import BDCS.DB
-import BDCS.Exceptions
+import           BDCS.DB
+import           BDCS.Exceptions
+import           BDCS.FileType(getFileType)
+import           BDCS.Projects(insertProject)
 import qualified BDCS.ReqType as RT
-import BDCS.FileType(getFileType)
-import RPM.Parse(parseRPMC)
-import RPM.Tags
-import RPM.Types
+import           RPM.Parse(parseRPMC)
+import           RPM.Tags
+import           RPM.Types
 
 type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
-
---
--- PROJECTS
---
-
-findProject :: MonadIO m => String -> SqlPersistT m (Maybe (Key Projects))
-findProject name = do
-    ndx <- select $ from $ \proj -> do
-           where_ (proj ^. ProjectsName ==. val name)
-           limit 1
-           return (proj ^. ProjectsId)
-    return $ listToMaybe (map unValue ndx)
-
-insertProject :: MonadIO m => [Tag] -> SqlPersistT m (Key Projects)
-insertProject rpm =
-    throwIfNothingOtherwise projectName (DBException "No SourceRPM tag") $
-        findProject >=> \case
-            Nothing   -> insert $ mkProject rpm `throwIfNothing` DBException "Couldn't make Projects record"
-            Just proj -> return proj
- where
-    mkProject :: [Tag] -> Maybe Projects
-    mkProject tags = do
-        name        <- projectName
-        summary     <- findByteStringTag "Summary" tags >>= Just . unpack
-        description <- findByteStringTag "Description" tags >>= Just . unpack
-        let homepage = findStringTag "URL" tags
-
-        -- FIXME:  Where to get this from?
-        let upstream_vcs = "UPSTREAM_VCS"
-
-        return $ Projects name summary description homepage upstream_vcs
-
-    -- FIXME:  SourceRPM looks like "pykickstart-2.32-1.fc26.src.rpm", but we really just want "pykickstart"
-    -- here.  I'll get to that.
-    projectName = findStringTag "SourceRPM" rpm
 
 --
 -- SOURCES
