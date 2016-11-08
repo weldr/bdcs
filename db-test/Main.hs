@@ -27,30 +27,11 @@ import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFile
 import BDCS.Groups(createGroup)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
+import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
 import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types
-
---
--- BUILDS
---
-
-insertBuildSignatures :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m [Key BuildSignatures]
-insertBuildSignatures sigs buildId =
-    case (mkRSASignature sigs, mkSHASignature sigs) of
-        (Just rsa, Just sha) -> mapM insert [rsa, sha]
-        _                    -> return []
- where
-    mkRSASignature :: [Tag] -> Maybe BuildSignatures
-    mkRSASignature tags = do
-        rsaSig <- findTag "RSAHeader" tags >>= \t -> tagValue t :: Maybe BS.ByteString
-        return $ BuildSignatures buildId "RSA" rsaSig
-
-    mkSHASignature :: [Tag] -> Maybe BuildSignatures
-    mkSHASignature tags = do
-        shaSig <- findTag "SHA1Header" tags >>= \t -> (tagValue t :: Maybe String) >>= Just . pack
-        return $ BuildSignatures buildId "SHA1" shaSig
 
 --
 -- WORKING WITH RPMS

@@ -16,6 +16,7 @@ library
                        BDCS.Packages,
                        BDCS.Projects,
                        BDCS.ReqType,
+                       BDCS.Signatures,
                        BDCS.Sources
 
   build-depends:       base >=4.8 && <4.9,
