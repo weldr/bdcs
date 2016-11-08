@@ -14,8 +14,7 @@ import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack, unpack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
-import           Data.Data(Typeable, cast, gmapQi, showConstr, toConstr)
-import           Data.List(find)
+import           Data.Data(Typeable)
 import           Data.Maybe(fromMaybe, listToMaybe)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Data.Word(Word16, Word32)
@@ -63,21 +62,6 @@ throwIfNothingOtherwise _        exn _  = throw exn
 --
 -- INSPECTING THE RPM TAG TYPE
 --
-
-findTag :: String -> [Tag] -> Maybe Tag
-findTag name = find (\t -> name == showConstr (toConstr t))
-
-findByteStringTag :: String -> [Tag] -> Maybe BS.ByteString
-findByteStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe BS.ByteString
-
-findStringTag :: String -> [Tag] -> Maybe String
-findStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe String
-
-findStringListTag :: String -> [Tag] -> [String]
-findStringListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [String]
-
-tagValue :: Typeable a => Tag -> Maybe a
-tagValue = gmapQi 0 cast
 
 --
 -- PROJECTS
