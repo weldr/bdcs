@@ -11,6 +11,7 @@ library
                        BDCS.Exceptions,
                        BDCS.Files,
                        BDCS.FileType,
+                       BDCS.KeyValue,
                        BDCS.Projects,
                        BDCS.ReqType,
                        BDCS.Sources

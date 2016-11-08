@@ -25,6 +25,7 @@ import           BDCS.Builds(associateBuildWithPackage, insertBuild)
 import           BDCS.DB
 import           BDCS.Exceptions
 import           BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
+import           BDCS.KeyValue(insertKeyValue)
 import           BDCS.Projects(insertProject)
 import qualified BDCS.ReqType as RT
 import           BDCS.Sources(insertSource)
@@ -86,14 +87,6 @@ createGroup fileIds tags = do
     void $ mapM (\reqId -> insert $ GroupRequirements groupId reqId) reqIdList
 
     return groupId
-
---
--- KEY/VALUE
---
-
-insertKeyValue :: MonadIO m => String -> String -> SqlPersistT m (Key KeyVal)
-insertKeyValue k v =
-    insert (KeyVal k v)
 
 --
 -- PACKAGES
