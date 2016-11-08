@@ -15,7 +15,6 @@ import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Data.Maybe(fromMaybe, listToMaybe)
-import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Data.Word(Word16, Word32)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
@@ -24,6 +23,7 @@ import           System.Exit(exitFailure)
 import           System.FilePath.Posix((</>))
 import           System.IO(hPutStrLn, stderr)
 
+import           BDCS.Builds(associateBuildWithPackage, insertBuild)
 import           BDCS.DB
 import           BDCS.Exceptions
 import           BDCS.FileType(getFileType)
@@ -39,45 +39,6 @@ type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
 --
 -- BUILDS
 --
-
-findBuild :: MonadIO m => Int -> String -> String -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
-findBuild epoch release arch sourceId = do
-    -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
-    ndx <- select $ from $ \build -> do
-           where_ (build ^. BuildsSource_id ==. val sourceId &&.
-                   build ^. BuildsEpoch ==. val epoch &&.
-                   build ^. BuildsRelease ==. val release &&.
-                   build ^. BuildsArch ==. val arch)
-           limit 1
-           return (build ^. BuildsId)
-    return $ listToMaybe (map unValue ndx)
-
-insertBuild :: MonadIO m => [Tag] -> Key Sources -> SqlPersistT m (Key Builds)
-insertBuild rpm sourceId =
-    throwIfNothingOtherwise (era rpm) (DBException "No Epoch/Release/Arch tag") $ \(e, r, a) ->
-        findBuild e r a sourceId >>= \case
-            Nothing  -> insert $ mkBuild rpm `throwIfNothing` DBException "Couldn't make Builds record"
-            Just bld -> return bld
- where
-    mkBuild :: [Tag] -> Maybe Builds
-    mkBuild tags = do
-        (epoch, release, arch) <- era tags
-        build_time <- findTag "BuildTime"     tags >>= \t -> (tagValue t :: Maybe Word32)   >>= Just . posixSecondsToUTCTime . realToFrac
-        -- FIXME: RPM splits the changelog up into three tag types.  I'm just grabbing the text here for now.
-        changelog  <- findTag "ChangeLogText" tags >>= \t -> (tagValue t :: Maybe [String]) >>= Just . head >>= Just . pack
-
-        -- FIXME:  Where to get these from?
-        let build_config_ref = "BUILD_CONFIG_REF"
-        let build_env_ref = "BUILD_ENV_REF"
-
-        return $ Builds sourceId epoch release arch build_time changelog build_config_ref build_env_ref
-
-    era :: [Tag] -> Maybe (Int, String, String)
-    era tags = do
-        epoch   <- maybe (Just 0) (\t -> (tagValue t :: Maybe Word32) >>= Just . fromIntegral) (findTag "Epoch" tags)
-        release <- findStringTag "Release" tags
-        arch    <- findStringTag "Arch" tags
-        return (epoch, release, arch)
 
 insertBuildSignatures :: MonadIO m => [Tag] -> Key Builds -> SqlPersistT m [Key BuildSignatures]
 insertBuildSignatures sigs buildId =
@@ -144,10 +105,6 @@ associateFilesWithPackage :: MonadIO m => [Key Files] -> Key KeyVal -> SqlPersis
 associateFilesWithPackage files package =
     mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
          (zip files $ repeat package)
-
-associateBuildWithPackage :: MonadIO m => Key Builds -> Key KeyVal -> SqlPersistT m (Key BuildKeyValues)
-associateBuildWithPackage buildId kvId =
-    insert $ BuildKeyValues buildId kvId
 
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds tags = do

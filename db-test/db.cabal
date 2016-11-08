@@ -6,7 +6,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     BDCS.DB,
+  exposed-modules:     BDCS.Builds,
+                       BDCS.DB,
                        BDCS.Exceptions,
                        BDCS.FileType,
                        BDCS.Projects,
