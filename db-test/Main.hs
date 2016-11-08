@@ -7,14 +7,13 @@
 
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
 import           Control.Conditional(notM, whenM)
-import           Control.Exception(Exception, catch, throw)
+import           Control.Exception(catch)
 import           Control.Monad((>=>), void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack, unpack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
-import           Data.Data(Typeable)
 import           Data.Maybe(fromMaybe, listToMaybe)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Data.Word(Word16, Word32)
@@ -26,6 +25,7 @@ import           System.FilePath.Posix((</>))
 import           System.IO(hPutStrLn, stderr)
 
 import BDCS.DB
+import BDCS.Exceptions
 import qualified BDCS.ReqType as RT
 import BDCS.FileType(getFileType)
 import RPM.Parse(parseRPMC)
@@ -33,35 +33,6 @@ import RPM.Tags
 import RPM.Types
 
 type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
-
---
--- EXCEPTION HANDLING
---
-
--- A general purpose exception type for dealing with things that go wrong when working
--- with the database.  This could be broken out into a lot more type constructors to
--- make for an actually useful exception system.  In general, I dislike Haskell exceptions
--- but runSqlite will roll back the entire transaction if an exception is raised.  That's
--- a good reason to use them.
-data DBException = DBException String
- deriving(Typeable)
-
-instance Exception DBException
-
-instance Show DBException where
-    show (DBException s) = show s
-
-throwIfNothing :: Exception e => Maybe a -> e -> a
-throwIfNothing (Just v) _   = v
-throwIfNothing _        exn = throw exn
-
-throwIfNothingOtherwise :: Exception e => Maybe a -> e -> (a -> b) -> b
-throwIfNothingOtherwise (Just v) _   fn = fn v
-throwIfNothingOtherwise _        exn _  = throw exn
-
---
--- INSPECTING THE RPM TAG TYPE
---
 
 --
 -- PROJECTS
