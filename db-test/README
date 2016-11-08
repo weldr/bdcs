@@ -1,6 +1,4 @@
-Download the haskell-rpm repo.  You don't have to build it.  You do have to
-remove everything from rpm.cabal after the library section.  I don't know
-why yet.  Then:
+Download the haskell-rpm repo.  You don't have to build it.  Then:
 
 $ cabal sandbox init
 $ cabal sandbox add-source ~/src/haskell-rpm/
