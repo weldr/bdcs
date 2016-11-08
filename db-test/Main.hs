@@ -29,44 +29,12 @@ import           BDCS.Exceptions
 import           BDCS.FileType(getFileType)
 import           BDCS.Projects(insertProject)
 import qualified BDCS.ReqType as RT
+import           BDCS.Sources(insertSource)
 import           RPM.Parse(parseRPMC)
 import           RPM.Tags
 import           RPM.Types
 
 type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
-
---
--- SOURCES
---
-
-findSource :: MonadIO m => String -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
-findSource version projectId = do
-    -- FIXME:  Is (project_id, version) unique in Sources?
-    ndx <- select $ from $ \src -> do
-           where_ (src ^. SourcesProject_id ==. val projectId &&.
-                   src ^. SourcesVersion    ==. val version)
-           limit 1
-           return (src ^. SourcesId)
-    return $ listToMaybe (map unValue ndx)
-
-insertSource :: MonadIO m => [Tag] -> Key Projects -> SqlPersistT m (Key Sources)
-insertSource rpm projectId =
-    throwIfNothingOtherwise sourceVersion (DBException "No Version tag") $ \v ->
-        findSource v projectId >>= \case
-            Nothing  -> insert $ mkSource rpm `throwIfNothing` DBException "Couldn't make Sources record"
-            Just src -> return src
- where
-    mkSource :: [Tag] -> Maybe Sources
-    mkSource tags = do
-        license <- findStringTag "License" tags
-        version <- sourceVersion
- 
-        -- FIXME:  Where to get this from?
-        let source_ref = "SOURCE_REF"
-
-        return $ Sources projectId license version source_ref
-
-    sourceVersion = findStringTag "Version" rpm
 
 --
 -- BUILDS

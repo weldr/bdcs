@@ -10,7 +10,8 @@ library
                        BDCS.Exceptions,
                        BDCS.FileType,
                        BDCS.Projects,
-                       BDCS.ReqType
+                       BDCS.ReqType,
+                       BDCS.Sources
 
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
@@ -20,8 +21,10 @@ library
                        persistent,
                        persistent-sqlite,
                        persistent-template,
+                       rpm,
                        text,
-                       time
+                       time,
+                       transformers
   default-language:    Haskell2010
 
 executable test
