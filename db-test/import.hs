@@ -1,6 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -16,6 +15,7 @@ import           Data.ByteString.Char8(pack)
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
+import qualified Data.Text as T
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           System.IO(hPutStrLn, stderr)
@@ -37,8 +37,8 @@ import RPM.Types
 -- WORKING WITH RPMS
 --
 
-loadRPM :: RPM -> IO ()
-loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
+loadRPM :: FilePath -> RPM -> IO ()
+loadRPM db RPM{..} = runSqlite (T.pack db) $ whenM (notM $ buildImported sigs) $ do
     projectId <- insertProject tags
     sourceId  <- insertSource tags projectId
     buildId   <- insertBuild tags sourceId
@@ -58,8 +58,8 @@ loadRPM RPM{..} = runSqlite "test.db" $ whenM (notM $ buildImported sigs) $ do
     sigs = headerTags $ head rpmHeaders
     tags = headerTags $ rpmHeaders !! 1
 
-processRPM :: FilePath -> IO ()
-processRPM path = void $ runExceptT $ runResourceT pipeline
+processRPM :: FilePath -> FilePath -> IO ()
+processRPM db path = void $ runExceptT $ runResourceT pipeline
  where
     pipeline = getRPM path =$= parseRPMC $$ consumer
 
@@ -67,7 +67,7 @@ processRPM path = void $ runExceptT $ runResourceT pipeline
     getRPM = sourceFile
 
     consumer :: MonadIO m => Consumer RPM m ()
-    consumer = awaitForever (liftIO . loadRPM)
+    consumer = awaitForever (liftIO . loadRPM db)
 
 --
 -- MAIN
@@ -92,8 +92,10 @@ main = do
         putStrLn "Usage: test RPM [RPM ...]"
         exitFailure
 
-    initDB "test.db"
+    initDB db
     mapM_ processOne argv
  where
-    processOne path = catch (processRPM path >> putStrLn ("Imported " ++ path))
+    db = "test.db"
+
+    processOne path = catch (processRPM db path >> putStrLn ("Imported " ++ path))
                             (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing RPM " ++ path ++ ": " ++ show e))
