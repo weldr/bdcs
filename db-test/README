@@ -1,7 +1,18 @@
-Download the haskell-rpm repo.  You don't have to build it.  Then:
+This code requires haskell-rpm which is a separate git repo, but is also
+a subtree in this git repo.  So you don't really need to go get it separately.
+
+RUNNING LOCALLY
+===============
 
 $ cabal sandbox init
-$ cabal sandbox add-source ~/src/haskell-rpm/
 $ cabal install --dependencies-only
 $ cabal build
-$ cabal run import -- metadata.db [list of RPMs here]
+$ cabal run import -- metadata.db Packages/*rpm
+
+
+RUNNING DOCKERLY
+================
+
+$ cd ..
+$ sudo docker build -t bdcs .
+$ sudo docker run -v /home/clumens/mddb:/mddb -v /home/clumens/Packages:/rpms:ro --rm -it bdcs
