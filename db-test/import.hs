@@ -88,14 +88,15 @@ main = do
     -- Read the list of rpms to process from the command line arguments
     argv <- getArgs
 
-    when (length argv < 1) $ do
-        putStrLn "Usage: test RPM [RPM ...]"
+    when (length argv < 2) $ do
+        putStrLn "Usage: test output.db RPM [RPM ...]"
         exitFailure
 
-    initDB db
-    mapM_ processOne argv
- where
-    db = "test.db"
+    let db   = head argv
+    let rpms = tail argv
 
-    processOne path = catch (processRPM db path >> putStrLn ("Imported " ++ path))
-                            (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing RPM " ++ path ++ ": " ++ show e))
+    initDB db
+    mapM_ (processOne db) rpms
+ where
+    processOne db path = catch (processRPM db path >> putStrLn ("Imported " ++ path))
+                               (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing RPM " ++ path ++ ": " ++ show e))

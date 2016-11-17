@@ -4,4 +4,4 @@ $ cabal sandbox init
 $ cabal sandbox add-source ~/src/haskell-rpm/
 $ cabal install --dependencies-only
 $ cabal build
-$ cabal run import -- [list of RPMs here]
+$ cabal run import -- metadata.db [list of RPMs here]
