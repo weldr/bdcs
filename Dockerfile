@@ -9,6 +9,8 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 COPY haskell-rpm /root/bdcs/haskell-rpm/
 COPY db-test /root/bdcs/db-test/
+# ensure any local sandbox stuff doesn't mess up the installs
+RUN rm -f /root/bdcs/*/cabal.sandbox.config
 
 RUN cd /root/bdcs/haskell-rpm && cabal install
 RUN cd /root/bdcs/db-test && cabal install
