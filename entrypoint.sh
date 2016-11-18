@@ -1,3 +1,3 @@
 #!/bin/bash
 
-/root/.cabal/bin/import /mddb/metadata.db /rpms/*rpm
+/usr/local/bin/import /mddb/metadata.db /rpms/*rpm
