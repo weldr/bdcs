@@ -1,3 +1,9 @@
+ifdef WORKSPACE
+d = ${WORKSPACE}
+else
+d = ${PWD}
+endif
+
 importer:
 	docker build -t build-img -f Dockerfile.build .
 	docker create --name build-cont build-img
@@ -6,7 +12,7 @@ importer:
 	docker build -t import-img .
 
 mddb:
-	-rm ${PWD}/mddb/metadata.db
-	docker run -v ${PWD}/mddb:/mddb -v ${PWD}/rpms:/rpms:ro --rm -it import-img
+	-rm ${d}/mddb/metadata.db
+	docker run -v ${d}/mddb:/mddb -v ${d}/rpms:/rpms:ro --rm -it import-img
 
 .PHONY: importer mddb
