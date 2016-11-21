@@ -8,3 +8,5 @@ importer:
 mddb:
 	-rm ${PWD}/mddb/metadata.db
 	docker run -v ${PWD}/mddb:/mddb -v ${PWD}/rpms:/rpms:ro --rm -it import-img
+
+.PHONY: importer mddb
