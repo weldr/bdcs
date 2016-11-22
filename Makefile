@@ -12,7 +12,7 @@ importer:
 	docker build -t import-img .
 
 mddb:
-	-rm ${d}/mddb/metadata.db
+	if [ -f ${d}/mddb/metadata.db ]; then rm ${d}/mddb/metadata.db; fi
 	docker run -v ${d}/mddb:/mddb -v ${d}/rpms:/rpms:ro --rm -it import-img
 
 .PHONY: importer mddb
