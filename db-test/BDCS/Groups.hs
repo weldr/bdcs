@@ -10,7 +10,7 @@ import Data.Maybe(fromMaybe, listToMaybe)
 import Database.Esqueleto
 
 import           BDCS.DB
-import           BDCS.KeyValue(insertKeyValue)
+import           BDCS.KeyValue(findKeyValue, insertKeyValue)
 import qualified BDCS.ReqType as RT
 import           RPM.Tags(Tag, findStringTag, findStringListTag)
 
@@ -31,15 +31,17 @@ createGroup fileIds tags = do
 
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
-    void $ insertKeyValue "name" name >>= \kvId -> insert $ GroupKeyValues groupId kvId
-    void $ insertKeyValue "version" version >>= \kvId -> insert $ GroupKeyValues groupId kvId
-    void $ insertKeyValue "release" release >>= \kvId -> insert $ GroupKeyValues groupId kvId
-    void $ insertKeyValue "arch" arch >>= \kvId -> insert $ GroupKeyValues groupId kvId
+    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \(k, v) ->
+        findKeyValue k v >>= \case
+            Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
+            Just kv -> insert $ GroupKeyValues groupId kv
 
     -- Create the Provides attributes
     -- TODO versions, flags
-    void $ mapM (\provide -> insertKeyValue "rpm-provide" provide >>= \kvId -> insert $ GroupKeyValues groupId kvId)
-                (findStringListTag "ProvideName" tags)
+    mapM_ (\provide -> findKeyValue "rpm-provide" provide >>= \case
+                           Nothing -> insertKeyValue "rpm-provide" provide >>= \kvId -> insert $ GroupKeyValues groupId kvId
+                           Just kv -> insert $ GroupKeyValues groupId kv)
+          (findStringListTag "ProvideName" tags)
 
     -- Create the requirements
     -- TODO versions, flags
