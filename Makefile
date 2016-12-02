@@ -12,7 +12,7 @@ importer:
 	docker build -t import-img .
 
 mddb:
-	if [ -f ${d}/mddb/metadata.db ]; then rm ${d}/mddb/metadata.db; fi
-	docker run -v ${d}/mddb:/mddb -v ${d}/rpms:/rpms:ro --rm import-img
+	docker volume create -d local --opt o=size=2GB --name bdcs-mddb-volume
+	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:ro --rm import-img
 
 .PHONY: importer mddb
