@@ -1,3 +1,19 @@
+-- This describes the schema used by the metadata database (mddb).  We
+-- considered several options for how to implement the mddb, finally deciding
+-- upon sqlite (though, other relational databases would also be fine).  We
+-- would like the mddb to eventually hold the data for multiple builds of each
+-- package from many releases.  This could mean hundreds of millions of rows
+-- needed to store the files.  Thus, the ability to work with a fairly large
+-- database is important.
+--
+-- We evaluated document-based databases like mongodb but found it too slow and
+-- a little unwieldy to use for our purposes.  We also evaluated key/value
+-- systems like redis but found that accessing data was slow unless you add
+-- your own index algorithm.  And if you're going to do that, you might as well
+-- use something that already provides indexing.  Add sqlite's ubiquity and
+-- the ability to move to another relational database if needed, and the
+-- decision was made.
+--
 -- In general, the design of this database does not worry too much about
 -- normal forms.  However, we do use a lot of intermediate tables to represent
 -- one-to-many relationships as well as ensure that a piece of data only exists
