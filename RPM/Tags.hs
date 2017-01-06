@@ -1,3 +1,18 @@
+-- Copyright (C) 2016 Red Hat, Inc.
+--
+-- This library is free software; you can redistribute it and/or
+-- modify it under the terms of the GNU Lesser General Public
+-- License as published by the Free Software Foundation; either
+-- version 2.1 of the License, or (at your option) any later version.
+--
+-- This library is distributed in the hope that it will be useful,
+-- but WITHOUT ANY WARRANTY; without even the implied warranty of
+-- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+-- Lesser General Public License for more details.
+--
+-- You should have received a copy of the GNU Lesser General Public
+-- License along with this library; if not, see <http://www.gnu.org/licenses/>.
+
 {-# LANGUAGE DeriveDataTypeable #-}
 
 module RPM.Tags(Tag(..),
@@ -10,6 +25,7 @@ module RPM.Tags(Tag(..),
                 tagValue)
  where
 
+import           Data.Bits((.&.), shiftR)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C
 import           Data.Data(Data, cast, gmapQi, showConstr, toConstr)
@@ -189,7 +205,7 @@ data Tag = DEPRECATED                   Tag
          | ClassDict                    [String] Word32 Word32
          | FileDependsX                 [Word32] Word32 Word32
          | FileDependsN                 [Word32] Word32 Word32
-         | DependsDict                  [Word32] Word32 Word32
+         | DependsDict                  [(Word32, Word32)] Word32 Word32
          | SourcePkgID                  BS.ByteString Word32 Word32
          | FileContexts                 [String] Word32 Word32
          | FSContexts                   [String] Word32 Word32
@@ -505,7 +521,7 @@ mkTag store tag ty offset count = case tag of
     1142    -> maker mkStringArray   >>=            \v -> Just $ ClassDict v offset count
     1143    -> maker mkWord32        >>=            \v -> Just $ FileDependsX v offset count
     1144    -> maker mkWord32        >>=            \v -> Just $ FileDependsN v offset count
-    1145    -> maker mkWord32        >>=            \v -> Just $ DependsDict v offset count
+    1145    -> maker mkWord32        >>=            \v -> Just $ DependsDict (map (\x -> ((x `shiftR` 24) .&. 0xff, x .&. 0x00ffffff)) v) offset count
     1146    -> maker mkBinary        >>=            \v -> Just $ SourcePkgID v offset count
     1147    -> maker mkStringArray   >>=            \v -> Just $ OBSOLETE $ FileContexts v offset count
     1148    -> maker mkStringArray   >>=            \v -> Just $ FSContexts v offset count
