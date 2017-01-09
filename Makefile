@@ -13,6 +13,6 @@ importer:
 
 mddb:
 	docker volume create -d local --opt o=size=2GB --name bdcs-mddb-volume
-	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --rm wiggum/import-img
+	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" --rm wiggum/import-img
 
 .PHONY: importer mddb
