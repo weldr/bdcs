@@ -5,7 +5,7 @@ maintainer:          clumens@redhat.com
 build-type:          Simple
 cabal-version:       >=1.10
 license:             LGPL
-license-file:        ../LICENSE
+license-file:        LICENSE
 
 library
   exposed-modules:     BDCS.Builds,
