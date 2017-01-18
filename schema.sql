@@ -68,6 +68,7 @@ create table sources (
     version text not null,
     source_ref text not null
 );
+create index sources_project_id_idx on sources(project_id);
 
 -- A build represents a single successful compilation of a single source (hence
 -- the source_id reference).  It continues the theme of spreading NEVRA-style
@@ -98,6 +99,7 @@ create table builds (
     build_config_ref text not null,
     build_env_ref text not null
 );
+create index builds_source_id_idx on builds(source_id);
 
 -- Associate various types of build signatures with a single build.  A build
 -- signature could take the form of the RSA or SHA1 header out of a built RPM, or
@@ -110,6 +112,7 @@ create table build_signatures (
     signature_type text not null,
     signature_data blob not null
 );  
+create index build_signatures_build_id_idx on build_signatures(build_id);
 
 -- Provide fixed values for what type a file can be.  This prevents it from being
 -- free-form text that could potentially include values we don't know how to
@@ -159,6 +162,7 @@ create table files (
     mtime integer not null,
     symlink_target text
 );
+create index files_path_idx on files(path);
 
 -- This table associates a single file with a single build.  It allows for a
 -- file to be a part of several builds at the same time, and for a single build
@@ -167,6 +171,8 @@ create table build_files (
     build_id integer references build(id) not null,
     file_id integer references files(id) not null
 );
+create index build_files_build_id_idx on build_files(build_id);
+create index build_files_file_id_idx on build_files(file_id);
 
 -- This table is a free form key/value association.  It allows storing data that
 -- doesn't make sense anywhere else, or is more free form in nature, or just
@@ -192,12 +198,22 @@ create table key_val (
     val_value text not null
 );
 
+-- for key/val, it's not likely that we'll have a query that is looking up
+-- a key name based on the value name. Queries will either be looking for
+-- values given a key, or looking for ids based on a key/value pair.
+-- So instead of an index on val_value, make the second index on both key
+-- and value.
+create index key_val_key_value_idx on key_val(key_value);
+create index key_val_val_value_idx on key_val(key_value, val_value);
+
 -- Associate key/value data with an individual project.  It is possible for a
 -- single project to have many different key/value data pieces, or none.
 create table project_values (
     project_id integer references projects(id) not null,
     key_val_id integer references key_val(id) not null
 );
+create index project_values_project_id_idx on project_values(project_id);
+create index project_values_key_val_id_idx on project_values(key_val_id);
 
 -- Associate key/value data with an individual source.  It is possible for a
 -- single source to have many different key/value data pieces, or none.
@@ -205,6 +221,8 @@ create table source_key_values (
     source_id integer references sources(id) not null,
     key_val_id integer references key_val(id) not null
 );
+create index source_key_values_source_id_idx on source_key_values(source_id);
+create index source_key_values_key_val_id_idx on source_key_values(key_val_id);
 
 -- Associate key/value data with an individual build.  It is possible for a
 -- single build to have many different key/value data pieces, or none.
@@ -212,6 +230,8 @@ create table build_key_values (
     build_id integer references builds(id) not null,
     key_val_id integer references key_val(id) not null
 );
+create index build_key_values_build_id_idx on build_key_values(build_id);
+create index build_key_values_key_val_id_idx on build_key_values(key_val_id);
 
 -- Associate key/value data with an individual file.  It is possible for a
 -- single file to have many different key/value data pieces, or none.
@@ -219,6 +239,8 @@ create table file_key_values (
     file_id integer references files(id) not null,
     key_val_id integer references key_val(id) not null
 );
+create index file_key_values_file_id_idx on file_key_values(file_id);
+create index file_key_values_key_val_id_idx on file_key_values(key_val_id);
 
 -- Groups of things. e.g., a rpm subpackage, a comps group, a module
 -- This differs from file tags in that a group can contain other groups in
@@ -234,17 +256,23 @@ create table group_files (
     group_id integer references groups(id) not null,
     file_id integer references files(id) not null
 );
+create index group_files_group_id_idx on group_files(group_id);
+create index group_files_file_id_idx on group_files(file_id);
 
 -- FIXME how do you prevent cycles in this thing?
 create table group_groups (
     parent_group_id references groups(id) not null,
     child_group_id references groups(id) not null
 );
+create index group_groups_parent_group_id_idx on group_groups(parent_group_id);
+create index group_groups_child_group_id_idx on group_groups(child_group_id);
 
 create table group_key_values (
     group_id integer references groups(id) not null,
     key_val_id integer references key_val(id) not null
 );
+create index group_key_values_group_id_idx on group_key_values(group_id);
+create index group_key_values_key_val_id_idx on group_key_values(key_val_id);
 
 create table requirements (
     id integer primary key,
@@ -258,3 +286,7 @@ create table group_requirements (
     group_id integer references groups(id) not null,
     req_id integer references requirements(id) not null
 );
+create index group_requirements_group_id_idx on group_requirements(group_id);
+create index group_requirements_req_id_idx on group_requirements(req_id);
+
+.quit
