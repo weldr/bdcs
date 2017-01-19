@@ -62,8 +62,8 @@ data NEVRA = NEVRA String String String String String
  deriving(Eq, Ord, Show)
 
 printNEVRA :: NEVRA -> String
-printNEVRA (NEVRA n "" v r a)   =             n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
-printNEVRA (NEVRA n e v r a)    = e ++ ":" ++ n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
+printNEVRA (NEVRA n "" v r a)   = "('" ++ n ++ "', '" ++ a ++ "', '0', '" ++ v ++ "', '" ++ r ++ "')"
+printNEVRA (NEVRA n e v r a)    = "('" ++ n ++ "', '" ++ a ++ "', '" ++ e ++ "', " ++ v ++ "', '" ++ r ++ "')"
 
 -- Look up a key/value pair for the group with the given name.  It is assumed there
 -- will only be one key/value pair.
@@ -217,9 +217,8 @@ closeRPM db rpm = runSqlite (T.pack db) $ do
                                           doit (r ++ providers ++ tl) deps' seen'
 
 printResult :: String -> [NEVRA] -> IO ()
-printResult rpm deps = do
-    putStrLn $ "*** Dependencies for " ++ rpm ++ ":"
-    mapM_ (\dep -> putStrLn $ "\t" ++ printNEVRA dep) deps
+printResult rpm deps =
+    mapM_ (putStrLn . printNEVRA) deps
 
 main :: IO ()
 main = do
