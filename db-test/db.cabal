@@ -64,3 +64,31 @@ executable import
   default-language:    Haskell2010
 
   ghc-options:         -Wall
+
+executable depclose
+  main-is:             depclose.hs
+
+  build-depends:       attoparsec >=0.12.1.4,
+                       attoparsec-binary,
+                       base >= 4.7 && < 4.9,
+                       bytestring,
+                       cond,
+                       conduit,
+                       conduit-combinators,
+                       conduit-extra,
+                       containers,
+                       db,
+                       directory,
+                       esqueleto,
+                       filepath,
+                       persistent,
+                       persistent-sqlite,
+                       persistent-template,
+                       rpm,
+                       text,
+                       time,
+                       transformers
+
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall
