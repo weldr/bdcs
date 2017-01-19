@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 
 module BDCS.Groups(createGroup,
                    findRequires)
@@ -21,13 +22,26 @@ module BDCS.Groups(createGroup,
 
 import Control.Monad(forM_, void)
 import Control.Monad.IO.Class(MonadIO)
+import Data.Bits(testBit)
+import Data.Char(isSpace)
+import Data.List(dropWhileEnd)
 import Data.Maybe(fromMaybe, listToMaybe)
+import Data.Word(Word32)
 import Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.KeyValue(findKeyValue, insertKeyValue)
 import qualified BDCS.ReqType as RT
-import           RPM.Tags(Tag, findStringTag, findStringListTag)
+import           RPM.Tags(Tag, findStringTag, findStringListTag, findWord32ListTag)
+
+rpmFlagsToOperator :: Word32 -> String
+rpmFlagsToOperator f =
+    if | f `testBit` 1 && f `testBit` 3 -> "<="
+       | f `testBit` 1                  -> "<"
+       | f `testBit` 2 && f `testBit` 3 -> ">="
+       | f `testBit` 2                  -> ">"
+       | f `testBit` 3                  -> "="
+       | otherwise                      -> ""
 
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds tags = do
@@ -52,17 +66,32 @@ createGroup fileIds tags = do
             Just kv -> insert $ GroupKeyValues groupId kv
 
     -- Create the Provides attributes
-    -- TODO versions, flags
-    mapM_ (\provide -> findKeyValue "rpm-provide" provide >>= \case
-                           Nothing -> insertKeyValue "rpm-provide" provide >>= \kvId -> insert $ GroupKeyValues groupId kvId
-                           Just kv -> insert $ GroupKeyValues groupId kv)
-          (findStringListTag "ProvideName" tags)
+    -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
+    let provNames   = findStringListTag "ProvideName" tags
+    let provFlags   = findWord32ListTag "ProvideFlags" tags
+    let provVersion = findStringListTag  "ProvideVersion" tags
+
+    forM_ (zip3 provNames provFlags provVersion) $ \(n, f, v) -> do
+        let cmp  = rpmFlagsToOperator f
+        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
+
+        findKeyValue "rpm-provide" expr >>= \case
+            Nothing -> insertKeyValue "rpm-provide" expr >>= \kvId -> insert $ GroupKeyValues groupId kvId
+            Just kv -> insert $ GroupKeyValues groupId kv
 
     -- Create the requirements
-    -- TODO versions, flags
-    forM_ (findStringListTag "RequireName" tags) $ \reqName -> do
-        reqId <- findRequires RT.RPM RT.Runtime RT.Must reqName >>= \case
-                     Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must reqName
+    -- TODO Conflicts, Obsoletes, Recommends, Enhances, Suggests, Supplements
+    --      How to handle everything from RPMSENSE_POSTTRANS and beyond?
+    let reqNames    = findStringListTag "RequireName" tags
+    let reqFlags    = findWord32ListTag "RequireFlags" tags
+    let reqVersions = findStringListTag "RequireVersion" tags
+
+    forM_ (zip3 reqNames reqFlags reqVersions) $ \(n, f, v) -> do
+        let cmp  = rpmFlagsToOperator f
+        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
+
+        reqId <- findRequires RT.RPM RT.Runtime RT.Must expr >>= \case
+                     Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must expr
                      Just rid -> return rid
 
         void $ insert $ GroupRequirements groupId reqId
@@ -70,12 +99,12 @@ createGroup fileIds tags = do
     return groupId
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
-findRequires reqLang reqCtx reqStrength reqName = do
+findRequires reqLang reqCtx reqStrength reqExpr = do
     ndx <- select $ from $ \r -> do
            where_ (r ^. RequirementsReq_language ==. val reqLang &&.
                    r ^. RequirementsReq_context ==. val reqCtx &&.
                    r ^. RequirementsReq_strength ==. val reqStrength &&.
-                   r ^. RequirementsReq_expr ==. val reqName)
+                   r ^. RequirementsReq_expr ==. val reqExpr)
            limit 1
            return (r ^. RequirementsId)
     return $ listToMaybe (map unValue ndx)
