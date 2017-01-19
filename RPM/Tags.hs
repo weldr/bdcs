@@ -21,6 +21,7 @@ module RPM.Tags(Tag(..),
                 findTag,
                 findStringTag,
                 findStringListTag,
+                findWord32ListTag,
                 mkTag,
                 tagValue)
  where
@@ -761,6 +762,11 @@ findStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe String
 -- Strings, and return as a list.  If no results are found, return an empty list.
 findStringListTag :: String -> [Tag] -> [String]
 findStringListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [String]
+
+-- | Given a 'Tag' name and a list of 'Tag's, find all matches, convert them into
+-- Word32, and return as a list.  if no results are found, return an empty list.
+findWord32ListTag :: String -> [Tag] -> [Word32]
+findWord32ListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [Word32]
 
 -- | Given a 'Tag', return its type.
 tagValue :: Typeable a => Tag -> Maybe a
