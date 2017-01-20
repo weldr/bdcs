@@ -13,6 +13,7 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
@@ -45,8 +46,8 @@
 --   dep satisfied two different ways, lang packs, multilib, etc.).
 -- * Has not been shown to give the same results as yum/dnf.
 
-import           Control.Monad(liftM, when)
-import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad(forM, liftM, when)
+import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.List(isInfixOf)
 import           Data.Maybe(catMaybes, fromMaybe, listToMaybe)
 import qualified Data.Set as Set
@@ -65,37 +66,43 @@ printNEVRA :: NEVRA -> String
 printNEVRA (NEVRA n "" v r a)   = "('" ++ n ++ "', '" ++ a ++ "', '0', '" ++ v ++ "', '" ++ r ++ "')"
 printNEVRA (NEVRA n e v r a)    = "('" ++ n ++ "', '" ++ a ++ "', '" ++ e ++ "', " ++ v ++ "', '" ++ r ++ "')"
 
--- Look up a key/value pair for the group with the given name.  It is assumed there
+concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
+concatMapM fn lst = liftM concat (mapM fn lst)
+
+-- Look up a key/value pair for the group with the given GroupsId.  It is assumed there
 -- will only be one key/value pair.
-getValueForGroupName :: MonadIO m => String -> String -> SqlPersistT m (Maybe String)
-getValueForGroupName name key = do
+getValueForGroup :: MonadIO m => GroupsId -> String -> SqlPersistT m (Maybe String)
+getValueForGroup grp key = do
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` group) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
                     group_keyval ^. GroupKeyValuesGroup_id ==. group ^. GroupsId
-           where_ $ group ^. GroupsName ==. val name &&.
+           where_ $ group ^. GroupsId ==. val grp &&.
                     keyval ^. KeyValKey_value ==. val key
            limit 1
            return $ keyval ^. KeyValVal_value
     return $ listToMaybe (map unValue ndx)
 
 -- Given a group name, return the complete NEVRA tuple for it.  Each element
--- except for the name can potentially be empty.
-getNEVRAForGroupName :: MonadIO m => String -> SqlPersistT m NEVRA
-getNEVRAForGroupName name = do
-    epoch   <- fromMaybe "" <$> getValueForGroupName name "epoch"
-    ver     <- fromMaybe "" <$> getValueForGroupName name "version"
-    release <- fromMaybe "" <$> getValueForGroupName name "release"
-    arch    <- fromMaybe "" <$> getValueForGroupName name "arch"
-    return $ NEVRA name epoch ver release arch
+-- except for the name can potentially be empty.  Multiple NEVRAs could exist
+-- for a single group name - for instance, packages that have multilib versions.
+-- We do not make decisions about multilib in this program.
+getNEVRAsForGroupName :: MonadIO m => String -> SqlPersistT m [NEVRA]
+getNEVRAsForGroupName name = do
+    ids <- findGroupId name
+    forM ids $ \i -> do
+        epoch   <- fromMaybe "" <$> getValueForGroup i "epoch"
+        ver     <- fromMaybe "" <$> getValueForGroup i "version"
+        release <- fromMaybe "" <$> getValueForGroup i "release"
+        arch    <- fromMaybe "" <$> getValueForGroup i "arch"
+        return $ NEVRA name epoch ver release arch
 
 -- Given a group name, return its index in the groups table.
-findGroupId :: MonadIO m => String -> SqlPersistT m (Maybe GroupsId)
+findGroupId :: MonadIO m => String -> SqlPersistT m [GroupsId]
 findGroupId name = do
     ndx <- select $ from $ \groups -> do
            where_ $ groups ^. GroupsName ==. val name
-           limit 1
            return $ groups ^. GroupsId
-    return $ listToMaybe (map unValue ndx)
+    return $ map unValue ndx
 
 -- Given a group's index into the groups table, return its name.
 findGroupName :: MonadIO m => GroupsId -> SqlPersistT m (Maybe String)
@@ -160,16 +167,16 @@ whatProvidesFile name = do
 -- this time.
 getRequirements :: MonadIO m => String -> SqlPersistT m [String]
 getRequirements name = findGroupId name >>= \case
-    Nothing  -> return []
-    Just ndx -> do
-        reqs <- select $ distinct $ from $ \(req `InnerJoin` group_reqs) -> do
+    []  -> return []
+    ndx -> do
+        reqs <- select $ from $ \(req `InnerJoin` group_reqs) -> do
                 on     $ req ^. RequirementsId ==. group_reqs ^. GroupRequirementsReq_id
                 -- Filter out rpmlib() requirements.  Those don't appear to be provided
                 -- by anything so they will just always be unsolvable.  I don't think
                 -- we care about them anyway.  There are other types of these requires,
                 -- too (config() comes to mind) but those appear to be provided by
                 -- something.  So they can stay in the results for now.
-                where_ $ group_reqs ^. GroupRequirementsGroup_id ==. val ndx &&.
+                where_ $ group_reqs ^. GroupRequirementsGroup_id `in_` valList ndx &&.
                          not_ (req ^. RequirementsReq_expr `like` val "rpmlib" ++. (%))
                 return $ req ^. RequirementsReq_expr
         return $ map unValue reqs
@@ -197,7 +204,18 @@ closeRPM db rpm = runSqlite (T.pack db) $ do
         -- the dependencies set, mark as seen, and call this function again.  We add
         -- the providers to the worklist so we can gather all their dependencies, too.
            | "/" `isInfixOf` hd     -> do providers <- whatProvidesFile hd
-                                          nevras <- mapM getNEVRAForGroupName providers
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn $ "Providers for file " ++ hd ++ " are:"
+                                              mapM_ putStrLn providers
+                                              putStrLn "Gathering group names"
+#endif
+                                          nevras <- concatMapM getNEVRAsForGroupName providers
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn "Groups are:"
+                                              mapM_ (putStrLn . printNEVRA) nevras
+#endif
                                           let deps' = deps `Set.union` Set.fromList nevras
                                           let seen' = Set.insert hd seen
                                           doit (providers ++ tl) deps' seen'
@@ -210,14 +228,31 @@ closeRPM db rpm = runSqlite (T.pack db) $ do
         -- result of file dependencies.  (This assumption will fail if files can somehow
         -- depend on other files.)
            | otherwise              -> do providers <- whatProvides hd
-                                          r <- liftM concat (mapM getRequirements providers)
-                                          nevras <- mapM getNEVRAForGroupName providers
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn $ "Providers for " ++ hd ++ " are:"
+                                              mapM_ putStrLn providers
+                                              putStrLn "Gathering requirements"
+#endif
+                                          r <- concatMapM getRequirements providers
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn "Requirements are:"
+                                              mapM_ putStrLn r
+                                              putStrLn "Gathering group names"
+#endif
+                                          nevras <- concatMapM getNEVRAsForGroupName providers
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn "Groups are:"
+                                              mapM_ (putStrLn . printNEVRA) nevras
+#endif
                                           let deps' = deps `Set.union` Set.fromList nevras
                                           let seen' = Set.insert hd seen
                                           doit (r ++ providers ++ tl) deps' seen'
 
-printResult :: String -> [NEVRA] -> IO ()
-printResult rpm deps =
+printResult :: [NEVRA] -> IO ()
+printResult deps =
     mapM_ (putStrLn . printNEVRA) deps
 
 main :: IO ()
@@ -236,4 +271,4 @@ main = do
  where
     processOne db rpm = do
         result <- closeRPM db rpm
-        printResult rpm result
+        printResult result
