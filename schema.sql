@@ -251,6 +251,7 @@ create table groups (
     group_type text not null,
     constraint unique_name_type unique (name, group_type)
 );
+create index groups_name_idx on groups(name);
 
 create table group_files (
     group_id integer references groups(id) not null,
