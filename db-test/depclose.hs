@@ -119,8 +119,8 @@ findProviderId thing = do
            -- FIXME:  Might need to change this for expressions.  We can't check
            -- versions here but maybe the right thing to do is just strip out
            -- versioning from "thing" and grab everything that starts with it.
-           where_ $ keyval ^. KeyValVal_value ==. val thing ||.
-                    keyval ^. KeyValKey_value ==. val "packageName" &&. keyval ^. KeyValVal_value ==. val thing
+           where_ $ ( keyval ^. KeyValKey_value ==. val "rpm-provide" &&. keyval ^. KeyValVal_value ==. val thing ) ||.
+                    ( keyval ^. KeyValKey_value ==. val "packageName" &&. keyval ^. KeyValVal_value ==. val thing )
            return $ group_keyval ^. GroupKeyValuesGroup_id
     return $ map unValue ndx
 
