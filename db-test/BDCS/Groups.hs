@@ -20,19 +20,19 @@ module BDCS.Groups(createGroup,
                    findRequires)
  where
 
-import Control.Monad(forM_, void)
+import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(MonadIO)
 import Data.Bits(testBit)
 import Data.Char(isSpace)
 import Data.List(dropWhileEnd)
-import Data.Maybe(fromMaybe, listToMaybe)
+import Data.Maybe(fromJust, fromMaybe, isJust, listToMaybe)
 import Data.Word(Word32)
 import Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.KeyValue(findKeyValue, insertKeyValue)
 import qualified BDCS.ReqType as RT
-import           RPM.Tags(Tag, findStringTag, findStringListTag, findWord32ListTag)
+import           RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
 
 rpmFlagsToOperator :: Word32 -> String
 rpmFlagsToOperator f =
@@ -46,7 +46,7 @@ rpmFlagsToOperator f =
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds tags = do
     -- Get the NEVRA so it can be saved as attributes
-    -- FIXME epoch, ignoring right now since it's optional, also using fromMaybe here seems probably bad
+    let epoch = findTag "Epoch" tags >>= \t -> (tagValue t :: Maybe Word32) >>= Just . show
     let name = fromMaybe "" $ findStringTag "Name" tags
     let version = fromMaybe "" $ findStringTag "Version" tags
     let release = fromMaybe "" $ findStringTag "Release" tags
@@ -61,6 +61,13 @@ createGroup fileIds tags = do
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
     forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \(k, v) ->
+        findKeyValue k v >>= \case
+            Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
+            Just kv -> insert $ GroupKeyValues groupId kv
+
+    -- Add the epoch attribute, when it exists.
+    when (isJust epoch) $ void $ do
+        let (k, v) = ("epoch", fromJust epoch)
         findKeyValue k v >>= \case
             Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
