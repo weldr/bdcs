@@ -168,6 +168,7 @@ create index files_path_idx on files(path);
 -- file to be a part of several builds at the same time, and for a single build
 -- to contain several files.
 create table build_files (
+    id integer primary key,
     build_id integer references build(id) not null,
     file_id integer references files(id) not null
 );
@@ -209,6 +210,7 @@ create index key_val_val_value_idx on key_val(key_value, val_value);
 -- Associate key/value data with an individual project.  It is possible for a
 -- single project to have many different key/value data pieces, or none.
 create table project_values (
+    id integer primary key,
     project_id integer references projects(id) not null,
     key_val_id integer references key_val(id) not null
 );
@@ -218,6 +220,7 @@ create index project_values_key_val_id_idx on project_values(key_val_id);
 -- Associate key/value data with an individual source.  It is possible for a
 -- single source to have many different key/value data pieces, or none.
 create table source_key_values (
+    id integer primary key,
     source_id integer references sources(id) not null,
     key_val_id integer references key_val(id) not null
 );
@@ -227,6 +230,7 @@ create index source_key_values_key_val_id_idx on source_key_values(key_val_id);
 -- Associate key/value data with an individual build.  It is possible for a
 -- single build to have many different key/value data pieces, or none.
 create table build_key_values (
+    id integer primary key,
     build_id integer references builds(id) not null,
     key_val_id integer references key_val(id) not null
 );
@@ -236,6 +240,7 @@ create index build_key_values_key_val_id_idx on build_key_values(key_val_id);
 -- Associate key/value data with an individual file.  It is possible for a
 -- single file to have many different key/value data pieces, or none.
 create table file_key_values (
+    id integer primary key,
     file_id integer references files(id) not null,
     key_val_id integer references key_val(id) not null
 );
@@ -254,6 +259,7 @@ create table groups (
 create index groups_name_idx on groups(name);
 
 create table group_files (
+    id integer primary key,
     group_id integer references groups(id) not null,
     file_id integer references files(id) not null
 );
@@ -262,6 +268,7 @@ create index group_files_file_id_idx on group_files(file_id);
 
 -- FIXME how do you prevent cycles in this thing?
 create table group_groups (
+    id integer primary key,
     parent_group_id references groups(id) not null,
     child_group_id references groups(id) not null
 );
@@ -269,6 +276,7 @@ create index group_groups_parent_group_id_idx on group_groups(parent_group_id);
 create index group_groups_child_group_id_idx on group_groups(child_group_id);
 
 create table group_key_values (
+    id integer primary key,
     group_id integer references groups(id) not null,
     key_val_id integer references key_val(id) not null
 );
@@ -284,6 +292,7 @@ create table requirements (
 );
 
 create table group_requirements (
+    id integer primary key,
     group_id integer references groups(id) not null,
     req_id integer references requirements(id) not null
 );
