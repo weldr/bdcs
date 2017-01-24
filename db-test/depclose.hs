@@ -121,14 +121,11 @@ findProviderId :: MonadIO m => String -> SqlPersistT m [GroupsId]
 findProviderId thing = do
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id
-           -- A requirement could be satisfied by either exactly matching what was
-           -- asked for (which could be an expression), or by matching the package
-           -- name.  Package names are not listed as an rpm-provide typically.
-           -- FIXME:  Might need to change this for expressions.  We can't check
-           -- versions here but maybe the right thing to do is just strip out
-           -- versioning from "thing" and grab everything that starts with it.
-           where_ $ ( keyval ^. KeyValKey_value ==. val "rpm-provide" &&. keyval ^. KeyValVal_value ==. val thing ) ||.
-                    ( keyval ^. KeyValKey_value ==. val "packageName" &&. keyval ^. KeyValVal_value ==. val thing )
+           -- A requirement is satisfied by matching a rpm-provide, which may be
+           -- an exact match (name-only) or a versioned match (name = version).
+           -- For provides with versions, ignoring the version and grabbing everything.
+           where_ $ keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
+                    ( keyval ^. KeyValVal_value ==. val thing ||. keyval ^. KeyValVal_value `like` val (thing ++ " ") ++. (%))
            return $ group_keyval ^. GroupKeyValuesGroup_id
     return $ map unValue ndx
 
@@ -149,7 +146,8 @@ findGroupContainingFile file = do
 -- can make decisions.  Just the name won't be enough.
 whatProvides :: MonadIO m => String -> SqlPersistT m [String]
 whatProvides name = do
-    providerIds <- findProviderId name
+    let name' = takeWhile (/= ' ') name
+    providerIds <- findProviderId name'
     catMaybes <$> mapM findGroupName providerIds
 
 -- Return the group name for everything that provides the given file path.  We store
