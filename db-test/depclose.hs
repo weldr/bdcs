@@ -64,7 +64,7 @@ data NEVRA = NEVRA String String String String String
 
 printNEVRA :: NEVRA -> String
 printNEVRA (NEVRA n "" v r a)   = "('" ++ n ++ "', '" ++ a ++ "', '0', '" ++ v ++ "', '" ++ r ++ "')"
-printNEVRA (NEVRA n e v r a)    = "('" ++ n ++ "', '" ++ a ++ "', '" ++ e ++ "', " ++ v ++ "', '" ++ r ++ "')"
+printNEVRA (NEVRA n e v r a)    = "('" ++ n ++ "', '" ++ a ++ "', '" ++ e ++ "', '" ++ v ++ "', '" ++ r ++ "')"
 
 concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
 concatMapM fn lst = liftM concat (mapM fn lst)
