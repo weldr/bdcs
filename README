@@ -21,6 +21,7 @@ is the $PWD/Packages directory.  Then run:
 
 $ cd db-test
 $ cabal sandbox init
+$ cabal sandbox add-source ../../haskell-rpm
 $ cabal install --dependencies-only
 $ cabal build
 $ sqlite3 metadata.db < ../schema.sql
