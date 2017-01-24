@@ -53,7 +53,8 @@ createGroup fileIds tags = do
     let arch = fromMaybe "" $ findStringTag "Arch" tags
 
     -- Create the groups row
-    groupId <- insert $ Groups name "rpm"
+    let groupName = name ++ "-" ++ version ++ "-" ++ release ++ "." ++ arch
+    groupId <- insert $ Groups groupName "rpm"
 
     -- Create the group_files rows
     void $ mapM (\fId -> insert $ GroupFiles groupId fId) fileIds

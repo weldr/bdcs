@@ -25,17 +25,10 @@
 
 module BDCS.DB where
 
-import Control.Monad(void)
 import Data.ByteString(ByteString)
-import Data.Text(pack)
 import Data.Time(UTCTime)
-import Database.Esqueleto
-import Database.Persist.Sqlite(runSqlite)
 import Database.Persist.TH
-import System.Directory(createDirectoryIfMissing)
-import System.FilePath.Posix(takeDirectory)
 
-import BDCS.FileType
 import BDCS.ReqType
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
@@ -68,10 +61,13 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     signature_type String
     signature_data ByteString
     deriving Eq Show
+ FileTypes
+    file_type String
+    deriving Eq Show
  Files
     path String
     digest String
-    file_type FileType
+    file_type_id FileTypesId
     file_mode Int
     file_user String
     file_group String
@@ -130,9 +126,3 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     req_id RequirementsId
     deriving Eq Show
  |]
-
-initDB ::  FilePath -> IO ()
-initDB filename = createDirectoryIfMissing True dirname >>
-                  runSqlite (pack filename) (void $ runMigrationSilent migrateAll)
- where
-    dirname = takeDirectory filename

@@ -154,7 +154,7 @@ create table files (
     id integer primary key,
     path text not null,
     digest text not null,
-    file_type_id references files_types(id) not null,
+    file_type_id integer references file_types(id) not null,
     file_mode integer not null,
     file_user text not null,
     file_group text not null,

@@ -20,7 +20,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
-import           Control.Conditional(notM, whenM)
+import           Control.Conditional(unlessM)
 import           Control.Exception(catch)
 import           Control.Monad(void, when)
 import           Control.Monad.Except(runExceptT)
@@ -31,6 +31,7 @@ import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
+import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           System.IO(hPutStrLn, stderr)
@@ -53,7 +54,7 @@ import RPM.Types
 --
 
 loadRPM :: FilePath -> RPM -> IO ()
-loadRPM db RPM{..} = runSqlite (T.pack db) $ whenM (notM $ buildImported sigs) $ do
+loadRPM db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     projectId <- insertProject tags
     sourceId  <- insertSource tags projectId
     buildId   <- insertBuild tags sourceId
@@ -110,7 +111,10 @@ main = do
     let db   = head argv
     let rpms = tail argv
 
-    initDB db
+    unlessM (doesFileExist db) $ do
+        putStrLn "Database must already exist - create with sqlite3 schema.sql"
+        exitFailure
+
     mapM_ (processOne db) rpms
  where
     processOne db path = catch (processRPM db path >> putStrLn ("Imported " ++ path))

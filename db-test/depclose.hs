@@ -90,11 +90,12 @@ getNEVRAsForGroupName :: MonadIO m => String -> SqlPersistT m [NEVRA]
 getNEVRAsForGroupName name = do
     ids <- findGroupId name
     forM ids $ \i -> do
+        name'   <- fromMaybe "" <$> getValueForGroup i "name"
         epoch   <- fromMaybe "" <$> getValueForGroup i "epoch"
         ver     <- fromMaybe "" <$> getValueForGroup i "version"
         release <- fromMaybe "" <$> getValueForGroup i "release"
         arch    <- fromMaybe "" <$> getValueForGroup i "arch"
-        return $ NEVRA name epoch ver release arch
+        return $ NEVRA name' epoch ver release arch
 
 -- Given a group name, return its index in the groups table.
 findGroupId :: MonadIO m => String -> SqlPersistT m [GroupsId]

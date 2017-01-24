@@ -23,6 +23,7 @@ $ cd db-test
 $ cabal sandbox init
 $ cabal install --dependencies-only
 $ cabal build
+$ sqlite3 metadata.db < ../schema.sql
 $ cabal run import -- metadata.db Packages/*rpm
 
 

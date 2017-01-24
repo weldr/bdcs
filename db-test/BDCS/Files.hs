@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -17,13 +17,13 @@
 
 module BDCS.Files(FileTuple,
                   insertFiles,
-                  mkFile,
                   associateFilesWithBuild,
                   associateFilesWithPackage)
  where
 
+import Control.Monad((>=>))
 import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(fromMaybe)
+import Data.Maybe(fromJust, fromMaybe)
 import Data.Word(Word16, Word32)
 import Database.Esqueleto
 import System.FilePath.Posix((</>))
@@ -36,9 +36,16 @@ type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
 
 insertFiles :: MonadIO m => [Tag] -> SqlPersistT m [Key Files]
 insertFiles rpm =
-    mapM (insert . mkFile)
+    mapM (mkFile >=> insert)
          (zipFiles rpm)
  where
+    mkFile :: MonadIO m => FileTuple -> SqlPersistT m Files
+    mkFile (path, digest, mode, user, group, size, mtime, target) = do
+        -- FIXME: This could return Nothing, but only if the database were built wrong.
+        -- Is it worth catching that error here and doing... something?
+        ty <- fromJust <$> getFileType mode
+        return $ Files path digest ty mode user group size mtime target
+
     filePaths :: [Tag] -> [String]
     filePaths tags = let
         indexes   = fromMaybe [] $ findTag "DirIndexes" tags >>= \t -> tagValue t :: Maybe [Word32]
@@ -65,10 +72,6 @@ insertFiles rpm =
         targets = fromMaybe [] $ findTag "FileLinkTos" tags   >>= \t -> (tagValue t :: Maybe [String]) >>= Just . map strToMaybe
      in
         megazip paths digests modes users groups sizes mtimes targets
-
-mkFile :: FileTuple -> Files
-mkFile (path, digest, mode, user, group, size, mtime, target) =
-    Files path digest (getFileType mode) mode user group size mtime target
 
 associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
 associateFilesWithBuild files build =
