@@ -23,7 +23,7 @@ module BDCS.Groups(createGroup,
 import Control.Monad(forM_, void, when)
 import Control.Monad.IO.Class(MonadIO)
 import Data.Bits(testBit)
-import Data.Char(isSpace)
+import Data.Char(isSpace, toLower, toUpper)
 import Data.List(dropWhileEnd)
 import Data.Maybe(fromJust, fromMaybe, isJust, listToMaybe)
 import Data.Word(Word32)
@@ -75,14 +75,7 @@ createGroup fileIds tags = do
 
     -- Create the Provides attributes
     -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
-    let provNames   = findStringListTag "ProvideName" tags
-    let provFlags   = findWord32ListTag "ProvideFlags" tags
-    let provVersion = findStringListTag  "ProvideVersion" tags
-
-    forM_ (zip3 provNames provFlags provVersion) $ \(n, f, v) -> do
-        let cmp  = rpmFlagsToOperator f
-        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
-
+    addPRCO "Provide" tags $ \expr ->
         findKeyValue "rpm-provide" expr >>= \case
             Nothing -> insertKeyValue "rpm-provide" expr >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
@@ -90,14 +83,7 @@ createGroup fileIds tags = do
     -- Create the requirements
     -- TODO Conflicts, Obsoletes, Recommends, Enhances, Suggests, Supplements
     --      How to handle everything from RPMSENSE_POSTTRANS and beyond?
-    let reqNames    = findStringListTag "RequireName" tags
-    let reqFlags    = findWord32ListTag "RequireFlags" tags
-    let reqVersions = findStringListTag "RequireVersion" tags
-
-    forM_ (zip3 reqNames reqFlags reqVersions) $ \(n, f, v) -> do
-        let cmp  = rpmFlagsToOperator f
-        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
-
+    addPRCO "Require" tags $ \expr -> do
         reqId <- findRequires RT.RPM RT.Runtime RT.Must expr >>= \case
                      Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must expr
                      Just rid -> return rid
@@ -105,6 +91,24 @@ createGroup fileIds tags = do
         void $ insert $ GroupRequirements groupId reqId
 
     return groupId
+
+addPRCO :: Monad m => String -> [Tag] -> (String -> m a) -> m ()
+addPRCO ty tags fn = do
+    let names = findStringListTag (ty' ++ "Name") tags
+    let flags = findWord32ListTag (ty' ++ "Flags") tags
+    let vers  = findStringListTag (ty' ++ "Version") tags
+
+    forM_ (zip3 names flags vers) $ \(n, f, v) -> do
+        let cmp  = rpmFlagsToOperator f
+        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
+
+        fn expr
+ where
+    titlecase :: String -> String
+    titlecase (hd:rest) = toUpper hd : map toLower rest
+    titlecase []        = []
+
+    ty' = titlecase ty
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = do
