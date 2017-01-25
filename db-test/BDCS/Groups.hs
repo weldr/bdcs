@@ -73,16 +73,11 @@ createGroup fileIds tags = do
             Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
 
-    -- Create the Provides attributes
-    -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
-    addPRCO "Provide" tags $ \expr ->
-        findKeyValue "rpm-provide" expr >>= \case
-            Nothing -> insertKeyValue "rpm-provide" expr >>= \kvId -> insert $ GroupKeyValues groupId kvId
-            Just kv -> insert $ GroupKeyValues groupId kv
+    forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete")] $ \tup ->
+        basicAddPRCO tags groupId (fst tup) (snd tup)
 
-    -- Create the requirements
-    -- TODO Conflicts, Obsoletes, Recommends, Enhances, Suggests, Supplements
-    --      How to handle everything from RPMSENSE_POSTTRANS and beyond?
+    -- Create the Requires attributes
+    -- TODO Recommends, Enhances, Suggests, Supplements
     addPRCO "Require" tags $ \expr -> do
         reqId <- findRequires RT.RPM RT.Runtime RT.Must expr >>= \case
                      Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must expr
@@ -91,24 +86,31 @@ createGroup fileIds tags = do
         void $ insert $ GroupRequirements groupId reqId
 
     return groupId
-
-addPRCO :: Monad m => String -> [Tag] -> (String -> m a) -> m ()
-addPRCO ty tags fn = do
-    let names = findStringListTag (ty' ++ "Name") tags
-    let flags = findWord32ListTag (ty' ++ "Flags") tags
-    let vers  = findStringListTag (ty' ++ "Version") tags
-
-    forM_ (zip3 names flags vers) $ \(n, f, v) -> do
-        let cmp  = rpmFlagsToOperator f
-        let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
-
-        fn expr
  where
+    basicAddPRCO tags groupId tagBase keyName =
+        addPRCO tagBase tags $ \expr ->
+            findKeyValue keyName expr >>= \case
+                Nothing -> insertKeyValue keyName expr >>= \kvId -> insert $ GroupKeyValues groupId kvId
+                Just kv -> insert $ GroupKeyValues groupId kv
+
+    addPRCO :: Monad m => String -> [Tag] -> (String -> m a) -> m ()
+    addPRCO ty tags fn = do
+        let names = findStringListTag (ty' ++ "Name") tags
+        let flags = findWord32ListTag (ty' ++ "Flags") tags
+        let vers  = findStringListTag (ty' ++ "Version") tags
+
+        -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
+        forM_ (zip3 names flags vers) $ \(n, f, v) -> do
+            let cmp  = rpmFlagsToOperator f
+            let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
+
+            fn expr
+     where
+        ty' = titlecase ty
+
     titlecase :: String -> String
     titlecase (hd:rest) = toUpper hd : map toLower rest
     titlecase []        = []
-
-    ty' = titlecase ty
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = do
