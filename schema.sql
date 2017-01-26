@@ -253,8 +253,7 @@ create index file_key_values_key_val_id_idx on file_key_values(key_val_id);
 create table groups (
     id integer primary key,
     name text not null,
-    group_type text not null,
-    constraint unique_name_type unique (name, group_type)
+    group_type text not null
 );
 create index groups_name_idx on groups(name);
 
