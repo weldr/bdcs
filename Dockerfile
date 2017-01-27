@@ -1,5 +1,4 @@
-FROM fedora:24
-RUN dnf -y install sqlite && dnf clean all
+FROM weld/fedora:24
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
