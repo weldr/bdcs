@@ -119,13 +119,14 @@ findGroupName ndx = do
 -- to satisfy the same requirement.
 findProviderId :: MonadIO m => String -> SqlPersistT m [GroupsId]
 findProviderId thing = do
+    let baseThing = takeWhile (/= ' ') thing
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id
            -- A requirement is satisfied by matching a rpm-provide, which may be
            -- an exact match (name-only) or a versioned match (name = version).
            -- For provides with versions, ignoring the version and grabbing everything.
-           where_ $ keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
-                    ( keyval ^. KeyValVal_value ==. val thing ||. keyval ^. KeyValVal_value `like` val (thing ++ " ") ++. (%))
+           where_ $ (keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
+                     keyval ^. KeyValVal_value ==. val baseThing)
            return $ group_keyval ^. GroupKeyValuesGroup_id
     return $ map unValue ndx
 

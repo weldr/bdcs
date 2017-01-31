@@ -43,7 +43,7 @@ insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
 insertPackageName rpm =
     throwIfNothingOtherwise packageName (DBException "No Name tag") $ \name ->
         findPackage name >>= \case
-            Nothing -> insertKeyValue "packageName" name
+            Nothing -> insertKeyValue "packageName" name Nothing
             Just p  -> return p
  where
     packageName = findStringTag "Name" rpm

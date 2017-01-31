@@ -196,7 +196,8 @@ create index build_files_file_id_idx on build_files(file_id);
 create table key_val (
     id integer primary key,
     key_value text not null,
-    val_value text not null
+    val_value text not null,
+    ext_value text
 );
 
 -- for key/val, it's not likely that we'll have a query that is looking up

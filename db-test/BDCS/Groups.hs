@@ -61,15 +61,15 @@ createGroup fileIds tags = do
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
     forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \(k, v) ->
-        findKeyValue k v >>= \case
-            Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
+        findKeyValue k v Nothing >>= \case
+            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
 
     -- Add the epoch attribute, when it exists.
     when (isJust epoch) $ void $ do
         let (k, v) = ("epoch", fromJust epoch)
-        findKeyValue k v >>= \case
-            Nothing -> insertKeyValue k v >>= \kvId -> insert $ GroupKeyValues groupId kvId
+        findKeyValue k v Nothing >>= \case
+            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete")] $ \tup ->
@@ -87,9 +87,12 @@ createGroup fileIds tags = do
     return groupId
  where
     basicAddPRCO tags groupId tagBase keyName =
-        addPRCO tagBase tags $ \expr ->
-            findKeyValue keyName expr >>= \case
-                Nothing -> insertKeyValue keyName expr >>= \kvId -> insert $ GroupKeyValues groupId kvId
+        addPRCO tagBase tags $ \expr -> let
+            -- split out the name part of "name >= version"
+            exprBase = takeWhile (/= ' ')  expr
+          in
+            findKeyValue keyName exprBase (Just expr) >>= \case
+                Nothing -> insertKeyValue keyName exprBase (Just expr) >>= \kvId -> insert $ GroupKeyValues groupId kvId
                 Just kv -> insert $ GroupKeyValues groupId kv
 
     addPRCO :: Monad m => String -> [Tag] -> (String -> m a) -> m ()
