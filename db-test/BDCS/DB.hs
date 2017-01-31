@@ -82,6 +82,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  KeyVal
     key_value String
     val_value String
+    ext_value String Maybe
     deriving Eq Show
  ProjectKeyValues
     package_id ProjectsId
