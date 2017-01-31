@@ -185,17 +185,15 @@ getRequirements name = findGroupId name >>= \case
 -- RPMs at once if they are all given to this function at the same time.  It prevents
 -- having to save the working data.
 closeRPM :: FilePath -> [String] -> IO [NEVRA]
-closeRPM db rpms = runSqlite (T.pack db) $ do
-    -- Pre-seed the list with the top-level requirements of all rpms.  The sets of
-    -- things we've determined are deps and the things we've already seen are
-    -- initialized to empty.
+closeRPM db rpms = runSqlite (T.pack db) $
+    -- The sets of things we've determined are deps and the things we've already seen
+    -- are initialized to empty.
     --
     -- This is two different sets so we know what's a package providing a dependency
     -- (stored in the first set) and what's an abstract dependency that we have already
     -- seen and potentially gathered (stored in the second set, things like "libc.so.6"
     -- or "config(whatever)").  We do not want to return the latter as results.
-    toplevel <- concatMapM getRequirements rpms
-    doit toplevel Set.empty Set.empty
+    doit rpms Set.empty Set.empty
  where
     doit []      deps _    = return $ Set.toList deps
     doit (hd:tl) deps seen =
