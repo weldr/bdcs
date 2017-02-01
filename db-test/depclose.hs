@@ -46,7 +46,7 @@
 --   dep satisfied two different ways, lang packs, multilib, etc.).
 -- * Has not been shown to give the same results as yum/dnf.
 
-import           Control.Monad(forM, liftM, when)
+import           Control.Monad(forM, forM_, liftM, when)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.List(isInfixOf)
 import           Data.Maybe(catMaybes, fromMaybe, listToMaybe)
@@ -59,12 +59,16 @@ import           System.Exit(exitFailure)
 
 import BDCS.DB
 
+data Proposition = NEVRA `Requires` String
+                 | NEVRA `Provides` String
+ deriving(Eq, Ord)
+
 data NEVRA = NEVRA String String String String String
  deriving(Eq, Ord, Show)
 
 printNEVRA :: NEVRA -> String
-printNEVRA (NEVRA n "" v r a)   = "('" ++ n ++ "', '" ++ a ++ "', '0', '" ++ v ++ "', '" ++ r ++ "')"
-printNEVRA (NEVRA n e v r a)    = "('" ++ n ++ "', '" ++ a ++ "', '" ++ e ++ "', '" ++ v ++ "', '" ++ r ++ "')"
+printNEVRA (NEVRA n "" v r a)   =             n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
+printNEVRA (NEVRA n e v r a)    = e ++ ":" ++ n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
 
 concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
 concatMapM fn lst = liftM concat (mapM fn lst)
@@ -185,7 +189,7 @@ getRequirements name = findGroupId name >>= \case
 -- for a list of packages and returns it as a list of NEVRAs.  It's easy to do several
 -- RPMs at once if they are all given to this function at the same time.  It prevents
 -- having to save the working data.
-closeRPM :: FilePath -> [String] -> IO [NEVRA]
+closeRPM :: FilePath -> [String] -> IO [Proposition]
 closeRPM db rpms = runSqlite (T.pack db) $
     -- The sets of things we've determined are deps and the things we've already seen
     -- are initialized to empty.
@@ -196,10 +200,10 @@ closeRPM db rpms = runSqlite (T.pack db) $
     -- or "config(whatever)").  We do not want to return the latter as results.
     doit rpms Set.empty Set.empty
  where
-    doit []      deps _    = return $ Set.toList deps
-    doit (hd:tl) deps seen =
+    doit []      props _    = return $ Set.toList props
+    doit (hd:tl) props seen =
         -- Seen it before, don't gather it up again.
-        if | hd `Set.member` seen   -> doit tl deps seen
+        if | hd `Set.member` seen   -> doit tl props seen
         -- This is a file requirement.  Get everything that provides it, add those to
         -- the dependencies set, mark as seen, and call this function again.  We add
         -- the providers to the worklist so we can gather all their dependencies, too.
@@ -216,9 +220,9 @@ closeRPM db rpms = runSqlite (T.pack db) $
                                               putStrLn "Groups are:"
                                               mapM_ (putStrLn . printNEVRA) nevras
 #endif
-                                          let deps' = deps `Set.union` Set.fromList nevras
-                                          let seen' = Set.insert hd seen
-                                          doit (providers ++ tl) deps' seen'
+                                          let props' = props `Set.union` Set.fromList (map (`Provides` hd) nevras)
+                                          let seen'  = Set.insert hd seen
+                                          doit (providers ++ tl) props' seen'
         -- This is either a package dependency or a dependency on something more abstract
         -- like an soname or feature (config(), etc.).  Get everything that provides it,
         -- add those to the dependencies set, mark as seen, and call this function again.
@@ -234,11 +238,13 @@ closeRPM db rpms = runSqlite (T.pack db) $
                                               mapM_ putStrLn providers
                                               putStrLn "Gathering requirements"
 #endif
-                                          r <- concatMapM getRequirements providers
+                                          reqs <- mapM getRequirements providers
 #if DEBUG
                                           liftIO $ do
                                               putStrLn "Requirements are:"
-                                              mapM_ putStrLn r
+                                              forM_ (zip providers reqs) $ \(thing, rs) -> do
+                                                  putStrLn $ "Requirements for " ++ thing ++ ":"
+                                                  mapM_ putStrLn rs
                                               putStrLn "Gathering group names"
 #endif
                                           nevras <- concatMapM getNEVRAsForGroupName providers
@@ -247,13 +253,18 @@ closeRPM db rpms = runSqlite (T.pack db) $
                                               putStrLn "Groups are:"
                                               mapM_ (putStrLn . printNEVRA) nevras
 #endif
-                                          let deps' = deps `Set.union` Set.fromList nevras
+                                          let props' = props `Set.union` Set.fromList (map (`Provides` hd) nevras)
+                                                             `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
+                                                                                                 (zip nevras reqs))
                                           let seen' = Set.insert hd seen
-                                          doit (r ++ providers ++ tl) deps' seen'
+                                          doit (concat reqs ++ providers ++ tl) props' seen'
 
-printResult :: [NEVRA] -> IO ()
-printResult deps =
-    mapM_ (putStrLn . printNEVRA) deps
+printResult :: [Proposition] -> IO ()
+printResult props =
+    mapM_ (putStrLn . printOne) props
+ where
+    printOne (nevra `Requires` thing) = printNEVRA nevra ++ " requires " ++ thing
+    printOne (nevra `Provides` thing) = printNEVRA nevra ++ " provides " ++ thing
 
 main :: IO ()
 main = do
