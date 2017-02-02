@@ -62,7 +62,7 @@ import BDCS.DB
 
 data Proposition = NEVRA `Requires` String
                  | NEVRA `Provides` String
- deriving(Eq, Ord)
+ deriving(Eq, Ord, Show)
 
 data NEVRA = NEVRA String String String String String
  deriving(Eq, Ord, Show)
@@ -213,8 +213,8 @@ closeRPM db rpms = runSqlite (T.pack db) $
 #if DEBUG
                                           liftIO $ do
                                               putStrLn "Requirements are:"
-                                              forM_ (zip providers reqs) $ \(thing, rs) -> do
-                                                  putStrLn $ "Requirements for " ++ thing ++ ":"
+                                              forM_ (zip providers' reqs) $ \((_, thing), rs) -> do
+                                                  putStrLn $ "Requirements for " ++ (show thing) ++ ":"
                                                   mapM_ putStrLn rs
                                               putStrLn "Gathering group names"
 #endif
