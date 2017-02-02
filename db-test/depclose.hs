@@ -200,61 +200,61 @@ closeRPM db rpms = runSqlite (T.pack db) $
     doit rpms Set.empty Set.empty
  where
     doit []      props _    = return $ Set.toList props
-    doit (hd:tl) props seen =
-        -- Seen it before, don't gather it up again.
-        if | hd `Set.member` seen   -> doit tl props seen
-        -- This is either a package dependency or a dependency on something more abstract
-        -- like an soname or feature (config(), etc.).  Get everything that provides it,
-        -- add those to the dependencies set, mark as seen, and call this function again.
-        -- This is the only place we call getRequirements, too.  Add all the top-level
-        -- requirements of all of this thing's providers to the worklist so they can be
-        -- further gathered up.
-        -- Dependencies that look like paths could be a path, or could match an abstract
-        -- feature, so they get checked twice.
-           | otherwise              -> do providers <- findProviderForName hd
+    -- Seen it before, don't gather it up again.
+    doit (hd:tl) props seen | hd `Set.member` seen = doit tl props seen
+    -- This is either a package dependency or a dependency on something more abstract
+    -- like an soname or feature (config(), etc.).  Get everything that provides it,
+    -- add those to the dependencies set, mark as seen, and call this function again.
+    -- This is the only place we call getRequirements, too.  Add all the top-level
+    -- requirements of all of this thing's providers to the worklist so they can be
+    -- further gathered up.
+    -- Dependencies that look like paths could be a path, or could match an abstract
+    -- feature, so they get checked twice.
+    doit (hd:tl) props seen | otherwise = do
+        providers <- findProviderForName hd
 #if DEBUG
-                                          liftIO $ do
-                                              putStrLn $ "Providers for " ++ hd ++ " are:"
-                                              mapM_ (putStrLn . show . snd) providers
-                                              putStrLn "Gathering requirements"
+        liftIO $ do
+            putStrLn $ "Providers for " ++ hd ++ " are:"
+            mapM_ (putStrLn . show . snd) providers
+            putStrLn "Gathering requirements"
 #endif
-                                          -- If the requirment looks like a filename, also look for packages
-                                          -- providing the file
-                                          fileProviders <- ifM (return $ head hd == '/')
-                                                               (findGroupContainingFile hd)
-                                                               (return [])
-                                          let providers' = providers ++ fileProviders
+        -- If the requirment looks like a filename, also look for packages
+        -- providing the file
+        fileProviders <- ifM (return $ head hd == '/')
+                             (findGroupContainingFile hd)
+                             (return [])
+        let providers' = providers ++ fileProviders
 
-                                          reqs <- mapM (getRequirements . fst) providers'
+        reqs <- mapM (getRequirements . fst) providers'
 #if DEBUG
-                                          liftIO $ do
-                                              putStrLn "Requirements are:"
-                                              forM_ (zip providers' reqs) $ \((_, thing), rs) -> do
-                                                  putStrLn $ "Requirements for " ++ (show thing) ++ ":"
-                                                  mapM_ putStrLn rs
-                                              putStrLn "Gathering group names"
+        liftIO $ do
+            putStrLn "Requirements are:"
+            forM_ (zip providers' reqs) $ \((_, thing), rs) -> do
+                putStrLn $ "Requirements for " ++ (show thing) ++ ":"
+                mapM_ putStrLn rs
+            putStrLn "Gathering group names"
 #endif
-                                          nevras <- mapM (getNEVRAForGroupId . fst) providers'
+        nevras <- mapM (getNEVRAForGroupId . fst) providers'
 #if DEBUG
-                                          liftIO $ do
-                                              putStrLn "Groups are:"
-                                              mapM_ (putStrLn . printNEVRA) nevras
-                                              putStrLn "Gathering obsoletes"
+        liftIO $ do
+            putStrLn "Groups are:"
+            mapM_ (putStrLn . printNEVRA) nevras
+            putStrLn "Gathering obsoletes"
 #endif
-                                          obsoletes <- mapM (whatObsoletes . fst) providers'
+        obsoletes <- mapM (whatObsoletes . fst) providers'
 #if DEBUG
-                                          liftIO $ do
-                                              putStrLn "Obsoletes are:"
-                                              forM_ (zip providers' obsoletes) $ (\thing, obs) -> do
-                                                  putStrLn $ "Obsoletes " ++ thing ++ ":"
-                                                  mapM_ putStrLn obs
+        liftIO $ do
+            putStrLn "Obsoletes are:"
+            forM_ (zip providers' obsoletes) $ (\thing, obs) -> do
+                putStrLn $ "Obsoletes " ++ thing ++ ":"
+                mapM_ putStrLn obs
 #endif
-                                          let props' = props `Set.union` Set.fromList (map snd providers')
-                                                             `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
-                                                                                                 (zip nevras reqs))
-                                                             `Set.union` Set.fromList (map (uncurry Obsoletes) (concat obsoletes))
-                                          let seen' = Set.insert hd seen
-                                          doit (concat reqs ++ map fst (concat obsoletes) ++ tl) props' seen'
+        let props' = props `Set.union` Set.fromList (map snd providers')
+                           `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
+                                                               (zip nevras reqs))
+                           `Set.union` Set.fromList (map (uncurry Obsoletes) (concat obsoletes))
+        let seen' = Set.insert hd seen
+        doit (concat reqs ++ map fst (concat obsoletes) ++ tl) props' seen'
 
 printResult :: [Proposition] -> IO ()
 printResult props =
