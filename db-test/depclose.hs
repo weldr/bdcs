@@ -50,7 +50,7 @@ import           Control.Conditional(ifM)
 import           Control.Monad(forM, forM_, liftM, when)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.List(isInfixOf)
-import           Data.Maybe(catMaybes, fromMaybe, listToMaybe)
+import           Data.Maybe(catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
 import           Database.Esqueleto
@@ -60,8 +60,9 @@ import           System.Exit(exitFailure)
 
 import BDCS.DB
 
-data Proposition = NEVRA `Requires` String
-                 | NEVRA `Provides` String
+data Proposition = String `Obsoletes` String
+                 | NEVRA  `Provides`  String
+                 | NEVRA  `Requires`  String
  deriving(Eq, Ord, Show)
 
 data NEVRA = NEVRA String String String String String
@@ -150,6 +151,21 @@ findGroupContainingFile file = do
     let propositions = zipWith Provides nevras paths'
     return $ zip ids' propositions
 
+-- Given a group id, return everything that obsoletes that group.  This is returned
+-- as both the name of the thing and the related expression.  We may need this expression
+-- for checking version numbers later.
+whatObsoletes :: MonadIO m => GroupsId -> SqlPersistT m [(String, String)]
+whatObsoletes id = do
+    ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` group) -> do
+           on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
+                    group_keyval ^.GroupKeyValuesGroup_id ==. group ^. GroupsId
+           where_ $ group ^. GroupsId ==. val id &&.
+                    keyval ^. KeyValKey_value ==. val "rpm-obsolete"
+           return  (group ^. GroupsName, keyval ^. KeyValExt_value)
+    return $ mapMaybe (\(a, b) -> case unValue b of
+                                      Nothing -> Nothing
+                                      Just b' -> Just (unValue a, b')) ndx
+
 -- Given a group id, look up everything it requires and return those expressions.
 -- The requires expressions can either just be a name ("Requires: blah") or a name
 -- plus version information ("Requires: blah > 2").  Nothing else is supported at
@@ -223,19 +239,30 @@ closeRPM db rpms = runSqlite (T.pack db) $
                                           liftIO $ do
                                               putStrLn "Groups are:"
                                               mapM_ (putStrLn . printNEVRA) nevras
+                                              putStrLn "Gathering obsoletes"
+#endif
+                                          obsoletes <- mapM (whatObsoletes . fst) providers'
+#if DEBUG
+                                          liftIO $ do
+                                              putStrLn "Obsoletes are:"
+                                              forM_ (zip providers' obsoletes) $ (\thing, obs) -> do
+                                                  putStrLn $ "Obsoletes " ++ thing ++ ":"
+                                                  mapM_ putStrLn obs
 #endif
                                           let props' = props `Set.union` Set.fromList (map snd providers')
                                                              `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
                                                                                                  (zip nevras reqs))
+                                                             `Set.union` Set.fromList (map (uncurry Obsoletes) (concat obsoletes))
                                           let seen' = Set.insert hd seen
-                                          doit (concat reqs ++ tl) props' seen'
+                                          doit (concat reqs ++ map fst (concat obsoletes) ++ tl) props' seen'
 
 printResult :: [Proposition] -> IO ()
 printResult props =
     mapM_ (putStrLn . printOne) props
  where
-    printOne (nevra `Requires` thing) = printNEVRA nevra ++ " requires " ++ thing
-    printOne (nevra `Provides` thing) = printNEVRA nevra ++ " provides " ++ thing
+    printOne (left  `Obsoletes` right) = left ++ " obsoletes " ++ right
+    printOne (nevra `Provides`  thing) = printNEVRA nevra ++ " provides " ++ thing
+    printOne (nevra `Requires`  thing) = printNEVRA nevra ++ " requires " ++ thing
 
 main :: IO ()
 main = do
