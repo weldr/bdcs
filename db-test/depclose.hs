@@ -46,6 +46,7 @@
 --   dep satisfied two different ways, lang packs, multilib, etc.).
 -- * Has not been shown to give the same results as yum/dnf.
 
+import           Control.Conditional(ifM)
 import           Control.Monad(forM, forM_, liftM, when)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.List(isInfixOf)
@@ -86,20 +87,16 @@ getValueForGroup grp key = do
            return $ keyval ^. KeyValVal_value
     return $ listToMaybe (map unValue ndx)
 
--- Given a group name, return the complete NEVRA tuple for it.  Each element
--- except for the name can potentially be empty.  Multiple NEVRAs could exist
--- for a single group name - for instance, packages that have multilib versions.
--- We do not make decisions about multilib in this program.
-getNEVRAsForGroupName :: MonadIO m => String -> SqlPersistT m [NEVRA]
-getNEVRAsForGroupName name = do
-    ids <- findGroupId name
-    forM ids $ \i -> do
-        name'   <- fromMaybe "" <$> getValueForGroup i "name"
-        epoch   <- fromMaybe "" <$> getValueForGroup i "epoch"
-        ver     <- fromMaybe "" <$> getValueForGroup i "version"
-        release <- fromMaybe "" <$> getValueForGroup i "release"
-        arch    <- fromMaybe "" <$> getValueForGroup i "arch"
-        return $ NEVRA name' epoch ver release arch
+-- Given a group id, return the complete NEVRA tuple for it.  Each element
+-- except for the name can potentially be empty.
+getNEVRAForGroupId :: MonadIO m => GroupsId -> SqlPersistT m NEVRA
+getNEVRAForGroupId id = do
+    name   <- fromMaybe "" <$> getValueForGroup id "name"
+    epoch   <- fromMaybe "" <$> getValueForGroup id "epoch"
+    ver     <- fromMaybe "" <$> getValueForGroup id "version"
+    release <- fromMaybe "" <$> getValueForGroup id "release"
+    arch    <- fromMaybe "" <$> getValueForGroup id "arch"
+    return $ NEVRA name epoch ver release arch
 
 -- Given a group name, return its index in the groups table.
 findGroupId :: MonadIO m => String -> SqlPersistT m [GroupsId]
@@ -109,81 +106,67 @@ findGroupId name = do
            return $ groups ^. GroupsId
     return $ map unValue ndx
 
--- Given a group's index into the groups table, return its name.
-findGroupName :: MonadIO m => GroupsId -> SqlPersistT m (Maybe String)
-findGroupName ndx = do
-    row <- select $ from $ \groups -> do
-           where_ $ groups ^. GroupsId ==. val ndx
-           limit 1
-           return $ groups ^. GroupsName
-    return $ listToMaybe (map unValue row)
-
 -- Given the name of something that is required by a package, look up everything
--- that provides it and return their indices.  It's possible for multiple things
--- to satisfy the same requirement.
-findProviderId :: MonadIO m => String -> SqlPersistT m [GroupsId]
-findProviderId thing = do
+-- that provides it and return their indices and the expression provided.  It's possible
+-- for multiple things to satisfy the same requirement.
+findProviderForName :: MonadIO m => String -> SqlPersistT m [(GroupsId, Proposition)]
+findProviderForName thing = do
     let baseThing = takeWhile (/= ' ') thing
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id
            -- A requirement is satisfied by matching a rpm-provide, which may be
            -- an exact match (name-only) or a versioned match (name = version).
            -- For provides with versions, ignoring the version and grabbing everything.
-           where_ $ (keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
-                     keyval ^. KeyValVal_value ==. val baseThing)
-           return $ group_keyval ^. GroupKeyValuesGroup_id
-    return $ map unValue ndx
+           where_ (keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
+                   keyval ^. KeyValVal_value ==. val baseThing)
+           return (group_keyval ^. GroupKeyValuesGroup_id, keyval ^. KeyValExt_value)
+
+    -- unpack the database values into something useful
+    let (ids, provides) = unzip ndx
+    let ids' = map unValue ids
+    let provides' = map (fromMaybe "" . unValue) provides
+
+    -- get the NEVRA for each group id returned, generate a propsition
+    nevras <- mapM getNEVRAForGroupId ids'
+    let propositions = zipWith Provides nevras provides'
+
+    -- return each group id with the associated proposition
+    return $ zip ids' propositions
 
 -- Given a file path, look up everything that provides it and return their indices.
--- It's possible for multiple things to provide the same file.
-findGroupContainingFile :: MonadIO m => String -> SqlPersistT m [GroupsId]
+-- and the expression provided. It's possible for multiple things to provide the same file.
+findGroupContainingFile :: MonadIO m => String -> SqlPersistT m [(GroupsId, Proposition)]
 findGroupContainingFile file = do
     ndx <- select $ distinct $ from $ \(group `InnerJoin` files) -> do
            on     $ group ^. GroupFilesFile_id ==. files ^. FilesId
            where_ $ files ^. FilesPath ==. val file
-           return $ group ^. GroupFilesGroup_id
-    return $ map unValue ndx
+           return (group ^. GroupFilesGroup_id, files ^. FilesPath)
 
--- Return the group name for everything that provides the given name.  This uses
--- findProviderId inside, but that just returns database indices.  Those need to
--- be converted into human-readable names.  This function will probably need to
--- be changed in the future to return some more complicated structure so a caller
--- can make decisions.  Just the name won't be enough.
-whatProvides :: MonadIO m => String -> SqlPersistT m [String]
-whatProvides name = do
-    let name' = takeWhile (/= ' ') name
-    providerIds <- findProviderId name'
-    catMaybes <$> mapM findGroupName providerIds
+    let (ids, paths) = unzip ndx
+    let ids' = map unValue ids
+    let paths' = map unValue paths
 
--- Return the group name for everything that provides the given file path.  We store
--- files and requires/provides separately, so this requires two lookup functions.
--- Just like whatProvides, this is a wrapper to convert database indices into names.
--- And also just like whatProvides, its return value will need to get more complex
--- in the future.
-whatProvidesFile :: MonadIO m => String -> SqlPersistT m [String]
-whatProvidesFile name = do
-    providerIds <- findGroupContainingFile name
-    catMaybes <$> mapM findGroupName providerIds
+    nevras <- mapM getNEVRAForGroupId ids'
+    let propositions = zipWith Provides nevras paths'
+    return $ zip ids' propositions
 
--- Given a group name, look up everything it requires and return those expressions.
+-- Given a group id, look up everything it requires and return those expressions.
 -- The requires expressions can either just be a name ("Requires: blah") or a name
 -- plus version information ("Requires: blah > 2").  Nothing else is supported at
 -- this time.
-getRequirements :: MonadIO m => String -> SqlPersistT m [String]
-getRequirements name = findGroupId name >>= \case
-    []  -> return []
-    ndx -> do
-        reqs <- select $ from $ \(req `InnerJoin` group_reqs) -> do
-                on     $ req ^. RequirementsId ==. group_reqs ^. GroupRequirementsReq_id
-                -- Filter out rpmlib() requirements.  Those don't appear to be provided
-                -- by anything so they will just always be unsolvable.  I don't think
-                -- we care about them anyway.  There are other types of these requires,
-                -- too (config() comes to mind) but those appear to be provided by
-                -- something.  So they can stay in the results for now.
-                where_ $ group_reqs ^. GroupRequirementsGroup_id `in_` valList ndx &&.
-                         not_ (req ^. RequirementsReq_expr `like` val "rpmlib" ++. (%))
-                return $ req ^. RequirementsReq_expr
-        return $ map unValue reqs
+getRequirements :: MonadIO m => GroupsId -> SqlPersistT m [String]
+getRequirements id = do
+    reqs <- select $ from $ \(req `InnerJoin` group_reqs) -> do
+            on     $ req ^. RequirementsId ==. group_reqs ^. GroupRequirementsReq_id
+            -- Filter out rpmlib() requirements.  Those don't appear to be provided
+            -- by anything so they will just always be unsolvable.  I don't think
+            -- we care about them anyway.  There are other types of these requires,
+            -- too (config() comes to mind) but those appear to be provided by
+            -- something.  So they can stay in the results for now.
+            where_ $ group_reqs ^. GroupRequirementsGroup_id ==. val id &&.
+                     not_ (req ^. RequirementsReq_expr `like` val "rpmlib" ++. (%))
+            return $ req ^. RequirementsReq_expr
+    return $ map unValue reqs
 
 -- And then this is the worklist function that actually gathers up the dependency tree
 -- for a list of packages and returns it as a list of NEVRAs.  It's easy to do several
@@ -204,41 +187,29 @@ closeRPM db rpms = runSqlite (T.pack db) $
     doit (hd:tl) props seen =
         -- Seen it before, don't gather it up again.
         if | hd `Set.member` seen   -> doit tl props seen
-        -- This is a file requirement.  Get everything that provides it, add those to
-        -- the dependencies set, mark as seen, and call this function again.  We add
-        -- the providers to the worklist so we can gather all their dependencies, too.
-           | "/" `isInfixOf` hd     -> do providers <- whatProvidesFile hd
-#if DEBUG
-                                          liftIO $ do
-                                              putStrLn $ "Providers for file " ++ hd ++ " are:"
-                                              mapM_ putStrLn providers
-                                              putStrLn "Gathering group names"
-#endif
-                                          nevras <- concatMapM getNEVRAsForGroupName providers
-#if DEBUG
-                                          liftIO $ do
-                                              putStrLn "Groups are:"
-                                              mapM_ (putStrLn . printNEVRA) nevras
-#endif
-                                          let props' = props `Set.union` Set.fromList (map (`Provides` hd) nevras)
-                                          let seen'  = Set.insert hd seen
-                                          doit (providers ++ tl) props' seen'
         -- This is either a package dependency or a dependency on something more abstract
         -- like an soname or feature (config(), etc.).  Get everything that provides it,
         -- add those to the dependencies set, mark as seen, and call this function again.
         -- This is the only place we call getRequirements, too.  Add all the top-level
         -- requirements of all of this thing's providers to the worklist so they can be
-        -- further gathered up.  Calling it here should take care of anything added as a
-        -- result of file dependencies.  (This assumption will fail if files can somehow
-        -- depend on other files.)
-           | otherwise              -> do providers <- whatProvides hd
+        -- further gathered up.
+        -- Dependencies that look like paths could be a path, or could match an abstract
+        -- feature, so they get checked twice.
+           | otherwise              -> do providers <- findProviderForName hd
 #if DEBUG
                                           liftIO $ do
                                               putStrLn $ "Providers for " ++ hd ++ " are:"
-                                              mapM_ putStrLn providers
+                                              mapM_ (putStrLn . show . snd) providers
                                               putStrLn "Gathering requirements"
 #endif
-                                          reqs <- mapM getRequirements providers
+                                          -- If the requirment looks like a filename, also look for packages
+                                          -- providing the file
+                                          fileProviders <- ifM (return $ head hd == '/')
+                                                               (findGroupContainingFile hd)
+                                                               (return [])
+                                          let providers' = providers ++ fileProviders
+
+                                          reqs <- mapM (getRequirements . fst) providers'
 #if DEBUG
                                           liftIO $ do
                                               putStrLn "Requirements are:"
@@ -247,17 +218,17 @@ closeRPM db rpms = runSqlite (T.pack db) $
                                                   mapM_ putStrLn rs
                                               putStrLn "Gathering group names"
 #endif
-                                          nevras <- concatMapM getNEVRAsForGroupName providers
+                                          nevras <- mapM (getNEVRAForGroupId . fst) providers'
 #if DEBUG
                                           liftIO $ do
                                               putStrLn "Groups are:"
                                               mapM_ (putStrLn . printNEVRA) nevras
 #endif
-                                          let props' = props `Set.union` Set.fromList (map (`Provides` hd) nevras)
+                                          let props' = props `Set.union` Set.fromList (map snd providers')
                                                              `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
                                                                                                  (zip nevras reqs))
                                           let seen' = Set.insert hd seen
-                                          doit (concat reqs ++ providers ++ tl) props' seen'
+                                          doit (concat reqs ++ tl) props' seen'
 
 printResult :: [Proposition] -> IO ()
 printResult props =
