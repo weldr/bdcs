@@ -4,7 +4,7 @@ else
 d = ${PWD}
 endif
 
-ORG_NAME=wiggum
+ORG_NAME=weld
 
 importer:
 	docker build -t $(ORG_NAME)/build-img -f Dockerfile.build .
