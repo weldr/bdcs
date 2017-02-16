@@ -38,7 +38,7 @@ that image and produces the mddb.
 
 The Dockerfile depends on a base image, named weld/fedora:24, which needs have
 been previously built. If it is not available it can be built from the
-composer-deployment repository by running `make weld-f24`.
+welder-deployment repository by running `make weld-f24`.
 
 The Makefile lays out the exact steps and can be used to simplify all this -
 just run "make importer mddb".  If make is unavailable, just copy the steps
