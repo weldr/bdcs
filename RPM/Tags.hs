@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -21,6 +21,9 @@ module RPM.Tags(Tag(..),
                 findTag,
                 findStringTag,
                 findStringListTag,
+                findWord16Tag,
+                findWord16ListTag,
+                findWord32Tag,
                 findWord32ListTag,
                 mkTag,
                 tagValue)
@@ -107,7 +110,7 @@ data Tag = DEPRECATED                   Tag
          | FileMTimes                   [Word32] Word32 Word32
          | FileMD5s                     [String] Word32 Word32
          | FileLinkTos                  [String] Word32 Word32
-         | FileFlags                    Word32 Word32 Word32
+         | FileFlags                    [Word32] Word32 Word32
          | Root                         Null Word32 Word32
          | FileUserName                 [String] Word32 Word32
          | FileGroupName                [String] Word32 Word32
@@ -123,7 +126,7 @@ data Tag = DEPRECATED                   Tag
          | RequireVersion               [String] Word32 Word32
          | NoSource                     [Word32] Word32 Word32
          | NoPatch                      [Word32] Word32 Word32
-         | ConflictFlags                Word32 Word32 Word32
+         | ConflictFlags                [Word32] Word32 Word32
          | ConflictName                 [String] Word32 Word32
          | ConflictVersion              [String] Word32 Word32
          | DefaultPrefix                String Word32 Word32
@@ -423,7 +426,7 @@ mkTag store tag ty offset count = case tag of
     1034    -> maker mkWord32        >>=            \v -> Just $ FileMTimes v offset count
     1035    -> maker mkStringArray   >>=            \v -> Just $ FileMD5s v offset count
     1036    -> maker mkStringArray   >>=            \v -> Just $ FileLinkTos v offset count
-    1037    -> maker mkWord32        >>= unlist >>= \v -> Just $ FileFlags v offset count
+    1037    -> maker mkWord32        >>=            \v -> Just $ FileFlags v offset count
     1038    -> maker mkNull          >>=            \v -> Just $ INTERNAL $ OBSOLETE $ Root v offset count
     1039    -> maker mkStringArray   >>=            \v -> Just $ FileUserName v offset count
     1040    -> maker mkStringArray   >>=            \v -> Just $ FileGroupName v offset count
@@ -439,7 +442,7 @@ mkTag store tag ty offset count = case tag of
     1050    -> maker mkStringArray   >>=            \v -> Just $ RequireVersion v offset count
     1051    -> maker mkWord32        >>=            \v -> Just $ NoSource v offset count
     1052    -> maker mkWord32        >>=            \v -> Just $ NoPatch v offset count
-    1053    -> maker mkWord32        >>= unlist >>= \v -> Just $ ConflictFlags v offset count
+    1053    -> maker mkWord32        >>=            \v -> Just $ ConflictFlags v offset count
     1054    -> maker mkStringArray   >>=            \v -> Just $ ConflictName v offset count
     1055    -> maker mkStringArray   >>=            \v -> Just $ ConflictVersion v offset count
     1056    -> maker mkString        >>=            \v -> Just $ INTERNAL $ DEPRECATED $ DefaultPrefix v offset count
@@ -762,6 +765,21 @@ findStringTag name tags = findTag name tags >>= \t -> tagValue t :: Maybe String
 -- Strings, and return as a list.  If no results are found, return an empty list.
 findStringListTag :: String -> [Tag] -> [String]
 findStringListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [String]
+
+-- | Given a 'Tag' name and a list of 'Tag's, find the match convert it into a
+-- Word16, and return it as a Maybe.
+findWord16Tag :: String -> [Tag] -> Maybe Word16
+findWord16Tag name tags = findTag name tags >>= \t -> tagValue t :: Maybe Word16
+
+-- | Given a 'Tag' name and a list of 'Tag's, find all matches, convert them into
+-- Word16, and return as a list.  if no results are found, return an empty list.
+findWord16ListTag :: String -> [Tag] -> [Word16]
+findWord16ListTag name tags = fromMaybe [] $ findTag name tags >>= \t -> tagValue t :: Maybe [Word16]
+
+-- | Given a 'Tag' name and a list of 'Tag's, find the match convert it into a
+-- Word32, and return it as a Maybe.
+findWord32Tag :: String -> [Tag] -> Maybe Word32
+findWord32Tag name tags = findTag name tags >>= \t -> tagValue t :: Maybe Word32
 
 -- | Given a 'Tag' name and a list of 'Tag's, find all matches, convert them into
 -- Word32, and return as a list.  if no results are found, return an empty list.

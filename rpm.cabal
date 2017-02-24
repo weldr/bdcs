@@ -10,7 +10,8 @@ license-file:        LICENSE
 library
     exposed-modules:    RPM.Parse,
                         RPM.Tags,
-                        RPM.Types
+                        RPM.Types,
+                        RPM.Version
 
     other-modules:      RPM.Internal.Numbers
 
@@ -94,3 +95,16 @@ executable rpm2json
     default-language:   Haskell2010
 
     ghc-options:        -Wall
+
+test-suite tests
+    type:               exitcode-stdio-1.0
+    hs-source-dirs:     tests
+    main-is:            Main.hs
+    
+    build-depends:      HUnit,
+                        base >= 4.7 && < 4.9,
+                        tasty,
+                        tasty-hunit,
+                        rpm
+
+    default-language:   Haskell2010
