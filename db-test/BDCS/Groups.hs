@@ -72,7 +72,7 @@ createGroup fileIds tags = do
             Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
             Just kv -> insert $ GroupKeyValues groupId kv
 
-    forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete")] $ \tup ->
+    forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
         basicAddPRCO tags groupId (fst tup) (snd tup)
 
     -- Create the Requires attributes
