@@ -76,13 +76,15 @@ createGroup fileIds tags = do
         basicAddPRCO tags groupId (fst tup) (snd tup)
 
     -- Create the Requires attributes
-    -- TODO Recommends, Enhances, Suggests, Supplements
-    addPRCO "Require" tags $ \expr -> do
-        reqId <- findRequires RT.RPM RT.Runtime RT.Must expr >>= \case
-                     Nothing  -> insert $ Requirements RT.RPM RT.Runtime RT.Must expr
-                     Just rid -> return rid
+    -- TODO Enhances, Supplements
+    forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
+           ("Supplement", RT.ShouldIfInstalled), ("Enhance", RT.MayIfInstalled)] $ \tup ->
+        addPRCO (fst tup) tags $ \expr -> do
+            reqId <- findRequires RT.RPM RT.Runtime (snd tup) expr >>= \case
+                         Nothing  -> insert $ Requirements RT.RPM RT.Runtime (snd tup) expr
+                         Just rid -> return rid
 
-        void $ insert $ GroupRequirements groupId reqId
+            void $ insert $ GroupRequirements groupId ReqId
 
     return groupId
  where

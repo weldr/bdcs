@@ -25,7 +25,7 @@ data ReqLanguage = RPM
 data ReqContext = Build | Runtime | Test
  deriving(Eq, Read, Show)
 
-data ReqStrength = Must | Should | May
+data ReqStrength = Must | Should | May | ShouldIfInstalled | MayIfInstalled
  deriving(Eq, Read, Show)
 
 derivePersistField "ReqLanguage"
