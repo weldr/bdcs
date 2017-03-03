@@ -84,7 +84,7 @@ createGroup fileIds tags = do
                          Nothing  -> insert $ Requirements RT.RPM RT.Runtime (snd tup) expr
                          Just rid -> return rid
 
-            void $ insert $ GroupRequirements groupId ReqId
+            void $ insert $ GroupRequirements groupId reqId
 
     return groupId
  where
