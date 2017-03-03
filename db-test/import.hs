@@ -31,6 +31,8 @@ import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
+import           Network.HTTP.Simple(Request, getResponseBody, httpSource, parseRequest)
+import           Network.URI(URI(..), parseURI)
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
@@ -74,8 +76,8 @@ loadRPM db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     sigs = headerTags $ head rpmHeaders
     tags = headerTags $ rpmHeaders !! 1
 
-processRPM :: FilePath -> FilePath -> IO ()
-processRPM db path = void $ runExceptT $ runResourceT pipeline
+processFromFile :: FilePath -> String -> IO ()
+processFromFile db path = void $ runExceptT $ runResourceT pipeline
  where
     pipeline = getRPM path =$= parseRPMC $$ consumer
 
@@ -84,6 +86,27 @@ processRPM db path = void $ runExceptT $ runResourceT pipeline
 
     consumer :: MonadIO m => Consumer RPM m ()
     consumer = awaitForever (liftIO . loadRPM db)
+
+processFromURL :: FilePath -> String -> IO ()
+processFromURL db url = do
+    r <- parseRequest url
+    void $ runExceptT $ runResourceT (pipeline r)
+ where
+    pipeline request = getRPM request =$= parseRPMC $$ consumer
+
+    getRPM :: MonadResource m => Request -> Producer m BS.ByteString
+    getRPM request = httpSource request getResponseBody
+
+    consumer :: MonadIO m => Consumer RPM m ()
+    consumer = awaitForever (liftIO . loadRPM db)
+
+processRPM :: FilePath -> String -> IO ()
+processRPM db url = do
+    let parsed = parseURI url
+    case parsed of
+        Just URI{..} -> if uriScheme == "file:" then processFromFile db uriPath
+                        else processFromURL db url
+        _            -> processFromURL db url
 
 --
 -- MAIN
