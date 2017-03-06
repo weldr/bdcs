@@ -5,4 +5,6 @@ if [ -e /mddb/metadata.db ]; then
 fi
 
 sqlite3 /mddb/metadata.db < /root/schema.sql
-/usr/local/bin/import /mddb/metadata.db /rpms/*rpm
+for f in /rpms/*rpm; do
+    /usr/local/bin/import /mddb/metadata.db file://${f}
+done
