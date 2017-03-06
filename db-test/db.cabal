@@ -65,7 +65,8 @@ executable import
                        text,
                        time,
                        transformers,
-                       unix
+                       unix,
+                       xml-conduit
 
   default-language:    Haskell2010
 
