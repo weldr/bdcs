@@ -76,7 +76,6 @@ createGroup fileIds tags = do
         basicAddPRCO tags groupId (fst tup) (snd tup)
 
     -- Create the Requires attributes
-    -- TODO Enhances, Supplements
     forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
            ("Supplement", RT.ShouldIfInstalled), ("Enhance", RT.MayIfInstalled)] $ \tup ->
         addPRCO (fst tup) tags $ \expr -> do
@@ -84,7 +83,12 @@ createGroup fileIds tags = do
                          Nothing  -> insert $ Requirements RT.RPM RT.Runtime (snd tup) expr
                          Just rid -> return rid
 
-            void $ insert $ GroupRequirements groupId reqId
+            -- Don't insert a requirement for a group more than once.  RPMs can have the same
+            -- requirement listed multiple times, for whatever reason, but we want to reduce
+            -- duplication.
+            findGroupRequirements groupId reqId >>= \case
+                Nothing -> void $ insert $ GroupRequirements groupId reqId
+                Just _  -> return ()
 
     return groupId
  where
@@ -115,6 +119,15 @@ createGroup fileIds tags = do
     titlecase :: String -> String
     titlecase (hd:rest) = toUpper hd : map toLower rest
     titlecase []        = []
+
+findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
+findGroupRequirements groupId reqId = do
+    ndx  <- select $ from $ \r -> do
+            where_ (r ^. GroupRequirementsGroup_id ==. val groupId &&.
+                    r ^. GroupRequirementsReq_id ==. val reqId)
+            limit 1
+            return (r ^. GroupRequirementsId)
+    return $ listToMaybe (map unValue ndx)
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = do
