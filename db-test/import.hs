@@ -29,10 +29,10 @@ import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Conduit((.|), Consumer, Producer, awaitForever, runConduitRes)
+import           Data.Conduit((.|), ConduitM, Consumer, Producer, awaitForever, runConduitRes, yield)
 import           Data.Conduit.Binary(sourceFile)
 import           Data.Conduit.Zlib(ungzip)
-import           Data.List(isSuffixOf)
+import           Data.List(isInfixOf, isSuffixOf)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
@@ -112,6 +112,13 @@ getFromFile = sourceFile
 getFromURL :: MonadResource m => Request -> Producer m BS.ByteString
 getFromURL request = httpSource request getResponseBody
 
+-- If a conduit is compressed, pass it through ungzip to uncompress it.  Otherwise, pass it
+-- through without doing anything.  We can only tell if a conduit is compressed by also being
+-- given the path to the thing being processed.
+maybeUngzip :: MonadResource m => FilePath -> ConduitM BS.ByteString BS.ByteString m ()
+maybeUngzip path | ".gz" `isSuffixOf` path  = ungzip
+                 | otherwise                = awaitForever yield
+
 processFromFile :: FilePath -> String -> IO ()
 processFromFile db path = do
     void $ runExceptT $ runConduitRes (pipeline path)
@@ -131,7 +138,7 @@ processFromLocalRepodata db metadataPath = do
     locations <- map (takeDirectory metadataPath </>) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
     mapM_ (processFromFile db) locations
  where
-    readMetadataPipeline path = getFromFile path .| ungzip .| sinkDoc def
+    readMetadataPipeline path = getFromFile path .| maybeUngzip path .| sinkDoc def
 
 processFromRepodata :: FilePath -> Request -> IO ()
 processFromRepodata db metadataRequest = do
@@ -139,7 +146,7 @@ processFromRepodata db metadataRequest = do
     locations <- map (\p -> metadataRequest { path=BS.concat [basePath, C8.pack p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
     mapM_ (processFromURL db) locations
  where
-    readMetadataPipeline request = getFromURL request .| ungzip .| sinkDoc def
+    readMetadataPipeline request = getFromURL request .| maybeUngzip (C8.unpack $ path request) .| sinkDoc def
 
 --
 -- MAIN
@@ -159,13 +166,11 @@ processThing :: FilePath -> String -> IO ()
 processThing db url = do
     let parsed = parseURI url
     case parsed of
-        Just URI{..} -> if | "primary.xml" `isSuffixOf` uriPath                            -> do putStrLn "Only compressed primary.xml is current supported"
-                                                                                                 exitFailure
-                           | uriScheme == "file:" && "primary.xml.gz" `isSuffixOf` uriPath -> processFromLocalRepodata db uriPath
-                           | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath           -> processFromFile db uriPath
-                           | "primary.xml.gz" `isSuffixOf` uriPath                         -> parseRequest url >>= processFromRepodata db
-                           | ".rpm" `isSuffixOf` uriPath                                   -> parseRequest url >>= processFromURL db
-                           | otherwise                                                     -> usage
+        Just URI{..} -> if | uriScheme == "file:" && "primary.xml" `isInfixOf` uriPath -> processFromLocalRepodata db uriPath
+                           | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath       -> processFromFile db uriPath
+                           | "primary.xml" `isInfixOf` uriPath                         -> parseRequest url >>= processFromRepodata db
+                           | ".rpm" `isSuffixOf` uriPath                               -> parseRequest url >>= processFromURL db
+                           | otherwise                                                 -> usage
         _ -> parseRequest url >>= processFromURL db
 
 usage :: IO ()
