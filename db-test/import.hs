@@ -31,7 +31,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit(($$), (=$=), Consumer, Producer)
 import           Data.Conduit.Zlib(ungzip)
-import           Data.List(isInfixOf)
+import           Data.List(isSuffixOf)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
@@ -158,10 +158,12 @@ processThing :: FilePath -> String -> IO ()
 processThing db url = do
     let parsed = parseURI url
     case parsed of
-        Just URI{..} -> if | uriScheme == "file:" && "primary.xml" `isInfixOf` uriPath -> processFromLocalRepodata db uriPath
-                           | uriScheme == "file:"                                      -> processFromFile db uriPath
-                           | "primary.xml" `isInfixOf` uriPath                         -> parseRequest url >>= processFromRepodata db
-                           | otherwise                                                 -> parseRequest url >>= processFromURL db
+        Just URI{..} -> if | "primary.xml" `isSuffixOf` uriPath                            -> do putStrLn "Only compressed primary.xml is current supported"
+                                                                                                 exitFailure
+                           | uriScheme == "file:" && "primary.xml.gz" `isSuffixOf` uriPath -> processFromLocalRepodata db uriPath
+                           | uriScheme == "file:"                                          -> processFromFile db uriPath
+                           | "primary.xml.gz" `isSuffixOf` uriPath                         -> parseRequest url >>= processFromRepodata db
+                           | otherwise                                                     -> parseRequest url >>= processFromURL db
         _ -> parseRequest url >>= processFromURL db
 
 main :: IO ()
