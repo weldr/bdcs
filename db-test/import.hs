@@ -162,22 +162,26 @@ processThing db url = do
         Just URI{..} -> if | "primary.xml" `isSuffixOf` uriPath                            -> do putStrLn "Only compressed primary.xml is current supported"
                                                                                                  exitFailure
                            | uriScheme == "file:" && "primary.xml.gz" `isSuffixOf` uriPath -> processFromLocalRepodata db uriPath
-                           | uriScheme == "file:"                                          -> processFromFile db uriPath
+                           | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath           -> processFromFile db uriPath
                            | "primary.xml.gz" `isSuffixOf` uriPath                         -> parseRequest url >>= processFromRepodata db
-                           | otherwise                                                     -> parseRequest url >>= processFromURL db
+                           | ".rpm" `isSuffixOf` uriPath                                   -> parseRequest url >>= processFromURL db
+                           | otherwise                                                     -> usage
         _ -> parseRequest url >>= processFromURL db
+
+usage :: IO ()
+usage = do
+    putStrLn "Usage: test output.db thing [thing ...]"
+    putStrLn "thing can be:"
+    putStrLn "\t* An HTTP, HTTPS, or file: URL to an RPM"
+    putStrLn "\t* A URL to a yum repo primary.xml.gz file"
+    exitFailure
 
 main :: IO ()
 main = do
     -- Read the list of objects to import from the command line arguments
     argv <- getArgs
 
-    when (length argv < 2) $ do
-        putStrLn "Usage: test output.db thing [thing ...]"
-        putStrLn "thing can be:"
-        putStrLn "\t* An HTTP, HTTPS, or file: URL to an RPM"
-        putStrLn "\t* A URL to a yum repo primary.xml.gz file"
-        exitFailure
+    when (length argv < 2) usage
 
     let db     = head argv
     let things = tail argv
