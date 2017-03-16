@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -166,7 +166,7 @@ processThing db url = do
 
 main :: IO ()
 main = do
-    -- Read the list of rpms to process from the command line arguments
+    -- Read the list of objects to import from the command line arguments
     argv <- getArgs
 
     when (length argv < 2) $ do
@@ -176,14 +176,14 @@ main = do
         putStrLn "\t* A URL to a yum repo primary.xml.gz file"
         exitFailure
 
-    let db   = head argv
-    let rpms = tail argv
+    let db     = head argv
+    let things = tail argv
 
     unlessM (doesFileExist db) $ do
         putStrLn "Database must already exist - create with sqlite3 schema.sql"
         exitFailure
 
-    mapM_ (processOne db) rpms
+    mapM_ (processOne db) things
  where
     processOne db path = catch (processThing db path)
                                (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing " ++ path ++ ": " ++ show e))
