@@ -21,15 +21,16 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import           Conduit(MonadResource, awaitForever, runResourceT, sourceFile)
 import           Control.Conditional(unlessM)
 import           Control.Exception(catch)
 import           Control.Monad(void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Conduit(($$), (=$=), Consumer, Producer)
+import           Data.Conduit((.|), Consumer, Producer, awaitForever, runConduitRes)
+import           Data.Conduit.Binary(sourceFile)
 import           Data.Conduit.Zlib(ungzip)
 import           Data.List(isSuffixOf)
 import           Database.Esqueleto
@@ -113,32 +114,32 @@ getFromURL request = httpSource request getResponseBody
 
 processFromFile :: FilePath -> String -> IO ()
 processFromFile db path = do
-    void $ runExceptT $ runResourceT (pipeline path)
+    void $ runExceptT $ runConduitRes (pipeline path)
     putStrLn $ "Imported " ++ path
  where
-    pipeline f = getFromFile f =$= parseRPMC $$ consumeRPM db
+    pipeline f = getFromFile f .| parseRPMC .| consumeRPM db
 
 processFromURL :: FilePath -> Request -> IO ()
 processFromURL db request = do
-    void $ runExceptT $ runResourceT (pipeline request)
+    void $ runExceptT $ runConduitRes (pipeline request)
     C8.putStrLn $ BS.concat ["Imported ", path request]
  where
-    pipeline r = getFromURL r =$= parseRPMC $$ consumeRPM db
+    pipeline r = getFromURL r .| parseRPMC .| consumeRPM db
 
 processFromLocalRepodata :: FilePath -> String -> IO ()
 processFromLocalRepodata db metadataPath = do
-    locations <- map (takeDirectory metadataPath </>) <$> extractLocations <$> runResourceT (readMetadataPipeline metadataPath)
+    locations <- map (takeDirectory metadataPath </>) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
     mapM_ (processFromFile db) locations
  where
-    readMetadataPipeline path = getFromFile path =$= ungzip $$ sinkDoc def
+    readMetadataPipeline path = getFromFile path .| ungzip .| sinkDoc def
 
 processFromRepodata :: FilePath -> Request -> IO ()
 processFromRepodata db metadataRequest = do
     let (basePath, _) = BS.breakSubstring "repodata/" (path metadataRequest)
-    locations <- map (\p -> metadataRequest { path=BS.concat [basePath, C8.pack p] }) <$> extractLocations <$> runResourceT (readMetadataPipeline metadataRequest)
+    locations <- map (\p -> metadataRequest { path=BS.concat [basePath, C8.pack p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
     mapM_ (processFromURL db) locations
  where
-    readMetadataPipeline request = getFromURL request =$= ungzip $$ sinkDoc def
+    readMetadataPipeline request = getFromURL request .| ungzip .| sinkDoc def
 
 --
 -- MAIN
