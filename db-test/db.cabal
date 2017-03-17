@@ -24,6 +24,7 @@ library
                        BDCS.ReqType,
                        BDCS.Signatures,
                        BDCS.Sources,
+                       BDCS.RPM.Sources,
                        Import.Comps,
                        Import.Conduit,
                        Import.RPM,

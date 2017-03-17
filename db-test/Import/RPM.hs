@@ -45,6 +45,7 @@ import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
 import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
+import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromFile, getFromURL)
 import RPM.Parse(parseRPMC)
 import RPM.Tags
@@ -58,7 +59,7 @@ consume db = awaitForever (liftIO . load db)
 load :: FilePath -> RPM -> IO ()
 load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     projectId <- insertProject tags
-    sourceId  <- insertSource tags projectId
+    sourceId  <- insertSource $ mkSource tags projectId
     buildId   <- insertBuild tags sourceId
     void $ insertBuildSignatures sigs buildId
     filesIds  <- insertFiles tags
