@@ -23,13 +23,22 @@ library
                        BDCS.Projects,
                        BDCS.ReqType,
                        BDCS.Signatures,
-                       BDCS.Sources
+                       BDCS.Sources,
+                       Import.Comps,
+                       Import.Conduit,
+                       Import.RPM,
+                       Import.Repodata
 
   build-depends:       base >=4.8 && <4.9,
                        bytestring,
+                       cond,
+                       conduit >= 1.2.8,
+                       conduit-extra,
                        directory,
                        esqueleto == 2.5.0,
                        filepath,
+                       http-conduit,
+                       mtl >= 2.2.1,
                        persistent,
                        persistent-sqlite,
                        persistent-template,
@@ -37,7 +46,8 @@ library
                        rpm,
                        text,
                        time,
-                       transformers
+                       transformers,
+                       xml-conduit
   default-language:    Haskell2010
 
 executable import
