@@ -210,7 +210,7 @@ closeRPM db rpms = runSqlite (T.pack db) $
     -- further gathered up.
     -- Dependencies that look like paths could be a path, or could match an abstract
     -- feature, so they get checked twice.
-    doit (hd:tl) props seen | otherwise = do
+                            | otherwise = do
         providers <- findProviderForName hd
 #if DEBUG
         liftIO $ do
