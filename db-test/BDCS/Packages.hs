@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -25,9 +25,7 @@ import Data.Maybe(listToMaybe)
 import Database.Esqueleto
 
 import BDCS.DB
-import BDCS.Exceptions(DBException(..), throwIfNothingOtherwise)
 import BDCS.KeyValue(insertKeyValue)
-import RPM.Tags(Tag, findStringTag)
 
 filesInPackage :: MonadIO m => String -> SqlPersistT m [String]
 filesInPackage name = do
@@ -39,14 +37,11 @@ filesInPackage name = do
                return (files ^. FilesPath)
     return $ map unValue results
 
-insertPackageName :: MonadIO m => [Tag] -> SqlPersistT m (Key KeyVal)
-insertPackageName rpm =
-    throwIfNothingOtherwise packageName (DBException "No Name tag") $ \name ->
-        findPackage name >>= \case
-            Nothing -> insertKeyValue "packageName" name Nothing
-            Just p  -> return p
- where
-    packageName = findStringTag "Name" rpm
+insertPackageName :: MonadIO m => String -> SqlPersistT m (Key KeyVal)
+insertPackageName packageName =
+    findPackage packageName >>= \case
+        Nothing -> insertKeyValue "packageName" packageName Nothing
+        Just p  -> return p
 
 findPackage :: MonadIO m => String -> SqlPersistT m (Maybe (Key KeyVal))
 findPackage name = do

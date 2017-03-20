@@ -39,12 +39,17 @@ import           Network.HTTP.Simple(Request)
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
 import BDCS.DB
+import BDCS.Exceptions(DBException(..), throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
-import BDCS.Groups(createGroup)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
 import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
+import BDCS.RPM.Builds(mkBuild)
+import BDCS.RPM.Files(mkFiles)
+import BDCS.RPM.Groups(createGroup)
+import BDCS.RPM.Projects(mkProject)
+import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromFile, getFromURL)
 import RPM.Parse(parseRPMC)
@@ -58,12 +63,12 @@ consume db = awaitForever (liftIO . load db)
 -- Load a parsed RPM into the database.
 load :: FilePath -> RPM -> IO ()
 load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
-    projectId <- insertProject tags
+    projectId <- insertProject $ mkProject tags
     sourceId  <- insertSource $ mkSource tags projectId
-    buildId   <- insertBuild tags sourceId
-    void $ insertBuildSignatures sigs buildId
-    filesIds  <- insertFiles tags
-    pkgNameId <- insertPackageName tags
+    buildId   <- insertBuild $ mkBuild tags sourceId
+    void $ insertBuildSignatures [mkRSASignature tags buildId, mkSHASignature tags buildId]
+    filesIds  <- mkFiles tags >>= insertFiles
+    pkgNameId <- insertPackageName $ findStringTag "Name" tags `throwIfNothing` DBException "No Name tag in RPM"
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId
