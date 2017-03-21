@@ -4,8 +4,8 @@ RUN dnf -y install xz-devel zlib-devel && dnf clean all
 RUN cabal update
 
 COPY haskell-rpm /root/bdcs/haskell-rpm/
-COPY db-test /root/bdcs/db-test/
+COPY importer /root/bdcs/importer/
 
 RUN cd /root/bdcs/haskell-rpm && cabal update && cabal install && cabal clean && \
-    cd /root/bdcs/db-test && cabal update && cabal install && cabal clean && \
+    cd /root/bdcs/importer && cabal update && cabal install && cabal clean && \
     cd /root/.cabal && rm -rf lib logs packages

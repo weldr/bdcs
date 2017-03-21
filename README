@@ -19,7 +19,7 @@ Running locally
 You will first need a directory full of RPMs somewhere.  Here, I assume that
 is the $PWD/Packages directory.  Then run:
 
-$ cd db-test
+$ cd importer
 $ cabal sandbox init
 $ cabal sandbox add-source ../../haskell-rpm
 $ cabal install --dependencies-only
