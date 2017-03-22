@@ -29,9 +29,9 @@ import BDCS.DB
 findProject :: MonadIO m => String -> SqlPersistT m (Maybe (Key Projects))
 findProject name = do
     ndx <- select $ from $ \proj -> do
-           where_ (proj ^. ProjectsName ==. val name)
+           where_ $ proj ^. ProjectsName ==. val name
            limit 1
-           return (proj ^. ProjectsId)
+           return $ proj ^. ProjectsId
     return $ listToMaybe (map unValue ndx)
 
 insertProject :: MonadIO m => Projects -> SqlPersistT m (Key Projects)

@@ -30,10 +30,10 @@ findSource :: MonadIO m => String -> Key Projects -> SqlPersistT m (Maybe (Key S
 findSource version projectId = do
     -- FIXME:  Is (project_id, version) unique in Sources?
     ndx <- select $ from $ \src -> do
-           where_ (src ^. SourcesProject_id ==. val projectId &&.
-                   src ^. SourcesVersion    ==. val version)
+           where_ $ src ^. SourcesProject_id ==. val projectId &&.
+                    src ^. SourcesVersion    ==. val version
            limit 1
-           return (src ^. SourcesId)
+           return $ src ^. SourcesId
     return $ listToMaybe (map unValue ndx)
 
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)

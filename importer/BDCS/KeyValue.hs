@@ -26,11 +26,11 @@ import BDCS.DB
 findKeyValue :: MonadIO m => String -> String -> Maybe String -> SqlPersistT m (Maybe (Key KeyVal))
 findKeyValue k v e = do
     ndx <- select $ from $ \kv -> do
-           where_ (kv ^. KeyValKey_value ==. val k &&.
-                   kv ^. KeyValVal_value ==. val v &&.
-                   kv ^. KeyValExt_value ==. val e)
+           where_ $ kv ^. KeyValKey_value ==. val k &&.
+                    kv ^. KeyValVal_value ==. val v &&.
+                    kv ^. KeyValExt_value ==. val e
            limit 1
-           return (kv ^. KeyValId)
+           return $ kv ^. KeyValId
     return $ listToMaybe (map unValue ndx)
 
 insertKeyValue :: MonadIO m => String -> String -> Maybe String -> SqlPersistT m (Key KeyVal)

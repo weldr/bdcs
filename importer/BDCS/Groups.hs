@@ -27,19 +27,19 @@ import qualified BDCS.ReqType as RT
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
 findGroupRequirements groupId reqId = do
     ndx  <- select $ from $ \r -> do
-            where_ (r ^. GroupRequirementsGroup_id ==. val groupId &&.
-                    r ^. GroupRequirementsReq_id ==. val reqId)
+            where_ $ r ^. GroupRequirementsGroup_id ==. val groupId &&.
+                     r ^. GroupRequirementsReq_id ==. val reqId
             limit 1
-            return (r ^. GroupRequirementsId)
+            return $ r ^. GroupRequirementsId
     return $ listToMaybe (map unValue ndx)
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = do
     ndx <- select $ from $ \r -> do
-           where_ (r ^. RequirementsReq_language ==. val reqLang &&.
-                   r ^. RequirementsReq_context ==. val reqCtx &&.
-                   r ^. RequirementsReq_strength ==. val reqStrength &&.
-                   r ^. RequirementsReq_expr ==. val reqExpr)
+           where_ $ r ^. RequirementsReq_language ==. val reqLang &&.
+                    r ^. RequirementsReq_context ==. val reqCtx &&.
+                    r ^. RequirementsReq_strength ==. val reqStrength &&.
+                    r ^. RequirementsReq_expr ==. val reqExpr
            limit 1
-           return (r ^. RequirementsId)
+           return $ r ^. RequirementsId
     return $ listToMaybe (map unValue ndx)

@@ -92,7 +92,7 @@ getValueForGroup grp key = do
 -- except for the name can potentially be empty.
 getNEVRAForGroupId :: MonadIO m => GroupsId -> SqlPersistT m NEVRA
 getNEVRAForGroupId id = do
-    name   <- fromMaybe "" <$> getValueForGroup id "name"
+    name    <- fromMaybe "" <$> getValueForGroup id "name"
     epoch   <- fromMaybe "" <$> getValueForGroup id "epoch"
     ver     <- fromMaybe "" <$> getValueForGroup id "version"
     release <- fromMaybe "" <$> getValueForGroup id "release"
@@ -118,8 +118,8 @@ findProviderForName thing = do
            -- A requirement is satisfied by matching a rpm-provide, which may be
            -- an exact match (name-only) or a versioned match (name = version).
            -- For provides with versions, ignoring the version and grabbing everything.
-           where_ (keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
-                   keyval ^. KeyValVal_value ==. val baseThing)
+           where_ $ keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
+                    keyval ^. KeyValVal_value ==. val baseThing
            return (group_keyval ^. GroupKeyValuesGroup_id, keyval ^. KeyValExt_value)
 
     -- unpack the database values into something useful

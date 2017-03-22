@@ -31,12 +31,12 @@ findBuild :: MonadIO m => Int -> String -> String -> Key Sources -> SqlPersistT 
 findBuild epoch release arch sourceId = do
     -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
     ndx <- select $ from $ \build -> do
-           where_ (build ^. BuildsSource_id ==. val sourceId &&.
-                   build ^. BuildsEpoch ==. val epoch &&.
-                   build ^. BuildsRelease ==. val release &&.
-                   build ^. BuildsArch ==. val arch)
+           where_ $ build ^. BuildsSource_id ==. val sourceId &&.
+                    build ^. BuildsEpoch ==. val epoch &&.
+                    build ^. BuildsRelease ==. val release &&.
+                    build ^. BuildsArch ==. val arch
            limit 1
-           return (build ^. BuildsId)
+           return $ build ^. BuildsId
     return $ listToMaybe (map unValue ndx)
 
 insertBuild :: MonadIO m => Builds -> SqlPersistT m (Key Builds)

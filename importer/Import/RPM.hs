@@ -86,9 +86,9 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     buildImported sigs =
         case findStringTag "SHA1Header" sigs of
             Just sha -> do ndx <- select $ from $ \signatures -> do
-                                  where_ (signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
-                                          signatures ^. BuildSignaturesSignature_data ==. val (C8.pack sha))
-                                  return (signatures ^. BuildSignaturesId)
+                                  where_ $ signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
+                                           signatures ^. BuildSignaturesSignature_data ==. val (C8.pack sha)
+                                  return $ signatures ^. BuildSignaturesId
                            return $ not $ null ndx
             Nothing  -> return False
 
