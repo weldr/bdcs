@@ -66,7 +66,7 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     projectId <- insertProject $ mkProject tags
     sourceId  <- insertSource $ mkSource tags projectId
     buildId   <- insertBuild $ mkBuild tags sourceId
-    void $ insertBuildSignatures [mkRSASignature tags buildId, mkSHASignature tags buildId]
+    void $ insertBuildSignatures [mkRSASignature sigs buildId, mkSHASignature sigs buildId]
     filesIds  <- mkFiles tags >>= insertFiles
     pkgNameId <- insertPackageName $ findStringTag "Name" tags `throwIfNothing` DBException "No Name tag in RPM"
 
