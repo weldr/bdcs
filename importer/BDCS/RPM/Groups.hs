@@ -56,21 +56,16 @@ createGroup fileIds rpm = do
     groupId <- insert $ Groups name "rpm"
 
     -- Create the group_files rows
-    void $ mapM (\fId -> insert $ GroupFiles groupId fId) fileIds
+    mapM_ (\fId -> insert $ GroupFiles groupId fId) fileIds
 
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
-    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \(k, v) ->
-        findKeyValue k v Nothing >>= \case
-            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
-            Just kv -> insert $ GroupKeyValues groupId kv
+    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $
+        insertKeyValueIfMissing groupId
 
     -- Add the epoch attribute, when it exists.
-    when (isJust epoch) $ void $ do
-        let (k, v) = ("epoch", fromJust epoch)
-        findKeyValue k v Nothing >>= \case
-            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
-            Just kv -> insert $ GroupKeyValues groupId kv
+    when (isJust epoch) $ void $
+        insertKeyValueIfMissing groupId ("epoch", fromJust epoch)
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
         basicAddPRCO rpm groupId (fst tup) (snd tup)
@@ -92,6 +87,11 @@ createGroup fileIds rpm = do
 
     return groupId
  where
+    insertKeyValueIfMissing groupId (k, v) =
+        findKeyValue k v Nothing >>= \case
+            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
+            Just kv -> insert $ GroupKeyValues groupId kv
+
     basicAddPRCO tags groupId tagBase keyName =
         addPRCO tagBase tags $ \expr -> let
             -- split out the name part of "name >= version"
