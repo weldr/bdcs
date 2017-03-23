@@ -120,3 +120,16 @@ executable depclose
     cc-options:        "-DDEBUG"
   else
     cpp-options:       -Wall
+
+Test-Suite test-db
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      tests
+  main-is:             Main.hs
+  build-depends:       HUnit,
+                       base >= 4.8 && < 4.9,
+                       persistent,
+                       persistent-sqlite,
+                       tasty,
+                       tasty-hunit,
+                       db,
+                       rpm
