@@ -28,13 +28,13 @@ import RPM.Tags(Tag, findByteStringTag, findStringTag)
 mkProject :: [Tag] -> Projects
 mkProject tags = let
     projectName = throwIfNothingOtherwise (findStringTag "SourceRPM" tags)
-                                          (DBException "No SourceRPM tag in RPM")
+                                          (MissingRPMTag "SourceRPM")
                                           srpmToName
     summary     = throwIfNothingOtherwise (findByteStringTag "Summary" tags)
-                                          (DBException "No Summary tag in RPM")
+                                          (MissingRPMTag "Summary")
                                           unpack
     description = throwIfNothingOtherwise (findByteStringTag "Description" tags)
-                                          (DBException "No Description tag in RPM")
+                                          (MissingRPMTag "Description")
                                           unpack
     homepage    = findStringTag "URL" tags
 

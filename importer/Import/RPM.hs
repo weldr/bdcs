@@ -68,7 +68,7 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
     buildId   <- insertBuild $ mkBuild tags sourceId
     void $ insertBuildSignatures [mkRSASignature sigs buildId, mkSHASignature sigs buildId]
     filesIds  <- mkFiles tags >>= insertFiles
-    pkgNameId <- insertPackageName $ findStringTag "Name" tags `throwIfNothing` DBException "No Name tag in RPM"
+    pkgNameId <- insertPackageName $ findStringTag "Name" tags `throwIfNothing` MissingRPMTag "Name"
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId

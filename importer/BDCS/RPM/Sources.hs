@@ -26,8 +26,8 @@ import RPM.Tags(Tag, findStringTag)
 
 mkSource :: [Tag] -> Key Projects -> Sources
 mkSource tags projectId = let
-    license = findStringTag "License" tags `throwIfNothing` DBException "No License tag in RPM"
-    version = findStringTag "Version" tags `throwIfNothing` DBException "No Version tag in RPM"
+    license = findStringTag "License" tags `throwIfNothing` MissingRPMTag "License"
+    version = findStringTag "Version" tags `throwIfNothing` MissingRPMTag "Version"
 
     -- FIXME:  Where to get this from?
     source_ref = "SOURCE_REF"

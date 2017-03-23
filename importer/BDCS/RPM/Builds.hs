@@ -30,12 +30,12 @@ import RPM.Tags(Tag, findStringTag, findStringListTag, findTag, tagValue)
 mkBuild :: [Tag] -> Key Sources -> Builds
 mkBuild tags sourceId = let
     epoch   = maybe 0 fromIntegral (findTag "Epoch" tags >>= \t -> tagValue t :: Maybe Word32)
-    release = findStringTag "Release" tags `throwIfNothing` DBException "No Release tag in RPM"
-    arch    = findStringTag "Arch"    tags `throwIfNothing` DBException "No Arch tag in RPM"
+    release = findStringTag "Release" tags `throwIfNothing` MissingRPMTag "Release"
+    arch    = findStringTag "Arch"    tags `throwIfNothing` MissingRPMTag "Arch"
 
-    build_time = getBuildTime `throwIfNothing` DBException "No BuildTime tag in RPM"
+    build_time = getBuildTime `throwIfNothing` MissingRPMTag "BuildTime"
     -- FIXME: RPM splits the changelog up into three tag types.  I'm just grabbing the text here for now.
-    changelog  = getChangelog `throwIfNothing` DBException "No ChangeLogText tag in RPM"
+    changelog  = getChangelog `throwIfNothing` MissingRPMTag "ChangeLogText"
 
     -- FIXME:  Where to get these from?
     build_config_ref = "BUILD_CONFIG_REF"

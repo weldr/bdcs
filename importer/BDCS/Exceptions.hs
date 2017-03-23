@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -27,12 +27,14 @@ import Data.Data(Typeable)
 -- but runSqlite will roll back the entire transaction if an exception is raised.  That's
 -- a good reason to use them.
 data DBException = DBException String
- deriving(Typeable)
+                 | MissingRPMTag String
+ deriving(Eq, Typeable)
 
 instance Exception DBException
 
 instance Show DBException where
-    show (DBException s) = show s
+    show (DBException s)   = show s
+    show (MissingRPMTag s) = "Missing required tag in RPM: " ++ s
 
 throwIfNothing :: Exception e => Maybe a -> e -> a
 throwIfNothing (Just v) _   = v

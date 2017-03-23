@@ -27,7 +27,7 @@ import RPM.Tags(Tag, findTag, tagValue)
 
 mkRSASignature :: [Tag] -> Key Builds -> BuildSignatures
 mkRSASignature tags buildId = let
-    rsaSig = getRSASig `throwIfNothing` DBException "No RSAHeader tag in RPM"
+    rsaSig = getRSASig `throwIfNothing` MissingRPMTag "RSAHeader"
  in
     BuildSignatures buildId "RSA" rsaSig
  where
@@ -35,7 +35,7 @@ mkRSASignature tags buildId = let
 
 mkSHASignature :: [Tag] -> Key Builds -> BuildSignatures
 mkSHASignature tags buildId = let
-    shaSig = getSHASig `throwIfNothing` DBException "No SHA1Header tag in RPM"
+    shaSig = getSHASig `throwIfNothing` MissingRPMTag "SHA1Header"
  in
     BuildSignatures buildId "SHA1" shaSig
  where
