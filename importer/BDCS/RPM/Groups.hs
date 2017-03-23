@@ -44,13 +44,13 @@ rpmFlagsToOperator f =
        | otherwise                      -> ""
 
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
-createGroup fileIds tags = do
+createGroup fileIds rpm = do
     -- Get the NEVRA so it can be saved as attributes
-    let epoch = findTag "Epoch" tags >>= \t -> (tagValue t :: Maybe Word32) >>= Just . show
-    let name = fromMaybe "" $ findStringTag "Name" tags
-    let version = fromMaybe "" $ findStringTag "Version" tags
-    let release = fromMaybe "" $ findStringTag "Release" tags
-    let arch = fromMaybe "" $ findStringTag "Arch" tags
+    let epoch = findTag "Epoch" rpm >>= \t -> (tagValue t :: Maybe Word32) >>= Just . show
+    let name = fromMaybe "" $ findStringTag "Name" rpm
+    let version = fromMaybe "" $ findStringTag "Version" rpm
+    let release = fromMaybe "" $ findStringTag "Release" rpm
+    let arch = fromMaybe "" $ findStringTag "Arch" rpm
 
     -- Create the groups row
     groupId <- insert $ Groups name "rpm"
@@ -73,12 +73,12 @@ createGroup fileIds tags = do
             Just kv -> insert $ GroupKeyValues groupId kv
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
-        basicAddPRCO tags groupId (fst tup) (snd tup)
+        basicAddPRCO rpm groupId (fst tup) (snd tup)
 
     -- Create the Requires attributes
     forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
            ("Supplement", RT.ShouldIfInstalled), ("Enhance", RT.MayIfInstalled)] $ \tup ->
-        addPRCO (fst tup) tags $ \expr -> do
+        addPRCO (fst tup) rpm $ \expr -> do
             reqId <- findRequires RT.RPM RT.Runtime (snd tup) expr >>= \case
                          Nothing  -> insert $ Requirements RT.RPM RT.Runtime (snd tup) expr
                          Just rid -> return rid

@@ -133,3 +133,4 @@ Test-Suite test-db
                        tasty-hunit,
                        db,
                        rpm
+  default-language:    Haskell2010

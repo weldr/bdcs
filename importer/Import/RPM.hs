@@ -62,25 +62,25 @@ consume db = awaitForever (liftIO . load db)
 
 -- Load a parsed RPM into the database.
 load :: FilePath -> RPM -> IO ()
-load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigs) $ do
-    projectId <- insertProject $ mkProject tags
-    sourceId  <- insertSource $ mkSource tags projectId
-    buildId   <- insertBuild $ mkBuild tags sourceId
-    void $ insertBuildSignatures [mkRSASignature sigs buildId, mkSHASignature sigs buildId]
-    filesIds  <- mkFiles tags >>= insertFiles
-    pkgNameId <- insertPackageName $ findStringTag "Name" tags `throwIfNothing` MissingRPMTag "Name"
+load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
+    projectId <- insertProject $ mkProject tagHeaders
+    sourceId  <- insertSource $ mkSource tagHeaders projectId
+    buildId   <- insertBuild $ mkBuild tagHeaders sourceId
+    void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
+    filesIds  <- mkFiles tagHeaders >>= insertFiles
+    pkgNameId <- insertPackageName $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId
     void $ associateBuildWithPackage buildId pkgNameId
 
     -- groups and reqs
-    -- groupId <- createGroup filesIds tags
-    void $ createGroup filesIds tags
+    -- groupId <- createGroup filesIds tagHeaders
+    void $ createGroup filesIds tagHeaders
  where
     -- FIXME:  Be less stupid.
-    sigs = headerTags $ head rpmHeaders
-    tags = headerTags $ rpmHeaders !! 1
+    sigHeaders = headerTags $ head rpmHeaders
+    tagHeaders = headerTags $ rpmHeaders !! 1
 
     buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
     buildImported sigs =

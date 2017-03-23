@@ -19,7 +19,7 @@ module BDCS.KeyValue(findKeyValue,
 
 import Control.Monad.IO.Class(MonadIO)
 import Database.Esqueleto
-import Data.Maybe(listToMaybe, maybe)
+import Data.Maybe(listToMaybe)
 
 import BDCS.DB
 
