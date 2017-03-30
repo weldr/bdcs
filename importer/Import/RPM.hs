@@ -28,6 +28,7 @@ import           Control.Conditional(unlessM)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Reader(ReaderT, ask)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, awaitForever, runConduitRes)
@@ -52,6 +53,7 @@ import BDCS.RPM.Projects(mkProject)
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromFile, getFromURL)
+import Import.State(ImportState(..))
 import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types
@@ -92,16 +94,20 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ d
                            return $ not $ null ndx
             Nothing  -> return False
 
-loadFromFile :: FilePath -> String -> IO ()
-loadFromFile db path = do
-    void $ runExceptT $ runConduitRes (pipeline path)
-    putStrLn $ "Imported " ++ path
- where
-    pipeline f = getFromFile f .| parseRPMC .| consume db
+loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile path = do
+    db <- stDB <$> ask
 
-loadFromURL :: FilePath -> Request -> IO ()
-loadFromURL db request = do
-    void $ runExceptT $ runConduitRes (pipeline request)
-    C8.putStrLn $ BS.concat ["Imported ", path request]
+    void $ runExceptT $ runConduitRes (pipeline db path)
+    liftIO $ putStrLn $ "Imported " ++ path
  where
-    pipeline r = getFromURL r .| parseRPMC .| consume db
+    pipeline d f = getFromFile f .| parseRPMC .| consume d
+
+loadFromURL :: Request -> ReaderT ImportState IO ()
+loadFromURL request = do
+    db <- stDB <$> ask
+
+    void $ runExceptT $ runConduitRes (pipeline db request)
+    liftIO $ C8.putStrLn $ BS.concat ["Imported ", path request]
+ where
+    pipeline d r = getFromURL r .| parseRPMC .| consume d

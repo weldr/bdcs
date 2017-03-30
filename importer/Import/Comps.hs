@@ -24,6 +24,7 @@ module Import.Comps(CompsPkg(..),
                     loadFromURL)
  where
 
+import           Control.Monad.Reader(ReaderT)
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), runConduitRes)
 import qualified Data.Text as T
@@ -34,6 +35,7 @@ import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
 
 import Import.Conduit(getFromFile, getFromURL, ungzipIfCompressed)
+import Import.State(ImportState)
 
 data CompsPkg = CPMandatory T.Text
               | CPDefault T.Text
@@ -81,8 +83,8 @@ extractGroups doc = let
  in
     map parseCompsGroup groupCursors
 
-loadFromURL :: FilePath -> Request -> IO ()
-loadFromURL db metadataRequest = do
+loadFromURL :: Request -> ReaderT ImportState IO ()
+loadFromURL metadataRequest = do
     groups <- extractGroups <$> runConduitRes (readMetadataPipeline metadataRequest)
     -- FIXME:  For now we don't actually do any loading.  There's a lot of questions
     -- about how this is going to fit into the database, but I want to make sure this
@@ -91,8 +93,8 @@ loadFromURL db metadataRequest = do
  where
     readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
 
-loadFromFile :: FilePath -> String -> IO ()
-loadFromFile db metadataPath = do
+loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile metadataPath = do
     groups <- extractGroups <$> runConduitRes (readMetadataPipeline metadataPath)
     -- FIXME:  For now we don't actually do any loading.  There's a lot of questions
     -- about how this is going to fit into the database, but I want to make sure this

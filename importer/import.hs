@@ -22,6 +22,8 @@
 import Control.Conditional(unlessM)
 import Control.Exception(catch)
 import Control.Monad(void, when)
+import Control.Monad.IO.Class(liftIO)
+import Control.Monad.Reader(ReaderT, runReaderT)
 import Data.List(isInfixOf, isSuffixOf)
 import Network.HTTP.Simple(parseRequest)
 import Network.URI(URI(..), parseURI)
@@ -34,21 +36,20 @@ import           BDCS.Exceptions(DBException)
 import qualified Import.Comps as Comps
 import qualified Import.RPM as RPM
 import qualified Import.Repodata as Repodata
+import           Import.State(ImportState(..))
 
-processThing :: FilePath -> String -> IO ()
-processThing db url = do
-    let parsed = parseURI url
-    case parsed of
-        Just URI{..} -> if | uriScheme == "file:" && isPrimaryXMLFile uriPath       -> Repodata.loadFromFile db uriPath
-                           | uriScheme == "file:" && isCompsFile uriPath            -> Comps.loadFromFile db uriPath
-                           | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath    -> RPM.loadFromFile db uriPath
+processThing :: String -> ReaderT ImportState IO ()
+processThing url = case parseURI url of
+    Just URI{..} -> if | uriScheme == "file:" && isPrimaryXMLFile uriPath       -> Repodata.loadFromFile uriPath
+                       | uriScheme == "file:" && isCompsFile uriPath            -> Comps.loadFromFile uriPath
+                       | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath    -> RPM.loadFromFile uriPath
 
-                           | isPrimaryXMLFile uriPath                               -> parseRequest url >>= Repodata.loadFromURL db
-                           | isCompsFile uriPath                                    -> parseRequest url >>= Comps.loadFromURL db
-                           | ".rpm" `isSuffixOf` uriPath                            -> parseRequest url >>= RPM.loadFromURL db
+                       | isPrimaryXMLFile uriPath                               -> parseRequest url >>= Repodata.loadFromURL
+                       | isCompsFile uriPath                                    -> parseRequest url >>= Comps.loadFromURL
+                       | ".rpm" `isSuffixOf` uriPath                            -> parseRequest url >>= RPM.loadFromURL
 
-                           | otherwise                                              -> usage
-        _ -> parseRequest url >>= RPM.loadFromURL db
+                       | otherwise                                              -> liftIO usage
+    _ -> parseRequest url >>= RPM.loadFromURL
  where
     isPrimaryXMLFile path = "primary.xml" `isInfixOf` path
 
@@ -77,7 +78,9 @@ main = do
         putStrLn "Database must already exist - create with sqlite3 schema.sql"
         exitFailure
 
-    mapM_ (processOne db) things
+    let st = ImportState { stDB=db }
+
+    mapM_ (processOne st) things
  where
-    processOne db path = catch (processThing db path)
+    processOne st path = catch (runReaderT (processThing path) st)
                                (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing " ++ path ++ ": " ++ show e))

@@ -22,6 +22,7 @@ module Import.Repodata(loadFromFile,
                        loadFromURL)
  where
 
+import           Control.Monad.Reader(ReaderT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), runConduitRes)
@@ -35,6 +36,7 @@ import           Text.XML.Stream.Parse(def)
 
 import           Import.Conduit(getFromFile, getFromURL, ungzipIfCompressed)
 import qualified Import.RPM as RPM
+import           Import.State(ImportState(..))
 
 extractLocations :: Document -> [String]
 extractLocations doc = let
@@ -48,17 +50,17 @@ extractLocations doc = let
                >=> hasAttribute "href"
                >=> attribute "href"
 
-loadFromURL :: FilePath -> Request -> IO ()
-loadFromURL db metadataRequest = do
+loadFromURL :: Request -> ReaderT ImportState IO ()
+loadFromURL metadataRequest = do
     let (basePath, _) = BS.breakSubstring "repodata/" (path metadataRequest)
     locations <- map (\p -> metadataRequest { path=BS.concat [basePath, C8.pack p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
-    mapM_ (RPM.loadFromURL db) locations
+    mapM_ RPM.loadFromURL locations
  where
     readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
 
-loadFromFile :: FilePath -> String -> IO ()
-loadFromFile db metadataPath = do
+loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile metadataPath = do
     locations <- map (takeDirectory metadataPath </>) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
-    mapM_ (RPM.loadFromFile db) locations
+    mapM_ RPM.loadFromFile locations
  where
     readMetadataPipeline p = getFromFile p .| ungzipIfCompressed p .| sinkDoc def
