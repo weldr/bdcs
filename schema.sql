@@ -108,7 +108,7 @@ create index builds_source_id_idx on builds(source_id);
 -- can have several signatures at the same time.
 create table build_signatures (
     id integer primary key,
-    build_id integer references build(id) not null,
+    build_id integer references builds(id) not null,
     signature_type text not null,
     signature_data blob not null
 );  
@@ -169,7 +169,7 @@ create index files_path_idx on files(path);
 -- to contain several files.
 create table build_files (
     id integer primary key,
-    build_id integer references build(id) not null,
+    build_id integer references builds(id) not null,
     file_id integer references files(id) not null
 );
 create index build_files_build_id_idx on build_files(build_id);
