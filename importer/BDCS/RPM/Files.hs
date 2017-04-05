@@ -13,14 +13,17 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module BDCS.RPM.Files(mkFiles)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(fromJust, fromMaybe)
-import Data.Word(Word16, Word32)
-import Database.Esqueleto
-import System.FilePath.Posix((</>))
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(fromJust, fromMaybe)
+import qualified Data.Text as T
+import           Data.Word(Word16, Word32)
+import           Database.Esqueleto
+import           System.FilePath.Posix((</>))
 
 import BDCS.DB
 import BDCS.FileType(getFileType)
@@ -28,8 +31,8 @@ import RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 
 type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
 
-mkFiles :: MonadIO m => [Tag] -> SqlPersistT m [Files]
-mkFiles rpm =
+mkFiles :: MonadIO m => [Tag] -> [(T.Text, Maybe T.Text)] -> SqlPersistT m [Files]
+mkFiles rpm checksums =
     mapM mkOneFile (zipFiles rpm)
  where
     mkOneFile :: MonadIO m => FileTuple -> SqlPersistT m Files
@@ -37,7 +40,10 @@ mkFiles rpm =
         -- FIXME: This could return Nothing, but only if the database were built wrong.
         -- Is it worth catching that error here and doing... something?
         ty <- fromJust <$> getFileType mode
-        return $ Files path digest ty mode user group size mtime target
+        let cksum = case lookup (T.pack path) checksums of
+                        Just (Just c) -> c
+                        _             -> "UNKNOWN"
+        return $ Files path digest ty mode user group size mtime target (T.unpack cksum)
 
     filePaths :: [Tag] -> [String]
     filePaths tags = let

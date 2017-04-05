@@ -25,20 +25,24 @@ module Import.RPM(consume,
  where
 
 import           Control.Conditional(unlessM)
-import           Control.Monad(void)
+import           Control.Monad(void, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
+import           Control.Monad.State(execStateT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, awaitForever, runConduitRes)
+import           Data.Maybe(fromJust, isJust, fromMaybe)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
+import           GI.OSTree(IsRepo)
 import           Network.HTTP.Conduit(path)
 import           Network.HTTP.Simple(Request)
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
+import BDCS.CS(commit, commitContents, store, withTransaction)
 import BDCS.DB
 import BDCS.Exceptions(DBException(..), throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
@@ -59,17 +63,26 @@ import RPM.Tags
 import RPM.Types
 
 -- A conduit consumer that takes in RPM data and uses loadRPM to put them in the database.
-consume :: MonadIO m => FilePath -> Consumer RPM m ()
-consume db = awaitForever (liftIO . load db)
+consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m ()
+consume repo db = awaitForever $ \rpm@RPM{..} -> liftIO $ do
+    let name = fromMaybe "Unknown RPM" $ findStringTag "Name" (headerTags $ head rpmHeaders)
+
+    checksum <- withTransaction repo $ \r -> do
+        f <- store r rpmArchive
+        commit r f (T.pack $ "Import of " ++ name ++ " into the repo") Nothing
+
+    when (isJust checksum) $ do
+        checksums <- execStateT (commitContents repo (fromJust checksum)) []
+        load db rpm checksums
 
 -- Load a parsed RPM into the database.
-load :: FilePath -> RPM -> IO ()
-load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
+load :: FilePath -> RPM -> [(T.Text, Maybe T.Text)] -> IO ()
+load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
     projectId <- insertProject $ mkProject tagHeaders
     sourceId  <- insertSource $ mkSource tagHeaders projectId
     buildId   <- insertBuild $ mkBuild tagHeaders sourceId
     void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
-    filesIds  <- mkFiles tagHeaders >>= insertFiles
+    filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
     pkgNameId <- insertPackageName $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
     void $ associateFilesWithBuild filesIds buildId
@@ -80,9 +93,8 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ d
     -- groupId <- createGroup filesIds tagHeaders
     void $ createGroup filesIds tagHeaders
  where
-    -- FIXME:  Be less stupid.
-    sigHeaders = headerTags $ head rpmHeaders
-    tagHeaders = headerTags $ rpmHeaders !! 1
+    sigHeaders = headerTags $ head rpmSignatures
+    tagHeaders = headerTags $ head rpmHeaders
 
     buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
     buildImported sigs =
@@ -97,17 +109,19 @@ load db RPM{..} = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ d
 loadFromFile :: String -> ReaderT ImportState IO ()
 loadFromFile path = do
     db <- stDB <$> ask
+    repo <- stRepo <$> ask
 
-    void $ runExceptT $ runConduitRes (pipeline db path)
+    void $ runExceptT $ runConduitRes (pipeline repo db path)
     liftIO $ putStrLn $ "Imported " ++ path
  where
-    pipeline d f = getFromFile f .| parseRPMC .| consume d
+    pipeline r d f = getFromFile f .| parseRPMC .| consume r d
 
 loadFromURL :: Request -> ReaderT ImportState IO ()
 loadFromURL request = do
     db <- stDB <$> ask
+    repo <- stRepo <$> ask
 
-    void $ runExceptT $ runConduitRes (pipeline db request)
+    void $ runExceptT $ runConduitRes (pipeline repo db request)
     liftIO $ C8.putStrLn $ BS.concat ["Imported ", path request]
  where
-    pipeline d r = getFromURL r .| parseRPMC .| consume d
+    pipeline r d q = getFromURL q .| parseRPMC .| consume r d
