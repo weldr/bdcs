@@ -160,7 +160,8 @@ create table files (
     file_group text not null,
     file_size integer not null,
     mtime integer not null,
-    symlink_target text
+    symlink_target text,
+    cs_object text not null
 );
 create index files_path_idx on files(path);
 

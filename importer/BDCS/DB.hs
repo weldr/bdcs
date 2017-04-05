@@ -74,6 +74,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_size Int
     mtime Int
     symlink_target String Maybe
+    cs_object String
     deriving Eq Show
  BuildFiles
     build_id BuildsId
