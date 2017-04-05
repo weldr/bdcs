@@ -32,6 +32,7 @@ import System.Environment(getArgs)
 import System.Exit(exitFailure)
 import System.IO(hPutStrLn, stderr)
 
+import qualified BDCS.CS as CS
 import           BDCS.Exceptions(DBException)
 import qualified Import.Comps as Comps
 import qualified Import.RPM as RPM
@@ -57,7 +58,7 @@ processThing url = case parseURI url of
 
 usage :: IO ()
 usage = do
-    putStrLn "Usage: test output.db thing [thing ...]"
+    putStrLn "Usage: test output.db repo thing [thing ...]"
     putStrLn "thing can be:"
     putStrLn "\t* An HTTP, HTTPS, or file: URL to an RPM"
     putStrLn "\t* A URL to a yum repo primary.xml.gz file"
@@ -69,16 +70,18 @@ main = do
     -- Read the list of objects to import from the command line arguments
     argv <- getArgs
 
-    when (length argv < 2) usage
+    when (length argv < 3) usage
 
-    let db     = head argv
-    let things = tail argv
+    let db     = argv !! 0
+    repo      <- CS.open (argv !! 1)
+    let things = drop 2 argv
 
     unlessM (doesFileExist db) $ do
         putStrLn "Database must already exist - create with sqlite3 schema.sql"
         exitFailure
 
-    let st = ImportState { stDB=db }
+    let st = ImportState { stDB=db,
+                           stRepo=repo }
 
     mapM_ (processOne st) things
  where

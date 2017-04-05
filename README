@@ -25,7 +25,7 @@ $ cabal sandbox add-source ../../haskell-rpm
 $ cabal install --dependencies-only
 $ cabal build
 $ sqlite3 metadata.db < ../schema.sql
-$ cabal run import -- metadata.db Packages/*rpm
+$ cabal run import -- metadata.db cs.repo Packages/*rpm
 
 
 Running with docker
