@@ -9,7 +9,7 @@ module BDCS.CS(commit,
                withTransaction)
  where
 
-import           Control.Exception(bracket_, catch)
+import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(forM_, when)
 import           Control.Monad.State(StateT, lift, modify)
 import qualified Data.ByteString as BS
@@ -28,7 +28,13 @@ import           System.IO.Temp(withSystemTempFile)
 commit :: IsRepo a => a -> File -> T.Text -> Maybe T.Text -> IO (Maybe T.Text)
 commit repo repoFile subject body =
     unsafeCastTo RepoFile repoFile >>= \root -> do
-        checksum <- repoWriteCommit repo Nothing (Just subject) body Nothing root noCancellable
+        -- Get the parent, which should always be whatever "master" points to.  If there is no parent
+        -- (likely because nothing has been imported into this repo before), just return Nothing.
+        -- ostree will know what to do.
+        parent <- catch (Just <$> repoResolveRev repo (T.pack "master") False)
+                        (\(_ :: SomeException) -> return Nothing)
+
+        checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
         repoTransactionSetRef repo Nothing "master" checksum
         return $ Just checksum
 
