@@ -17,7 +17,7 @@ library
 
     build-depends:      attoparsec >= 0.12.1.4,
                         attoparsec-binary,
-                        base >= 4.7 && < 4.9,
+                        base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
                         conduit,
                         conduit-combinators,
@@ -36,7 +36,7 @@ executable inspect
     build-depends:      rpm,
                         attoparsec >= 0.12.1.4,
                         attoparsec-binary,
-                        base >= 4.7 && < 4.9,
+                        base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
                         conduit,
                         conduit-combinators,
@@ -56,7 +56,7 @@ executable unrpm
     build-depends:      rpm,
                         attoparsec >= 0.12.1.4,
                         attoparsec-binary,
-                        base >= 4.7 && < 4.9,
+                        base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
                         conduit,
                         conduit-combinators,
@@ -80,7 +80,7 @@ executable rpm2json
     build-depends:      rpm,
                         attoparsec >= 0.12.1.4,
                         attoparsec-binary,
-                        base >= 4.7 && < 4.9,
+                        base >= 4.7 && < 5.0,
                         aeson < 1.0,
                         aeson-pretty,
                         bytestring >= 0.10 && < 0.11,
@@ -102,7 +102,7 @@ test-suite tests
     main-is:            Main.hs
     
     build-depends:      HUnit,
-                        base >= 4.7 && < 4.9,
+                        base >= 4.7 && < 5.0,
                         tasty,
                         tasty-hunit,
                         rpm
