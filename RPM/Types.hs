@@ -27,6 +27,7 @@ import RPM.Tags
 
 data RPM = RPM {
     rpmLead :: Lead,
+    rpmSignatures :: [Header],
     rpmHeaders :: [Header],
     rpmArchive :: BS.ByteString }
  deriving(Eq, Show)
@@ -35,6 +36,7 @@ instance Pretty RPM where
     pPrint RPM{..} =
         vcat [ text "RPM:",
                nest 2 (text "rpmLead = "    $$ nest 2 (pPrint rpmLead)),
+               nest 2 (text "rpmSignatures = " $$ nest 2 (vcat $ map pPrint rpmSignatures)),
                nest 2 (text "rpmHeaders = " $$ nest 2 (vcat $ map pPrint rpmHeaders)),
                nest 2 (text "rpmArchive = ...") ]
 

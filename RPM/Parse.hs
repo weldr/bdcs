@@ -116,7 +116,8 @@ parseRPM = do
     hdr <- parseSection
     rpmArchive <- takeByteString
     return RPM { rpmLead,
-                 rpmHeaders=[sig, hdr],
+                 rpmSignatures=[sig],
+                 rpmHeaders=[hdr],
                  rpmArchive }
  where
     signaturePadding :: Header -> Int
