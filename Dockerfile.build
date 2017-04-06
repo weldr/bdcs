@@ -1,5 +1,5 @@
-FROM juhp/fedora-haskell-ghc:7.10.3
-RUN dnf -y install xz-devel zlib-devel && dnf clean all
+FROM juhp/fedora-haskell-ghc:8.0.2
+RUN dnf -y install happy xz-devel zlib-devel && dnf clean all
 
 RUN cabal update
 
