@@ -9,7 +9,6 @@ COPY haskell-rpm /root/bdcs/haskell-rpm/
 COPY importer /root/bdcs/importer/
 
 RUN cabal update && cabal install happy && \
-    cd /root/bdcs/haskell-rpm && cabal install && \
-    cd /root/bdcs/importer && cabal install && \
-    cd /root/.cabal && rm -rf lib logs packages && \
-    cabal clean
+    cd /root/bdcs/haskell-rpm && cabal install && cabal clean && \
+    cd /root/bdcs/importer && cabal install && cabal clean && \
+    cd /root/.cabal && rm -rf lib logs packages
