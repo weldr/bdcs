@@ -61,19 +61,11 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     signature_type String
     signature_data ByteString
     deriving Eq Show
- FileTypes
-    file_type String
-    deriving Eq Show
  Files
     path String
-    digest String
-    file_type_id FileTypesId
-    file_mode Int
     file_user String
     file_group String
-    file_size Int
     mtime Int
-    symlink_target String Maybe
     cs_object String
     deriving Eq Show
  BuildFiles

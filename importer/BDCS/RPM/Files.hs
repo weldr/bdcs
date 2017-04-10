@@ -19,29 +19,28 @@ module BDCS.RPM.Files(mkFiles)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(fromJust, fromMaybe)
+import           Data.List(zip4)
+import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
-import           Data.Word(Word16, Word32)
+import           Data.Word(Word32)
 import           Database.Esqueleto
 import           System.FilePath.Posix((</>))
 
 import BDCS.DB
-import BDCS.FileType(getFileType)
 import RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 
-type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
+type FileTuple = (String, String, String, Int)
 
 mkFiles :: MonadIO m => [Tag] -> [(T.Text, T.Text)] -> SqlPersistT m [Files]
 mkFiles rpm checksums =
     mapM mkOneFile (zipFiles rpm)
  where
     mkOneFile :: MonadIO m => FileTuple -> SqlPersistT m Files
-    mkOneFile (path, digest, mode, user, group, size, mtime, target) = do
+    mkOneFile (path, user, group, mtime) = do
         -- FIXME: This could return Nothing, but only if the database were built wrong.
         -- Is it worth catching that error here and doing... something?
-        ty <- fromJust <$> getFileType mode
         let cksum = fromMaybe "UNKNOWN" (lookup (T.pack path) checksums)
-        return $ Files path digest ty mode user group size mtime target (T.unpack cksum)
+        return $ Files path user group mtime (T.unpack cksum)
 
     filePaths :: [Tag] -> [String]
     filePaths tags = let
@@ -53,19 +52,9 @@ mkFiles rpm checksums =
 
     zipFiles :: [Tag] -> [FileTuple]
     zipFiles tags = let
-        megazip :: [a] -> [b] -> [c] -> [d] -> [e] -> [f] -> [g] -> [h] -> [(a, b, c, d, e, f, g, h)]
-        megazip (a:as) (b:bs) (c:cs) (d:ds) (e:es) (f:fs) (g:gs) (h:hs) = (a, b, c, d, e, f, g, h) : megazip as bs cs ds es fs gs hs
-        megazip _ _ _ _ _ _ _ _ = []
-
-        strToMaybe s = if s == "" then Nothing else Just s
-
         paths   = filePaths tags
-        digests = findStringListTag "FileMD5s" tags
-        modes   = fromMaybe [] $ findTag "FileModes" tags     >>= \t -> (tagValue t :: Maybe [Word16]) >>= Just . map fromIntegral
         users   = findStringListTag "FileUserName" tags
         groups  = findStringListTag "FileGroupName" tags
-        sizes   = fromMaybe [] $ findTag "FileSizes" tags     >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         mtimes  = fromMaybe [] $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
-        targets = fromMaybe [] $ findTag "FileLinkTos" tags   >>= \t -> (tagValue t :: Maybe [String]) >>= Just . map strToMaybe
      in
-        megazip paths digests modes users groups sizes mtimes targets
+        zip4 paths users groups mtimes

@@ -114,22 +114,6 @@ create table build_signatures (
 );  
 create index build_signatures_build_id_idx on build_signatures(build_id);
 
--- Provide fixed values for what type a file can be.  This prevents it from being
--- free-form text that could potentially include values we don't know how to
--- handle.
-create table file_types (
-    id integer primary key,
-    file_type text not null
-);
-insert into file_types (file_type) values
-    ('regular file'),
-    ('directory'),
-    ('socket'),
-    ('symbolic link'),
-    ('block device'),
-    ('character device'),
-    ('FIFO');
-
 -- This is one of the largest tables in the metadata database - the one that
 -- stores a row for every file that has been imported.  This table stores
 -- everything required for recreating a file on disk with the right path and
@@ -150,17 +134,18 @@ insert into file_types (file_type) values
 --
 -- Thus (for now), each new build imported will result in rows for all its file
 -- being created again.
+--
+-- The content store contains some metadata about the file (size, mode) that is
+-- not duplicated here. This table does include mtime, since that is not tracked
+-- by the content store (and would cause problems with identitcal files across
+-- multiple builds if it did), and user/group, since those are stored here as
+-- names instead of UID/GID.
 create table files (
     id integer primary key,
     path text not null,
-    digest text not null,
-    file_type_id integer references file_types(id) not null,
-    file_mode integer not null,
     file_user text not null,
     file_group text not null,
-    file_size integer not null,
     mtime integer not null,
-    symlink_target text,
     cs_object text not null
 );
 create index files_path_idx on files(path);
