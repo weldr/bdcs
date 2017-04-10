@@ -31,7 +31,7 @@ import RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 
 type FileTuple = (String, String, Int, String, String, Int, Int, Maybe String)
 
-mkFiles :: MonadIO m => [Tag] -> [(T.Text, Maybe T.Text)] -> SqlPersistT m [Files]
+mkFiles :: MonadIO m => [Tag] -> [(T.Text, T.Text)] -> SqlPersistT m [Files]
 mkFiles rpm checksums =
     mapM mkOneFile (zipFiles rpm)
  where
@@ -40,9 +40,7 @@ mkFiles rpm checksums =
         -- FIXME: This could return Nothing, but only if the database were built wrong.
         -- Is it worth catching that error here and doing... something?
         ty <- fromJust <$> getFileType mode
-        let cksum = case lookup (T.pack path) checksums of
-                        Just (Just c) -> c
-                        _             -> "UNKNOWN"
+        let cksum = fromMaybe "UNKNOWN" (lookup (T.pack path) checksums)
         return $ Files path digest ty mode user group size mtime target (T.unpack cksum)
 
     filePaths :: [Tag] -> [String]

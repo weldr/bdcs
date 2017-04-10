@@ -25,7 +25,7 @@ module Import.RPM(consume,
  where
 
 import           Control.Conditional(unlessM)
-import           Control.Monad(void, when)
+import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
@@ -33,7 +33,7 @@ import           Control.Monad.State(execStateT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, awaitForever, runConduitRes)
-import           Data.Maybe(fromJust, isJust, fromMaybe)
+import           Data.Maybe(fromMaybe)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
@@ -71,12 +71,11 @@ consume repo db = awaitForever $ \rpm@RPM{..} -> liftIO $ do
         f <- store r rpmArchive
         commit r f (T.pack $ "Import of " ++ name ++ " into the repo") Nothing
 
-    when (isJust checksum) $ do
-        checksums <- execStateT (commitContents repo (fromJust checksum)) []
-        load db rpm checksums
+    checksums <- execStateT (commitContents repo checksum) []
+    load db rpm checksums
 
 -- Load a parsed RPM into the database.
-load :: FilePath -> RPM -> [(T.Text, Maybe T.Text)] -> IO ()
+load :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO ()
 load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
     projectId <- insertProject $ mkProject tagHeaders
     sourceId  <- insertSource $ mkSource tagHeaders projectId

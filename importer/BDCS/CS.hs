@@ -25,7 +25,7 @@ import           System.IO.Temp(withSystemTempFile)
 -- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
 -- function also requires a commit subject and optionally a commit body.  The subject and body are
 -- visible if you use "ostree log master".  Returns the checksum of the commit.
-commit :: IsRepo a => a -> File -> T.Text -> Maybe T.Text -> IO (Maybe T.Text)
+commit :: IsRepo a => a -> File -> T.Text -> Maybe T.Text -> IO T.Text
 commit repo repoFile subject body =
     unsafeCastTo RepoFile repoFile >>= \root -> do
         -- Get the parent, which should always be whatever "master" points to.  If there is no parent
@@ -36,27 +36,27 @@ commit repo repoFile subject body =
 
         checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
         repoTransactionSetRef repo Nothing "master" checksum
-        return $ Just checksum
+        return checksum
 
 -- Given an open ostree repo and a checksum to some commit, return an association list mapping a file
 -- path to its checksum.  This is useful for creating a mapping in the MDDB from the MDDB to the
 -- ostree content store.
-commitContents :: IsRepo a => a -> T.Text -> StateT [(T.Text, Maybe T.Text)] IO ()
+commitContents :: IsRepo a => a -> T.Text -> StateT [(T.Text, T.Text)] IO ()
 commitContents repo commit = do
     (root, _) <- repoReadCommit repo commit noCancellable
     file <- fileResolveRelativePath root "/"
     info <- fileQueryInfo file "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
     walk file info
  where
-    walk :: File -> FileInfo -> StateT [(T.Text, Maybe T.Text)] IO ()
+    walk :: File -> FileInfo -> StateT [(T.Text, T.Text)] IO ()
     walk f i = do
         ty <- lift $ fileInfoGetFileType i
         case ty of
             FileTypeDirectory -> do (p, c) <- lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
-                                        -- FIXME:  This is only necessary because every directory after "/" is returning
-                                        -- no checksum.  I haven't figured out why that happens yet.
-                                        checksum <- catch (Just <$> repoFileTreeGetContentsChecksum repoFile)
-                                                          (\(_ :: UnexpectedNullPointerReturn) -> return Nothing) 
+                                        -- this needs to be called before repoFileTreeGetContentsChecksum to populate the data
+                                        repoFileEnsureResolved repoFile
+
+                                        checksum <- repoFileTreeGetContentsChecksum repoFile
                                         path <- fileGetPath f
                                         return (path, checksum)
 
@@ -78,12 +78,12 @@ commitContents repo commit = do
             _                 -> do (p, c) <- lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
                                         checksum <- repoFileGetChecksum repoFile
                                         path <- fileGetPath f
-                                        return (path, Just checksum)
+                                        return (path, checksum)
 
                                     when (isJust p) $
                                         modify (++ [(T.pack $ fromJust p, c)])
 
-    getAllChildren :: FileEnumerator -> [FileInfo] -> StateT [(T.Text, Maybe T.Text)] IO [FileInfo]
+    getAllChildren :: FileEnumerator -> [FileInfo] -> StateT [(T.Text, T.Text)] IO [FileInfo]
     getAllChildren enum accum =
         fileEnumeratorNextFile enum noCancellable >>= \case
             Just next -> getAllChildren enum (accum ++ [next])
