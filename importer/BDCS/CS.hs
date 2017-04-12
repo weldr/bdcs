@@ -56,7 +56,7 @@ commitContents repo commit = do
                                         -- this needs to be called before repoFileTreeGetContentsChecksum to populate the data
                                         repoFileEnsureResolved repoFile
 
-                                        checksum <- repoFileTreeGetContentsChecksum repoFile
+                                        checksum <- repoFileTreeGetMetadataChecksum repoFile
                                         path <- fileGetPath f
                                         return (fmap T.pack path, checksum)
 
