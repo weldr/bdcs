@@ -25,8 +25,8 @@ import qualified Data.ByteString as BS
 import           Data.Conduit(ConduitM, Producer, awaitForever, yield)
 import           Data.Conduit.Binary(sourceFile)
 import           Data.Conduit.Zlib(ungzip)
-import           Data.List(isSuffixOf)
 import           Network.HTTP.Simple(Request, getResponseBody, httpSource)
+import           System.FilePath(takeExtension)
 
 -- Load data from a given file into a conduit.
 getFromFile :: MonadResource m => FilePath -> Producer m BS.ByteString
@@ -40,5 +40,5 @@ getFromURL request = httpSource request getResponseBody
 -- through without doing anything.  We can only tell if a conduit is compressed by also being
 -- given the path to the thing being processed.
 ungzipIfCompressed :: MonadResource m => FilePath -> ConduitM BS.ByteString BS.ByteString m ()
-ungzipIfCompressed path | ".gz" `isSuffixOf` path  = ungzip
-                        | otherwise                = awaitForever yield
+ungzipIfCompressed path | takeExtension path == ".gz" = ungzip
+                        | otherwise                   = awaitForever yield

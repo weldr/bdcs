@@ -17,9 +17,10 @@ module BDCS.Groups(findGroupRequirements,
                    findRequires)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(listToMaybe)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(listToMaybe)
+import qualified Data.Text as T
+import           Database.Esqueleto
 
 import           BDCS.DB
 import qualified BDCS.ReqType as RT
@@ -33,7 +34,7 @@ findGroupRequirements groupId reqId = do
             return $ r ^. GroupRequirementsId
     return $ listToMaybe (map unValue ndx)
 
-findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> String -> SqlPersistT m (Maybe (Key Requirements))
+findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> T.Text -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = do
     ndx <- select $ from $ \r -> do
            where_ $ r ^. RequirementsReq_language ==. val reqLang &&.

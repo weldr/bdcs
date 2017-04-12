@@ -13,15 +13,16 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.RPM.Builds(mkBuild)
  where
 
-import Data.ByteString.Char8(pack)
-import Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import Data.Word(Word32)
-import Database.Esqueleto(Key)
+import           Data.ByteString.Char8(pack)
+import qualified Data.Text as T
+import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
+import           Data.Word(Word32)
+import           Database.Esqueleto(Key)
 
 import BDCS.DB(Builds(..), Sources)
 import BDCS.Exceptions(DBException(..), throwIfNothing)
@@ -30,8 +31,8 @@ import RPM.Tags(Tag, findStringTag, findStringListTag, findTag, tagValue)
 mkBuild :: [Tag] -> Key Sources -> Builds
 mkBuild tags sourceId = let
     epoch   = maybe 0 fromIntegral (findTag "Epoch" tags >>= \t -> tagValue t :: Maybe Word32)
-    release = findStringTag "Release" tags `throwIfNothing` MissingRPMTag "Release"
-    arch    = findStringTag "Arch"    tags `throwIfNothing` MissingRPMTag "Arch"
+    release = T.pack $ findStringTag "Release" tags `throwIfNothing` MissingRPMTag "Release"
+    arch    = T.pack $ findStringTag "Arch"    tags `throwIfNothing` MissingRPMTag "Arch"
 
     build_time = getBuildTime `throwIfNothing` MissingRPMTag "BuildTime"
     -- FIXME: RPM splits the changelog up into three tag types.  I'm just grabbing the text here for now.

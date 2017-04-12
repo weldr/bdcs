@@ -13,13 +13,15 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.RPM.Projects(mkProject)
  where
 
-import Data.ByteString.Char8(unpack)
-import Data.List(elemIndices)
+import           Data.ByteString.Char8(unpack)
+import           Data.List(elemIndices)
+import qualified Data.Text as T
+import           Data.Text.Encoding(decodeUtf8)
 
 import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..), throwIfNothingOtherwise)
@@ -29,14 +31,14 @@ mkProject :: [Tag] -> Projects
 mkProject tags = let
     projectName = throwIfNothingOtherwise (findStringTag "SourceRPM" tags)
                                           (MissingRPMTag "SourceRPM")
-                                          srpmToName
+                                          (T.pack . srpmToName)
     summary     = throwIfNothingOtherwise (findByteStringTag "Summary" tags)
                                           (MissingRPMTag "Summary")
-                                          unpack
+                                          decodeUtf8
     description = throwIfNothingOtherwise (findByteStringTag "Description" tags)
                                           (MissingRPMTag "Description")
-                                          unpack
-    homepage    = findStringTag "URL" tags
+                                          decodeUtf8
+    homepage    = fmap T.pack (findStringTag "URL" tags)
 
     -- FIXME:  Where to get this from?
     upstream_vcs = "UPSTREAM_VCS"

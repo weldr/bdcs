@@ -20,13 +20,14 @@ module BDCS.Sources(findSource,
                     insertSource)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(listToMaybe)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(listToMaybe)
+import qualified Data.Text as T
+import           Database.Esqueleto
 
 import BDCS.DB
 
-findSource :: MonadIO m => String -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
+findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
 findSource version projectId = do
     -- FIXME:  Is (project_id, version) unique in Sources?
     ndx <- select $ from $ \src -> do

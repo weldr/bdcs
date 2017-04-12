@@ -14,20 +14,22 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.Packages(filesInPackage,
                      findPackage,
                      insertPackageName)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(listToMaybe)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(listToMaybe)
+import qualified Data.Text as T
+import           Database.Esqueleto
 
 import BDCS.DB
 import BDCS.KeyValue(insertKeyValue)
 
-filesInPackage :: MonadIO m => String -> SqlPersistT m [String]
+filesInPackage :: MonadIO m => T.Text -> SqlPersistT m [T.Text]
 filesInPackage name = do
     results <- select $ from $ \(files `InnerJoin` key_val `InnerJoin` file_key_values) -> do
                on $     key_val ^. KeyValId ==. file_key_values ^. FileKeyValuesKey_val_id &&.
@@ -37,13 +39,13 @@ filesInPackage name = do
                return $ files ^. FilesPath
     return $ map unValue results
 
-insertPackageName :: MonadIO m => String -> SqlPersistT m (Key KeyVal)
+insertPackageName :: MonadIO m => T.Text -> SqlPersistT m (Key KeyVal)
 insertPackageName packageName =
     findPackage packageName >>= \case
         Nothing -> insertKeyValue "packageName" packageName Nothing
         Just p  -> return p
 
-findPackage :: MonadIO m => String -> SqlPersistT m (Maybe (Key KeyVal))
+findPackage :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key KeyVal))
 findPackage name = do
     ndx <- select $ from $ \pkg -> do
            where_ $ pkg ^. KeyValKey_value ==. val "packageName" &&.

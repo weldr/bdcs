@@ -33,7 +33,6 @@ import           Control.Monad.State(execStateT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, awaitForever, runConduitRes)
-import           Data.Maybe(fromMaybe)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
@@ -65,11 +64,11 @@ import RPM.Types
 -- A conduit consumer that takes in RPM data and uses loadRPM to put them in the database.
 consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m ()
 consume repo db = awaitForever $ \rpm@RPM{..} -> liftIO $ do
-    let name = fromMaybe "Unknown RPM" $ findStringTag "Name" (headerTags $ head rpmHeaders)
+    let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
 
     checksum <- withTransaction repo $ \r -> do
         f <- store r rpmArchive
-        commit r f (T.pack $ "Import of " ++ name ++ " into the repo") Nothing
+        commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
 
     checksums <- execStateT (commitContents repo checksum) []
     load db rpm checksums
@@ -82,7 +81,7 @@ load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHe
     buildId   <- insertBuild $ mkBuild tagHeaders sourceId
     void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
     filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
-    pkgNameId <- insertPackageName $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
+    pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId
@@ -105,7 +104,7 @@ load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHe
                            return $ not $ null ndx
             Nothing  -> return False
 
-loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile path = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask

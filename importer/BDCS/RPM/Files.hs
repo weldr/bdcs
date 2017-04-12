@@ -29,7 +29,7 @@ import           System.FilePath.Posix((</>))
 import BDCS.DB
 import RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 
-type FileTuple = (String, String, String, Int)
+type FileTuple = (T.Text, T.Text, T.Text, Int)
 
 mkFiles :: MonadIO m => [Tag] -> [(T.Text, T.Text)] -> SqlPersistT m [Files]
 mkFiles rpm checksums =
@@ -39,10 +39,10 @@ mkFiles rpm checksums =
     mkOneFile (path, user, group, mtime) = do
         -- FIXME: This could return Nothing, but only if the database were built wrong.
         -- Is it worth catching that error here and doing... something?
-        let cksum = fromMaybe "UNKNOWN" (lookup (T.pack path) checksums)
-        return $ Files path user group mtime (T.unpack cksum)
+        let cksum = fromMaybe "UNKNOWN" (lookup path checksums)
+        return $ Files path user group mtime cksum
 
-    filePaths :: [Tag] -> [String]
+    filePaths :: [Tag] -> [FilePath]
     filePaths tags = let
         indexes   = fromMaybe [] $ findTag "DirIndexes" tags >>= \t -> tagValue t :: Maybe [Word32]
         dirnames  = findStringListTag "DirNames" tags
@@ -52,9 +52,9 @@ mkFiles rpm checksums =
 
     zipFiles :: [Tag] -> [FileTuple]
     zipFiles tags = let
-        paths   = filePaths tags
-        users   = findStringListTag "FileUserName" tags
-        groups  = findStringListTag "FileGroupName" tags
+        paths   = map T.pack $ filePaths tags
+        users   = map T.pack $ findStringListTag "FileUserName" tags
+        groups  = map T.pack $ findStringListTag "FileGroupName" tags
         mtimes  = fromMaybe [] $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
      in
         zip4 paths users groups mtimes

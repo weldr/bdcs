@@ -21,13 +21,14 @@ module BDCS.Builds(associateBuildWithPackage,
                    insertBuild)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(listToMaybe)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(listToMaybe)
+import qualified Data.Text as T
+import           Database.Esqueleto
 
 import BDCS.DB
 
-findBuild :: MonadIO m => Int -> String -> String -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
+findBuild :: MonadIO m => Int -> T.Text -> T.Text -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
 findBuild epoch release arch sourceId = do
     -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
     ndx <- select $ from $ \build -> do

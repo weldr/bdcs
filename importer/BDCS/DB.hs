@@ -25,57 +25,58 @@
 
 module BDCS.DB where
 
-import Data.ByteString(ByteString)
-import Data.Time(UTCTime)
-import Database.Persist.TH
+import           Data.ByteString(ByteString)
+import qualified Data.Text as T
+import           Data.Time(UTCTime)
+import           Database.Persist.TH
 
 import BDCS.ReqType
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects
-    name String
-    summary String
-    description String
-    homepage String Maybe
-    upstream_vcs String
+    name T.Text
+    summary T.Text
+    description T.Text
+    homepage T.Text Maybe
+    upstream_vcs T.Text
     NameKey name
     deriving Eq Show
  Sources
     project_id ProjectsId
-    license String
-    version String
-    source_ref String
+    license T.Text
+    version T.Text
+    source_ref T.Text
     deriving Eq Show
  Builds
     source_id SourcesId
     epoch Int default=0
-    release String
-    arch String
+    release T.Text
+    arch T.Text
     build_time UTCTime
     changelog ByteString
-    build_config_ref String
-    build_env_ref String
+    build_config_ref T.Text
+    build_env_ref T.Text
     deriving Eq Show
  BuildSignatures
     build_id BuildsId
-    signature_type String
+    signature_type T.Text
     signature_data ByteString
     deriving Eq Show
  Files
-    path String
-    file_user String
-    file_group String
+    path T.Text
+    file_user T.Text
+    file_group T.Text
     mtime Int
-    cs_object String
+    cs_object T.Text
     deriving Eq Show
  BuildFiles
     build_id BuildsId
     file_id FilesId
     deriving Eq Show
  KeyVal
-    key_value String
-    val_value String
-    ext_value String Maybe
+    key_value T.Text
+    val_value T.Text
+    ext_value T.Text Maybe
     deriving Eq Show
  ProjectKeyValues
     package_id ProjectsId
@@ -94,8 +95,8 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     key_val_id KeyValId
     deriving Eq Show
  Groups
-    name String
-    group_type String
+    name T.Text
+    group_type T.Text
     deriving Eq Show
  GroupFiles
     group_id GroupsId
@@ -113,7 +114,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     req_language ReqLanguage
     req_context ReqContext
     req_strength ReqStrength
-    req_expr String
+    req_expr T.Text
     deriving Eq Show
  GroupRequirements
     group_id GroupsId

@@ -93,7 +93,7 @@ loadFromURL metadataRequest = do
  where
     readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
 
-loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile metadataPath = do
     groups <- extractGroups <$> runConduitRes (readMetadataPipeline metadataPath)
     -- FIXME:  For now we don't actually do any loading.  There's a lot of questions

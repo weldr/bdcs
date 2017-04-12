@@ -27,6 +27,7 @@ import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), runConduitRes)
 import qualified Data.Text as T
+import           Data.Text.Encoding(encodeUtf8)
 import           Network.HTTP.Conduit(path)
 import           Network.HTTP.Simple(Request)
 import           System.FilePath((</>), takeDirectory)
@@ -38,29 +39,28 @@ import           Import.Conduit(getFromFile, getFromURL, ungzipIfCompressed)
 import qualified Import.RPM as RPM
 import           Import.State(ImportState(..))
 
-extractLocations :: Document -> [String]
+extractLocations :: Document -> [T.Text]
 extractLocations doc = let
     cursor = fromDocument doc
  in
     -- Find all <location href=""> elements and return the href's value.  laxElement
     -- means we ignore case and ignore namespacing.  Otherwise we need to take into
     -- account the namespace given in the primary.xml.
-    map T.unpack $
-        cursor $// laxElement "location"
-               >=> hasAttribute "href"
-               >=> attribute "href"
+    cursor $// laxElement "location"
+           >=> hasAttribute "href"
+           >=> attribute "href"
 
 loadFromURL :: Request -> ReaderT ImportState IO ()
 loadFromURL metadataRequest = do
     let (basePath, _) = BS.breakSubstring "repodata/" (path metadataRequest)
-    locations <- map (\p -> metadataRequest { path=BS.concat [basePath, C8.pack p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
+    locations <- map (\p -> metadataRequest { path=BS.concat [basePath, encodeUtf8 p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
     mapM_ RPM.loadFromURL locations
  where
     readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
 
-loadFromFile :: String -> ReaderT ImportState IO ()
+loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile metadataPath = do
-    locations <- map (takeDirectory metadataPath </>) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
+    locations <- map (\p -> takeDirectory metadataPath </> T.unpack p) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
     mapM_ RPM.loadFromFile locations
  where
     readMetadataPipeline p = getFromFile p .| ungzipIfCompressed p .| sinkDoc def

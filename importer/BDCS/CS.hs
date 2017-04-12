@@ -31,7 +31,7 @@ commit repo repoFile subject body =
         -- Get the parent, which should always be whatever "master" points to.  If there is no parent
         -- (likely because nothing has been imported into this repo before), just return Nothing.
         -- ostree will know what to do.
-        parent <- catch (Just <$> repoResolveRev repo (T.pack "master") False)
+        parent <- catch (Just <$> repoResolveRev repo "master" False)
                         (\(_ :: SomeException) -> return Nothing)
 
         checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
@@ -58,11 +58,11 @@ commitContents repo commit = do
 
                                         checksum <- repoFileTreeGetContentsChecksum repoFile
                                         path <- fileGetPath f
-                                        return (path, checksum)
+                                        return (fmap T.pack path, checksum)
 
                                     -- Add the name and checksum of this directory.
                                     when (isJust p) $
-                                        modify (++ [(T.pack $ fromJust p, c)])
+                                        modify (++ [(fromJust p, c)])
 
                                     -- Grab the info for everything in this directory.
                                     dirEnum <- fileEnumerateChildren f "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
@@ -78,10 +78,10 @@ commitContents repo commit = do
             _                 -> do (p, c) <- lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
                                         checksum <- repoFileGetChecksum repoFile
                                         path <- fileGetPath f
-                                        return (path, checksum)
+                                        return (fmap T.pack path, checksum)
 
                                     when (isJust p) $
-                                        modify (++ [(T.pack $ fromJust p, c)])
+                                        modify (++ [(fromJust p, c)])
 
     getAllChildren :: FileEnumerator -> [FileInfo] -> StateT [(T.Text, T.Text)] IO [FileInfo]
     getAllChildren enum accum =

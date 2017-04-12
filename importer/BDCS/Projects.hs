@@ -20,13 +20,14 @@ module BDCS.Projects(findProject,
                      insertProject)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Data.Maybe(listToMaybe)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Maybe(listToMaybe)
+import qualified Data.Text as T
+import           Database.Esqueleto
 
 import BDCS.DB
 
-findProject :: MonadIO m => String -> SqlPersistT m (Maybe (Key Projects))
+findProject :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Projects))
 findProject name = do
     ndx <- select $ from $ \proj -> do
            where_ $ proj ^. ProjectsName ==. val name

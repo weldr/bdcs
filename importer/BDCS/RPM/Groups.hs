@@ -15,18 +15,20 @@
 
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.RPM.Groups(createGroup)
  where
 
-import Control.Monad(forM_, void, when)
-import Control.Monad.IO.Class(MonadIO)
-import Data.Bits(testBit)
-import Data.Char(isSpace, toLower, toUpper)
-import Data.List(dropWhileEnd)
-import Data.Maybe(fromJust, fromMaybe, isJust)
-import Data.Word(Word32)
-import Database.Esqueleto
+import           Control.Monad(forM_, void, when)
+import           Control.Monad.IO.Class(MonadIO)
+import           Data.Bits(testBit)
+import           Data.Char(isSpace, toLower, toUpper)
+import           Data.List(dropWhileEnd)
+import           Data.Maybe(fromJust, fromMaybe, isJust)
+import qualified Data.Text as T
+import           Data.Word(Word32)
+import           Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.Groups(findRequires, findGroupRequirements)
@@ -34,7 +36,7 @@ import           BDCS.KeyValue(findKeyValue, insertKeyValue)
 import qualified BDCS.ReqType as RT
 import           RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
 
-rpmFlagsToOperator :: Word32 -> String
+rpmFlagsToOperator :: Word32 -> T.Text
 rpmFlagsToOperator f =
     if | f `testBit` 1 && f `testBit` 3 -> "<="
        | f `testBit` 1                  -> "<"
@@ -46,11 +48,11 @@ rpmFlagsToOperator f =
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds rpm = do
     -- Get the NEVRA so it can be saved as attributes
-    let epoch = findTag "Epoch" rpm >>= \t -> (tagValue t :: Maybe Word32) >>= Just . show
-    let name = fromMaybe "" $ findStringTag "Name" rpm
-    let version = fromMaybe "" $ findStringTag "Version" rpm
-    let release = fromMaybe "" $ findStringTag "Release" rpm
-    let arch = fromMaybe "" $ findStringTag "Arch" rpm
+    let epoch   = findTag "Epoch" rpm >>= \t -> (tagValue t :: Maybe Word32) >>= Just . T.pack . show
+    let name    = maybe "" T.pack (findStringTag "Name" rpm)
+    let version = maybe "" T.pack (findStringTag "Version" rpm)
+    let release = maybe "" T.pack (findStringTag "Release" rpm)
+    let arch    = maybe "" T.pack (findStringTag "Arch" rpm)
 
     -- Create the groups row
     groupId <- insert $ Groups name "rpm"
@@ -95,27 +97,23 @@ createGroup fileIds rpm = do
     basicAddPRCO tags groupId tagBase keyName =
         addPRCO tagBase tags $ \expr -> let
             -- split out the name part of "name >= version"
-            exprBase = takeWhile (/= ' ')  expr
+            exprBase = T.takeWhile (/= ' ')  expr
           in
             findKeyValue keyName exprBase (Just expr) >>= \case
                 Nothing -> insertKeyValue keyName exprBase (Just expr) >>= \kvId -> insert $ GroupKeyValues groupId kvId
                 Just kv -> insert $ GroupKeyValues groupId kv
 
-    addPRCO :: Monad m => String -> [Tag] -> (String -> m a) -> m ()
+    addPRCO :: Monad m => T.Text -> [Tag] -> (T.Text -> m a) -> m ()
     addPRCO ty tags fn = do
-        let names = findStringListTag (ty' ++ "Name") tags
-        let flags = findWord32ListTag (ty' ++ "Flags") tags
-        let vers  = findStringListTag (ty' ++ "Version") tags
+        let names = map T.pack $ findStringListTag (T.unpack ty' ++ "Name") tags
+        let flags =              findWord32ListTag (T.unpack ty' ++ "Flags") tags
+        let vers  = map T.pack $ findStringListTag (T.unpack ty' ++ "Version") tags
 
         -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
         forM_ (zip3 names flags vers) $ \(n, f, v) -> do
             let cmp  = rpmFlagsToOperator f
-            let expr = dropWhileEnd isSpace $ n ++ " " ++ cmp ++ " " ++ v
+            let expr = T.stripEnd $ T.concat [n, " ", cmp, " ", v]
 
             fn expr
      where
-        ty' = titlecase ty
-
-    titlecase :: String -> String
-    titlecase (hd:rest) = toUpper hd : map toLower rest
-    titlecase []        = []
+        ty' = T.toTitle ty

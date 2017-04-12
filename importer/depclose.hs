@@ -15,8 +15,8 @@
 
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- This program takes a database and an RPM name (or a list of RPMs) and returns
 -- a list of all the dependencies of that RPM.  If multiple RPMs are provided, it
@@ -53,6 +53,7 @@ import           Data.List(isInfixOf)
 import           Data.Maybe(catMaybes, fromMaybe, listToMaybe, mapMaybe)
 import qualified Data.Set as Set
 import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import           System.Environment(getArgs)
@@ -60,24 +61,24 @@ import           System.Exit(exitFailure)
 
 import BDCS.DB
 
-data Proposition = String `Obsoletes` String
-                 | NEVRA  `Provides`  String
-                 | NEVRA  `Requires`  String
+data Proposition = T.Text `Obsoletes` T.Text
+                 | NEVRA  `Provides`  T.Text
+                 | NEVRA  `Requires`  T.Text
  deriving(Eq, Ord, Show)
 
-data NEVRA = NEVRA String String String String String
+data NEVRA = NEVRA T.Text T.Text T.Text T.Text T.Text
  deriving(Eq, Ord, Show)
 
-printNEVRA :: NEVRA -> String
-printNEVRA (NEVRA n "" v r a)   =             n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
-printNEVRA (NEVRA n e v r a)    = e ++ ":" ++ n ++ "-" ++ v ++ "-" ++ r ++ "." ++ a
+printNEVRA :: NEVRA -> T.Text
+printNEVRA (NEVRA n "" v r a)   = T.concat [        n, "-", v, "-", r, ".", a]
+printNEVRA (NEVRA n e v r a)    = T.concat [e, ":", n, "-", v, "-", r, ".", a]
 
 concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
 concatMapM fn lst = liftM concat (mapM fn lst)
 
 -- Look up a key/value pair for the group with the given GroupsId.  It is assumed there
 -- will only be one key/value pair.
-getValueForGroup :: MonadIO m => GroupsId -> String -> SqlPersistT m (Maybe String)
+getValueForGroup :: MonadIO m => GroupsId -> T.Text -> SqlPersistT m (Maybe T.Text)
 getValueForGroup grp key = do
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` group) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
@@ -100,7 +101,7 @@ getNEVRAForGroupId id = do
     return $ NEVRA name epoch ver release arch
 
 -- Given a group name, return its index in the groups table.
-findGroupId :: MonadIO m => String -> SqlPersistT m [GroupsId]
+findGroupId :: MonadIO m => T.Text -> SqlPersistT m [GroupsId]
 findGroupId name = do
     ndx <- select $ from $ \groups -> do
            where_ $ groups ^. GroupsName ==. val name
@@ -110,9 +111,9 @@ findGroupId name = do
 -- Given the name of something that is required by a package, look up everything
 -- that provides it and return their indices and the expression provided.  It's possible
 -- for multiple things to satisfy the same requirement.
-findProviderForName :: MonadIO m => String -> SqlPersistT m [(GroupsId, Proposition)]
+findProviderForName :: MonadIO m => T.Text -> SqlPersistT m [(GroupsId, Proposition)]
 findProviderForName thing = do
-    let baseThing = takeWhile (/= ' ') thing
+    let baseThing = T.takeWhile (/= ' ') thing
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id
            -- A requirement is satisfied by matching a rpm-provide, which may be
@@ -136,7 +137,7 @@ findProviderForName thing = do
 
 -- Given a file path, look up everything that provides it and return their indices.
 -- and the expression provided. It's possible for multiple things to provide the same file.
-findGroupContainingFile :: MonadIO m => String -> SqlPersistT m [(GroupsId, Proposition)]
+findGroupContainingFile :: MonadIO m => T.Text -> SqlPersistT m [(GroupsId, Proposition)]
 findGroupContainingFile file = do
     ndx <- select $ distinct $ from $ \(group `InnerJoin` files) -> do
            on     $ group ^. GroupFilesFile_id ==. files ^. FilesId
@@ -154,7 +155,7 @@ findGroupContainingFile file = do
 -- Given a group id, return everything that obsoletes that group.  This is returned
 -- as both the name of the thing and the related expression.  We may need this expression
 -- for checking version numbers later.
-whatObsoletes :: MonadIO m => GroupsId -> SqlPersistT m [(String, String)]
+whatObsoletes :: MonadIO m => GroupsId -> SqlPersistT m [(T.Text, T.Text)]
 whatObsoletes id = do
     ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` group) -> do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
@@ -170,7 +171,7 @@ whatObsoletes id = do
 -- The requires expressions can either just be a name ("Requires: blah") or a name
 -- plus version information ("Requires: blah > 2").  Nothing else is supported at
 -- this time.
-getRequirements :: MonadIO m => GroupsId -> SqlPersistT m [String]
+getRequirements :: MonadIO m => GroupsId -> SqlPersistT m [T.Text]
 getRequirements id = do
     reqs <- select $ from $ \(req `InnerJoin` group_reqs) -> do
             on     $ req ^. RequirementsId ==. group_reqs ^. GroupRequirementsReq_id
@@ -188,7 +189,7 @@ getRequirements id = do
 -- for a list of packages and returns it as a list of NEVRAs.  It's easy to do several
 -- RPMs at once if they are all given to this function at the same time.  It prevents
 -- having to save the working data.
-closeRPM :: FilePath -> [String] -> IO [Proposition]
+closeRPM :: FilePath -> [T.Text] -> IO [Proposition]
 closeRPM db rpms = runSqlite (T.pack db) $
     -- The sets of things we've determined are deps and the things we've already seen
     -- are initialized to empty.
@@ -220,7 +221,7 @@ closeRPM db rpms = runSqlite (T.pack db) $
 #endif
         -- If the requirment looks like a filename, also look for packages
         -- providing the file
-        fileProviders <- ifM (return $ head hd == '/')
+        fileProviders <- ifM (return $ T.head hd == '/')
                              (findGroupContainingFile hd)
                              (return [])
         let providers' = providers ++ fileProviders
@@ -258,11 +259,11 @@ closeRPM db rpms = runSqlite (T.pack db) $
 
 printResult :: [Proposition] -> IO ()
 printResult props =
-    mapM_ (putStrLn . printOne) props
+    mapM_ (TIO.putStrLn . printOne) props
  where
-    printOne (left  `Obsoletes` right) = left ++ " obsoletes " ++ right
-    printOne (nevra `Provides`  thing) = printNEVRA nevra ++ " provides " ++ thing
-    printOne (nevra `Requires`  thing) = printNEVRA nevra ++ " requires " ++ thing
+    printOne (left  `Obsoletes` right) = T.concat [left, " obsoletes ", right]
+    printOne (nevra `Provides`  thing) = T.concat [printNEVRA nevra, " provides ", thing]
+    printOne (nevra `Requires`  thing) = T.concat [printNEVRA nevra, " requires ", thing]
 
 main :: IO ()
 main = do
@@ -274,7 +275,7 @@ main = do
         exitFailure
 
     let db   = head argv
-    let rpms = tail argv
+    let rpms = map T.pack $ tail argv
 
     result <- closeRPM db rpms
     printResult result

@@ -13,12 +13,15 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module BDCS.RPM.Signatures(mkRSASignature,
                            mkSHASignature)
  where
 
 import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack)
+import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB(Builds, BuildSignatures(..))
