@@ -1,26 +1,51 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module BDCS.CS(commit,
+module BDCS.CS(Object(..),
+               Metadata(..),
+               FileContents(..),
+               commit,
                commitContents,
+               load,
                open,
                store,
                withTransaction)
  where
 
+import           Control.Conditional(condM, ifM, otherwiseM)
 import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(forM_, when)
+import           Control.Monad.Except(MonadError, throwError)
+import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.State(StateT, lift, modify)
 import qualified Data.ByteString as BS
 import           Data.GI.Base.ManagedPtr(unsafeCastTo)
 import           Data.Maybe(fromJust, isJust)
 import qualified Data.Text as T
+import           Data.Word(Word32)
 import           GI.Gio
 import           GI.OSTree
 import           System.Directory(doesDirectoryExist)
+import           System.Endian(fromBE32)
 import           System.IO(hClose)
 import           System.IO.Temp(withSystemTempFile)
+
+data Object = DirMeta Metadata
+            | FileObject FileContents
+
+-- The metadata for a content store object, shared by file and dirmeta
+data Metadata = Metadata { uid :: Word32,
+                           gid :: Word32,
+                           mode :: Word32,
+                           xattrs :: [(BS.ByteString, BS.ByteString)] }
+
+-- metadata + contents for a file
+data FileContents = FileContents { metadata :: Metadata,
+                                   symlink :: Maybe T.Text,
+                                   contents :: InputStream }
 
 -- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
 -- function also requires a commit subject and optionally a commit body.  The subject and body are
@@ -117,6 +142,55 @@ store repo content =
 
         repoWriteArchiveToMtree repo archive mtree Nothing True noCancellable
         repoWriteMtree repo mtree noCancellable
+
+-- Given an open ostree repo and a checksum, read an object from the content store.
+-- The checksums stored in the mddb can be either dirmeta objects, which will contain
+-- the metadata for a directory (mode, xattrs), or a file object, which will contain the file
+-- metadata plus contents.
+-- On error (such as if the object does not exist) a String exception is thrown.
+load :: (IsRepo a, MonadError String m, MonadIO m) => a -> T.Text -> m Object
+load repo checksum =
+    condM [(repoHasObject repo ObjectTypeDirMeta checksum noCancellable, DirMeta <$> loadDir),
+           (repoHasObject repo ObjectTypeFile checksum noCancellable,    FileObject <$> loadFile),
+           (otherwiseM, throwError $ "No such object " ++ show checksum)]
+
+  where
+    loadDir :: (MonadError String m, MonadIO m) => m Metadata
+    loadDir =
+        -- Load the object from the content store
+        -- This will be a variant of type (uuua(ayay)), which is (UID, GID, mode, [(xattr-name, xattr-value)])
+        -- UID, GID and mode are all big-endian
+        repoLoadVariant repo ObjectTypeDirMeta checksum >>=
+            liftIO . variantToDirMeta >>= \case
+                Just (uid, gid, mode, xattrs) -> return Metadata {uid=fromBE32 uid,
+                                                                  gid=fromBE32 gid,
+                                                                  mode=fromBE32 mode,
+                                                                  xattrs=xattrs}
+                Nothing -> throwError $ "Error reading dirmeta object from content store: " ++ show checksum
+
+    loadFile :: (MonadError String m, MonadIO m) => m FileContents
+    loadFile = do
+        (contents, info, xattrsVariant) <- repoLoadFile repo checksum noCancellable
+
+        -- Fetch the useful parts out the fileinfo
+        uid <- fileInfoGetAttributeUint32 info "unix::uid"
+        gid <- fileInfoGetAttributeUint32 info "unix::gid"
+        mode <- fileInfoGetAttributeUint32 info "unix::mode"
+
+        symlink <- ifM (fileInfoGetIsSymlink info)
+                       (fmap Just (fileInfoGetSymlinkTarget info))
+                       (return Nothing)
+
+        -- the xattrs is a GVariant of type a(ayay), i.e., [(ByteString, ByteString)]
+        liftIO (variantToXattrs xattrsVariant) >>= \case
+            Just xattrs -> return FileContents {metadata=Metadata{uid, gid, mode, xattrs}, symlink, contents}
+            Nothing -> throwError $ "Error reading xattrs object for " ++ show checksum
+
+    variantToDirMeta :: GVariant -> IO (Maybe (Word32, Word32, Word32, [(BS.ByteString, BS.ByteString)]))
+    variantToDirMeta = fromGVariant
+
+    variantToXattrs :: GVariant -> IO (Maybe [(BS.ByteString, BS.ByteString)])
+    variantToXattrs = fromGVariant
 
 -- Wrap some repo-manipulating function in a transaction, committing it if the function succeeds.
 -- Returns the checksum of the commit.

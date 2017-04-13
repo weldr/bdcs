@@ -15,11 +15,15 @@
 
 module BDCS.Files(insertFiles,
                   associateFilesWithBuild,
-                  associateFilesWithPackage)
+                  associateFilesWithPackage,
+                  groupIdToFiles)
  where
 
-import Control.Monad.IO.Class(MonadIO)
-import Database.Esqueleto
+import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.Trans.Resource(MonadResource)
+import           Data.Conduit((.|), Source)
+import qualified Data.Conduit.List as CL
+import           Database.Esqueleto
 
 import BDCS.DB
 
@@ -35,3 +39,11 @@ associateFilesWithPackage :: MonadIO m => [Key Files] -> Key KeyVal -> SqlPersis
 associateFilesWithPackage files package =
     mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
          (zip files $ repeat package)
+
+groupIdToFiles :: MonadResource m => Key Groups -> Source (SqlPersistT m) Files
+groupIdToFiles groupid = do
+    let source = selectSource $ from $ \(files `InnerJoin` group_files) -> do
+                       on     $ files ^. FilesId ==. group_files ^. GroupFilesFile_id
+                       where_ $ group_files ^. GroupFilesGroup_id ==. val groupid
+                       return files
+    source .| CL.map entityVal

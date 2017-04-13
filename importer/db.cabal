@@ -43,6 +43,7 @@ library
                        conduit-combinators,
                        conduit-extra,
                        cpio-conduit,
+                       cpu,
                        directory,
                        esqueleto,
                        filepath,
@@ -77,6 +78,7 @@ executable import
                        conduit-combinators,
                        conduit-extra,
                        cpio-conduit,
+                       cpu,
                        db,
                        directory,
                        esqueleto,
@@ -101,6 +103,36 @@ executable import
                        transformers,
                        unix,
                        xml-conduit
+
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall
+
+executable export
+  main-is:             export.hs
+
+  build-depends:       base >= 4.9 && < 5.0,
+                       bytestring >= 0.10 && < 0.11,
+                       cond,
+                       conduit >= 1.2.8,
+                       conduit-extra,
+                       cpu,
+                       directory >= 1.3.1,
+                       esqueleto,
+                       filepath,
+                       gi-gio,
+                       gi-glib,
+                       gi-ostree,
+                       haskell-gi-base,
+                       mtl >= 2.2.1,
+                       persistent,
+                       persistent-sqlite,
+                       persistent-template,
+                       resourcet,
+                       temporary,
+                       text,
+                       time,
+                       unix
 
   default-language:    Haskell2010
 
