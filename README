@@ -21,11 +21,11 @@ is the $PWD/Packages directory.  Then run:
 
 $ cd importer
 $ cabal sandbox init
-$ cabal sandbox add-source ../../haskell-rpm
-$ cabal install --dependencies-only
+$ cabal sandbox add-source ../haskell-rpm
+$ cabal install --dependencies-only --enable-tests
 $ cabal build
 $ sqlite3 metadata.db < ../schema.sql
-$ cabal run import -- metadata.db cs.repo Packages/*rpm
+$ for f in ${PWD}/Packages/*rpm; do dist/build/import/import metadata.db cs.repo file://${f}; done
 
 
 Running with docker
