@@ -146,7 +146,7 @@ create table files (
     file_user text not null,
     file_group text not null,
     mtime integer not null,
-    cs_object text not null
+    cs_object text
 );
 create index files_path_idx on files(path);
 
