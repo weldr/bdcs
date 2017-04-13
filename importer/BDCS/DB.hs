@@ -67,7 +67,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_user T.Text
     file_group T.Text
     mtime Int
-    cs_object T.Text
+    cs_object T.Text Maybe
     deriving Eq Show
  BuildFiles
     build_id BuildsId

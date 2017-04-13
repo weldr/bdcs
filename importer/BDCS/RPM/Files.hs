@@ -37,9 +37,7 @@ mkFiles rpm checksums =
  where
     mkOneFile :: MonadIO m => FileTuple -> SqlPersistT m Files
     mkOneFile (path, user, group, mtime) = do
-        -- FIXME: This could return Nothing, but only if the database were built wrong.
-        -- Is it worth catching that error here and doing... something?
-        let cksum = fromMaybe "UNKNOWN" (lookup path checksums)
+        let cksum = lookup path checksums
         return $ Files path user group mtime cksum
 
     filePaths :: [Tag] -> [FilePath]
