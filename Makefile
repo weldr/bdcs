@@ -6,6 +6,10 @@ endif
 
 ORG_NAME=weld
 
+weld-f25:
+	git clone https://github.com/weldr/welder-deployment
+	$(MAKE) -C welder-deployment weld-f25
+
 importer:
 	docker build -t $(ORG_NAME)/build-img -f Dockerfile.build .
 	docker create --name build-cont $(ORG_NAME)/build-img
@@ -15,7 +19,13 @@ importer:
 
 mddb:
 	docker volume create -d local --name bdcs-mddb-volume
-	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" --rm $(ORG_NAME)/import-img
+	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" \
+	    --name mddb-container         \
+	    -e "IMPORT_URL=$(IMPORT_URL)" \
+	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
+	    $(ORG_NAME)/import-img
+	docker cp mddb-container:/mddb/metadata.db ./metadata.db
+	docker rm mddb-container
 
 api-mddb:
 	@if [ ! -e ${d}/api-rpms ]; then \
@@ -33,3 +43,14 @@ api-mddb:
 
 
 .PHONY: importer mddb api-mddb
+
+import-centos7:
+	make weld-f25
+	make importer
+	mkdir rpms/
+	sqlite3 metadata.db < schema.sql
+	for REPO in http://mirror.centos.org/centos/7/os/x86_64; do \
+	    export IMPORT_URL=`./primary-xml-gz $$REPO`; \
+	    export KEEP_MDDB=1; \
+	    make mddb; \
+	done
