@@ -14,7 +14,7 @@ importer:
 	docker build -t $(ORG_NAME)/import-img .
 
 mddb:
-	docker volume create -d local --opt o=size=2GB --name bdcs-mddb-volume
+	docker volume create -d local --name bdcs-mddb-volume
 	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" --rm $(ORG_NAME)/import-img
 
 api-mddb:
