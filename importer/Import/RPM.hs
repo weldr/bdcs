@@ -19,7 +19,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Import.RPM(consume,
-                  load,
+                  loadIntoMDDB,
                   loadFromFile,
                   loadFromURL)
  where
@@ -71,7 +71,8 @@ buildImported sigs =
                        return $ not $ null ndx
         Nothing  -> return False
 
--- A conduit consumer that takes in RPM data and uses loadRPM to put them in the database.
+-- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
+-- information into the mddb.
 consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m ()
 consume repo db = awaitForever $ \rpm@RPM{..} -> do
     -- Query the MDDB to see if the package has already been imported.  If so, quit now to
@@ -89,11 +90,11 @@ consume repo db = awaitForever $ \rpm@RPM{..} -> do
             commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
 
         checksums <- execStateT (commitContents repo checksum) []
-        load db rpm checksums
+        loadIntoMDDB db rpm checksums
 
--- Load a parsed RPM into the database.
-load :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO ()
-load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
+-- Load the headers from a parsed RPM into the mddb.
+loadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO ()
+loadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
     projectId <- insertProject $ mkProject tagHeaders
     sourceId  <- insertSource $ mkSource tagHeaders projectId
     buildId   <- insertBuild $ mkBuild tagHeaders sourceId
