@@ -24,7 +24,7 @@ module Import.RPM(consume,
                   loadFromURL)
  where
 
-import           Control.Conditional(unlessM)
+import           Control.Conditional(unless, unlessM)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -61,17 +61,35 @@ import RPM.Parse(parseRPMC)
 import RPM.Tags
 import RPM.Types
 
+buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
+buildImported sigs =
+    case findStringTag "SHA1Header" sigs of
+        Just sha -> do ndx <- select $ from $ \signatures -> do
+                              where_ $ signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
+                                       signatures ^. BuildSignaturesSignature_data ==. val (C8.pack sha)
+                              return $ signatures ^. BuildSignaturesId
+                       return $ not $ null ndx
+        Nothing  -> return False
+
 -- A conduit consumer that takes in RPM data and uses loadRPM to put them in the database.
 consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m ()
-consume repo db = awaitForever $ \rpm@RPM{..} -> liftIO $ do
-    let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
+consume repo db = awaitForever $ \rpm@RPM{..} -> do
+    -- Query the MDDB to see if the package has already been imported.  If so, quit now to
+    -- prevent it from being added to the content store a second time.  Note that load also
+    -- performs this check, but both of these functions are public and therefore both need
+    -- to prevent duplicate imports.
+    let sigHeaders = headerTags $ head rpmSignatures
+    existsInMDDB <- liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
 
-    checksum <- withTransaction repo $ \r -> do
-        f <- store r rpmArchive
-        commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+    unless existsInMDDB $ liftIO $ do
+        let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
 
-    checksums <- execStateT (commitContents repo checksum) []
-    load db rpm checksums
+        checksum <- withTransaction repo $ \r -> do
+            f <- store r rpmArchive
+            commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+
+        checksums <- execStateT (commitContents repo checksum) []
+        load db rpm checksums
 
 -- Load a parsed RPM into the database.
 load :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO ()
@@ -93,16 +111,6 @@ load db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHe
  where
     sigHeaders = headerTags $ head rpmSignatures
     tagHeaders = headerTags $ head rpmHeaders
-
-    buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
-    buildImported sigs =
-        case findStringTag "SHA1Header" sigs of
-            Just sha -> do ndx <- select $ from $ \signatures -> do
-                                  where_ $ signatures ^. BuildSignaturesSignature_type ==. val "SHA1" &&.
-                                           signatures ^. BuildSignaturesSignature_data ==. val (C8.pack sha)
-                                  return $ signatures ^. BuildSignaturesId
-                           return $ not $ null ndx
-            Nothing  -> return False
 
 loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile path = do
