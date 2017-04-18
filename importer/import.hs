@@ -59,7 +59,9 @@ processThing url = case parseURI url of
 usage :: IO ()
 usage = do
     putStrLn "Usage: test output.db repo thing [thing ...]"
-    putStrLn "thing can be:"
+    putStrLn "- repo is the path to an already existing content store repo or "
+    putStrLn "  the path to a repo to be created"
+    putStrLn "- thing can be:"
     putStrLn "\t* An HTTP, HTTPS, or file: URL to an RPM"
     putStrLn "\t* A URL to a yum repo primary.xml.gz file"
     putStrLn "\t* A URL to a yum repo comps.xml.gz file"
