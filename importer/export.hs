@@ -32,11 +32,11 @@ import           Data.Text(Text, pack, unpack)
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
-import           System.Directory(createDirectoryIfMissing, createFileLink, setModificationTime)
+import           System.Directory(createDirectoryIfMissing, setModificationTime)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           System.FilePath((</>), dropDrive, takeDirectory)
-import           System.Posix.Files(setFileMode)
+import           System.Posix.Files(createSymbolicLink, setFileMode)
 import           System.Posix.Types(CMode(..))
 
 import GI.Gio    hiding(on)
@@ -85,7 +85,7 @@ checkoutObject repo outPath Files{..} =
 
         -- Write the data or the symlink, depending
         case symlink of
-            Just symlinkTarget -> createFileLink (unpack symlinkTarget) fullPath
+            Just symlinkTarget -> createSymbolicLink (unpack symlinkTarget) fullPath
             Nothing -> runResourceT $ runConduit $ sourceInputStream contents .| sinkFile fullPath
 
         setMetadata fullPath metadata

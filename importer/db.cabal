@@ -117,7 +117,7 @@ executable export
                        conduit >= 1.2.8,
                        conduit-extra,
                        cpu,
-                       directory >= 1.3.1,
+                       directory,
                        esqueleto,
                        filepath,
                        gi-gio,
