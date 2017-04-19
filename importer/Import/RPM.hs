@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -24,7 +25,6 @@ module Import.RPM(consume,
                   loadFromURL)
  where
 
-import           Control.Conditional(unless, unlessM)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -32,7 +32,7 @@ import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.State(execStateT)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
-import           Data.Conduit((.|), Consumer, awaitForever, runConduitRes)
+import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
@@ -72,54 +72,68 @@ buildImported sigs =
         Nothing  -> return False
 
 -- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
--- information into the mddb.
-consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m ()
-consume repo db = awaitForever $ \rpm@RPM{..} -> do
-    -- Query the MDDB to see if the package has already been imported.  If so, quit now to
-    -- prevent it from being added to the content store a second time.  Note that load also
-    -- performs this check, but both of these functions are public and therefore both need
-    -- to prevent duplicate imports.
+-- information into the mddb.  The return value is whether or not an import occurred.  This is not the
+-- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
+consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m Bool
+consume repo db = await >>= \case
+    Just rpm@RPM{..} -> do
+        -- Query the MDDB to see if the package has already been imported.  If so, quit now to
+        -- prevent it from being added to the content store a second time.  Note that load also
+        -- performs this check, but both of these functions are public and therefore both need
+        -- to prevent duplicate imports.
+        let sigHeaders = headerTags $ head rpmSignatures
+        existsInMDDB <- liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
+
+        if existsInMDDB then return False
+        else liftIO $ do
+            let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
+
+            checksum <- withTransaction repo $ \r -> do
+                f <- store r rpmArchive
+                commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+
+            checksums <- execStateT (commitContents repo checksum) []
+            loadIntoMDDB db rpm checksums
+
+    Nothing -> return False
+
+-- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
+-- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
+-- package already exists in the mddb.
+loadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO Bool
+loadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
     let sigHeaders = headerTags $ head rpmSignatures
-    existsInMDDB <- liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
+    let tagHeaders = headerTags $ head rpmHeaders
 
-    unless existsInMDDB $ liftIO $ do
-        let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
+    existsInMDDB <- buildImported sigHeaders
 
-        checksum <- withTransaction repo $ \r -> do
-            f <- store r rpmArchive
-            commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+    if existsInMDDB then return False
+    else do
+        projectId <- insertProject $ mkProject tagHeaders
+        sourceId  <- insertSource $ mkSource tagHeaders projectId
+        buildId   <- insertBuild $ mkBuild tagHeaders sourceId
+        void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
+        filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
+        pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
-        checksums <- execStateT (commitContents repo checksum) []
-        loadIntoMDDB db rpm checksums
+        void $ associateFilesWithBuild filesIds buildId
+        void $ associateFilesWithPackage filesIds pkgNameId
+        void $ associateBuildWithPackage buildId pkgNameId
 
--- Load the headers from a parsed RPM into the mddb.
-loadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO ()
-loadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ unlessM (buildImported sigHeaders) $ do
-    projectId <- insertProject $ mkProject tagHeaders
-    sourceId  <- insertSource $ mkSource tagHeaders projectId
-    buildId   <- insertBuild $ mkBuild tagHeaders sourceId
-    void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
-    filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
-    pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
-
-    void $ associateFilesWithBuild filesIds buildId
-    void $ associateFilesWithPackage filesIds pkgNameId
-    void $ associateBuildWithPackage buildId pkgNameId
-
-    -- groups and reqs
-    -- groupId <- createGroup filesIds tagHeaders
-    void $ createGroup filesIds tagHeaders
- where
-    sigHeaders = headerTags $ head rpmSignatures
-    tagHeaders = headerTags $ head rpmHeaders
+        -- groups and reqs
+        -- groupId <- createGroup filesIds tagHeaders
+        void $ createGroup filesIds tagHeaders
+        return True
 
 loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile path = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
 
-    void $ runExceptT $ runConduitRes (pipeline repo db path)
-    liftIO $ putStrLn $ "Imported " ++ path
+    result <- runExceptT $ runConduitRes (pipeline repo db path)
+    case result of
+        Right True -> liftIO $ putStrLn $ "Imported " ++ path
+        _          -> return ()
  where
     pipeline r d f = getFromFile f .| parseRPMC .| consume r d
 
@@ -128,7 +142,9 @@ loadFromURL request = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
 
-    void $ runExceptT $ runConduitRes (pipeline repo db request)
-    liftIO $ C8.putStrLn $ BS.concat ["Imported ", path request]
+    result <- runExceptT $ runConduitRes (pipeline repo db request)
+    case result of
+        Right True -> liftIO $ C8.putStrLn $ BS.concat ["Imported ", path request]
+        _          -> return ()
  where
     pipeline r d q = getFromURL q .| parseRPMC .| consume r d
