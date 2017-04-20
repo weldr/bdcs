@@ -20,10 +20,9 @@ module Import.Conduit(getFromFile,
                       ungzipIfCompressed)
  where
 
+import           Conduit(ConduitM, Producer, mapC, sourceFile)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString as BS
-import           Data.Conduit(ConduitM, Producer, awaitForever, yield)
-import           Data.Conduit.Binary(sourceFile)
 import           Data.Conduit.Zlib(ungzip)
 import           Network.HTTP.Simple(Request, getResponseBody, httpSource)
 import           System.FilePath(takeExtension)
@@ -41,4 +40,4 @@ getFromURL request = httpSource request getResponseBody
 -- given the path to the thing being processed.
 ungzipIfCompressed :: MonadResource m => FilePath -> ConduitM BS.ByteString BS.ByteString m ()
 ungzipIfCompressed path | takeExtension path == ".gz" = ungzip
-                        | otherwise                   = awaitForever yield
+                        | otherwise                   = mapC id
