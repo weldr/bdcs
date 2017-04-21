@@ -32,6 +32,8 @@ import           Database.Persist.TH
 
 import BDCS.ReqType
 
+{-# ANN module ("HLint: ignore Use module export list" :: String) #-}
+
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects
     name T.Text

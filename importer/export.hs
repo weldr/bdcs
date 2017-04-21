@@ -118,6 +118,7 @@ usage = do
     -- TODO group id?
     exitFailure
 
+{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
 main = do
     argv <- getArgs
