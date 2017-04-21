@@ -23,9 +23,7 @@ module BDCS.RPM.Groups(createGroup)
 import           Control.Monad(forM_, void, when)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Bits(testBit)
-import           Data.Char(isSpace, toLower, toUpper)
-import           Data.List(dropWhileEnd)
-import           Data.Maybe(fromJust, fromMaybe, isJust)
+import           Data.Maybe(fromJust, isJust)
 import qualified Data.Text as T
 import           Data.Word(Word32)
 import           Database.Esqueleto
