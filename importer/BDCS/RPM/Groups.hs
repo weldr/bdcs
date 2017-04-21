@@ -70,7 +70,7 @@ createGroup fileIds rpm = do
         insertKeyValueIfMissing groupId ("epoch", fromJust epoch)
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
-        basicAddPRCO rpm groupId (fst tup) (snd tup)
+        uncurry (basicAddPRCO rpm groupId) tup
 
     -- Create the Requires attributes
     forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
