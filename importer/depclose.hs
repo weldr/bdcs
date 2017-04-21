@@ -47,7 +47,7 @@
 -- * Has not been shown to give the same results as yum/dnf.
 
 import           Control.Conditional(ifM)
-import           Control.Monad(forM, forM_, liftM, when)
+import           Control.Monad(forM, forM_, when)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.List(isInfixOf)
 import           Data.Maybe(catMaybes, fromMaybe, listToMaybe, mapMaybe)
@@ -74,7 +74,7 @@ printNEVRA (NEVRA n "" v r a)   = T.concat [        n, "-", v, "-", r, ".", a]
 printNEVRA (NEVRA n e v r a)    = T.concat [e, ":", n, "-", v, "-", r, ".", a]
 
 concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
-concatMapM fn lst = liftM concat (mapM fn lst)
+concatMapM fn lst = fmap concat (mapM fn lst)
 
 -- Look up a key/value pair for the group with the given GroupsId.  It is assumed there
 -- will only be one key/value pair.
