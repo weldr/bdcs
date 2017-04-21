@@ -19,6 +19,8 @@ module BDCS.ReqType where
 
 import Database.Persist.TH
 
+{-# ANN module "HLint: ignore Use module export list" #-}
+
 data ReqLanguage = RPM
  deriving(Eq, Read, Show)
 

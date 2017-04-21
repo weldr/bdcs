@@ -45,6 +45,9 @@ rpmFlagsToOperator f =
        | f `testBit` 3                  -> "="
        | otherwise                      -> ""
 
+-- Ignore the suggestion to not use lambda for creating GroupFiles rows, since
+-- the lambda makes it more clear what's actually happening
+{-# ANN createGroup ("HLint: ignore Avoid lambda" :: String) #-}
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds rpm = do
     -- Get the NEVRA so it can be saved as attributes

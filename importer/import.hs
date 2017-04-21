@@ -67,6 +67,7 @@ usage = do
     putStrLn "\t* A URL to a yum repo comps.xml.gz file"
     exitFailure
 
+{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
 main = do
     -- Read the list of objects to import from the command line arguments
