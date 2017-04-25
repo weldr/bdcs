@@ -1,6 +1,6 @@
 #!/bin/bash
 
-MDDB="/mddb/metadata.db"
+MDDB="/mddb/${MDDB:-metadata.db}"
 
 if [[ -e "$MDDB" && -z "$KEEP_MDDB" ]]; then
     rm "$MDDB"

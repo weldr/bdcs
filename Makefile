@@ -5,6 +5,7 @@ d = ${PWD}
 endif
 
 ORG_NAME=weld
+MDDB=metadata.db
 
 weld-f25:
 	git clone https://github.com/weldr/welder-deployment
@@ -23,6 +24,7 @@ mddb:
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
+	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/import-img
 	docker cp mddb-container:/mddb/metadata.db ./metadata.db
 	docker rm mddb-container
@@ -48,9 +50,10 @@ import-centos7:
 	make weld-f25
 	make importer
 	mkdir rpms/
-	sqlite3 metadata.db < schema.sql
+	sqlite3 centos-metadata.db < schema.sql
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64; do \
 	    export IMPORT_URL=`./primary-xml-gz $$REPO`; \
 	    export KEEP_MDDB=1; \
+	    export MDDB="centos-metadata.db"; \
 	    make mddb; \
 	done
