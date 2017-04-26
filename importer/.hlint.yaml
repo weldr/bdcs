@@ -1,0 +1,6 @@
+# HLint configuration file
+# https://github.com/ndmitchell/hlint
+##########################
+
+- ignore: {name: Eta reduce}
+- ignore: {name: Functor law}
