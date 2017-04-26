@@ -5,7 +5,7 @@ d = ${PWD}
 endif
 
 ORG_NAME=weld
-MDDB=metadata.db
+MDDB ?= metadata.db
 
 weld-f25:
 	git clone https://github.com/weldr/welder-deployment
@@ -26,7 +26,7 @@ mddb:
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/import-img
-	docker cp mddb-container:/mddb/metadata.db ./metadata.db
+	docker cp mddb-container:/mddb/$(MDDB) ./$(MDDB)
 	docker rm mddb-container
 
 api-mddb:
