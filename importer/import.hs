@@ -22,7 +22,6 @@
 import Control.Conditional(unlessM)
 import Control.Exception(catch)
 import Control.Monad(void, when)
-import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(ReaderT, runReaderT)
 import Data.List(isInfixOf, isSuffixOf)
 import Network.HTTP.Simple(parseRequest)
@@ -44,12 +43,13 @@ processThing url = case parseURI url of
     Just URI{..} -> if | uriScheme == "file:" && isPrimaryXMLFile uriPath       -> Repodata.loadFromFile uriPath
                        | uriScheme == "file:" && isCompsFile uriPath            -> Comps.loadFromFile uriPath
                        | uriScheme == "file:" && ".rpm" `isSuffixOf` uriPath    -> RPM.loadFromFile uriPath
+                       | uriScheme == "file:"                                   -> Repodata.loadRepoFromFile uriPath
 
                        | isPrimaryXMLFile uriPath                               -> parseRequest url >>= Repodata.loadFromURL
                        | isCompsFile uriPath                                    -> parseRequest url >>= Comps.loadFromURL
                        | ".rpm" `isSuffixOf` uriPath                            -> parseRequest url >>= RPM.loadFromURL
 
-                       | otherwise                                              -> liftIO usage
+                       | otherwise                                              -> parseRequest url >>= Repodata.loadRepoFromURL
     _ -> parseRequest url >>= RPM.loadFromURL
  where
     isPrimaryXMLFile path = "primary.xml" `isInfixOf` path
