@@ -135,11 +135,11 @@ loadFromURL metadataRequest = do
     locations <- map (\p -> metadataRequest { path=BS.concat [basePath, encodeUtf8 p] }) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataRequest)
     mapM_ RPM.loadFromURL locations
  where
-    readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
+    readMetadataPipeline request = getFromURL request .| ungzipIfCompressed .| sinkDoc def
 
 loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile metadataPath = do
     locations <- map (\p -> (takeDirectory . takeDirectory) metadataPath </> T.unpack p) <$> extractLocations <$> runConduitRes (readMetadataPipeline metadataPath)
     mapM_ RPM.loadFromFile locations
  where
-    readMetadataPipeline p = getFromFile p .| ungzipIfCompressed p .| sinkDoc def
+    readMetadataPipeline p = getFromFile p .| ungzipIfCompressed .| sinkDoc def
