@@ -20,6 +20,7 @@ importer:
 
 mddb:
 	docker volume create -d local --name bdcs-mddb-volume
+	docker rm -f mddb-container || true
 	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
