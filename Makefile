@@ -52,7 +52,7 @@ import-centos7:
 	mkdir rpms/
 	sqlite3 centos-metadata.db < schema.sql
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64; do \
-	    export IMPORT_URL=`./primary-xml-gz $$REPO`; \
+	    export IMPORT_URL="$$REPO"; \
 	    export KEEP_MDDB=1; \
 	    export MDDB="centos-metadata.db"; \
 	    make mddb; \
