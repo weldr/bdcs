@@ -14,9 +14,9 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module Import.Conduit(getFromFile,
-                      getFromURL,
+module Import.Conduit(getFromURI,
                       ungzipIfCompressed)
  where
 
@@ -27,15 +27,19 @@ import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Conduit.Binary as CB(take)
 import           Data.Conduit.Zlib(ungzip)
 import           Data.Word(Word8)
-import           Network.HTTP.Simple(Request, getResponseBody, httpSource)
+import           Network.HTTP.Simple(getResponseBody, httpSource, parseRequest)
+import           Network.URI(URI(..))
 
--- Load data from a given file into a conduit.
-getFromFile :: MonadResource m => FilePath -> Producer m BS.ByteString
-getFromFile = sourceFile
+import           Import.URI(showURI, uriToPath)
 
--- Load data from a given URL into a conduit.
-getFromURL :: MonadResource m => Request -> Producer m BS.ByteString
-getFromURL request = httpSource request getResponseBody
+-- Load data from a given file: or http: URL
+getFromURI :: MonadResource m => URI -> Producer m BS.ByteString
+getFromURI uri@URI{..} =
+    if uriScheme == "file:" then
+        sourceFile $ uriToPath uri
+    else do
+        request <- parseRequest $ showURI uri
+        httpSource request getResponseBody
 
 -- If a conduit is compressed, pass it through ungzip to uncompress it.  Otherwise, pass it
 -- through without doing anything. Determine whether a stream is compressed by looking for

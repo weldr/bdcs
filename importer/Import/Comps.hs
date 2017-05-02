@@ -20,21 +20,18 @@
 
 module Import.Comps(CompsPkg(..),
                     CompsGroup(..),
-                    loadFromFile,
-                    loadFromURL)
+                    loadFromURI)
  where
 
 import           Control.Monad.Reader(ReaderT)
-import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), runConduitRes)
 import qualified Data.Text as T
-import           Network.HTTP.Conduit(path)
-import           Network.HTTP.Simple(Request)
+import           Network.URI(URI(..))
 import           Text.XML(Document, sinkDoc)
 import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
 
-import Import.Conduit(getFromFile, getFromURL, ungzipIfCompressed)
+import Import.Conduit(getFromURI, ungzipIfCompressed)
 import Import.State(ImportState)
 
 data CompsPkg = CPMandatory T.Text
@@ -83,22 +80,12 @@ extractGroups doc = let
  in
     map parseCompsGroup groupCursors
 
-loadFromURL :: Request -> ReaderT ImportState IO ()
-loadFromURL metadataRequest = do
-    groups <- extractGroups <$> runConduitRes (readMetadataPipeline metadataRequest)
+loadFromURI :: URI -> ReaderT ImportState IO ()
+loadFromURI uri = do
+    groups <- extractGroups <$> runConduitRes (readMetadataPipeline uri)
     -- FIXME:  For now we don't actually do any loading.  There's a lot of questions
     -- about how this is going to fit into the database, but I want to make sure this
     -- code doesn't get lost.
     return ()
  where
-    readMetadataPipeline request = getFromURL request .| ungzipIfCompressed .| sinkDoc def
-
-loadFromFile :: FilePath -> ReaderT ImportState IO ()
-loadFromFile metadataPath = do
-    groups <- extractGroups <$> runConduitRes (readMetadataPipeline metadataPath)
-    -- FIXME:  For now we don't actually do any loading.  There's a lot of questions
-    -- about how this is going to fit into the database, but I want to make sure this
-    -- code doesn't get lost.
-    return ()
- where
-    readMetadataPipeline p = getFromFile p .| ungzipIfCompressed .| sinkDoc def
+    readMetadataPipeline p = getFromURI p .| ungzipIfCompressed .| sinkDoc def
