@@ -21,8 +21,7 @@
 
 module Import.RPM(consume,
                   loadIntoMDDB,
-                  loadFromFile,
-                  loadFromURL)
+                  loadFromURI)
  where
 
 import           Control.Monad(void)
@@ -30,15 +29,13 @@ import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.State(execStateT)
-import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
 import           GI.OSTree(IsRepo)
-import           Network.HTTP.Conduit(path)
-import           Network.HTTP.Simple(Request)
+import           Network.URI(URI(..))
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
 import BDCS.CS(commit, commitContents, store, withTransaction)
@@ -55,7 +52,7 @@ import BDCS.RPM.Groups(createGroup)
 import BDCS.RPM.Projects(mkProject)
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
-import Import.Conduit(getFromFile, getFromURL)
+import Import.Conduit(getFromURI)
 import Import.State(ImportState(..))
 import RPM.Parse(parseRPMC)
 import RPM.Tags
@@ -125,26 +122,13 @@ loadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
         void $ createGroup filesIds tagHeaders
         return True
 
-loadFromFile :: FilePath -> ReaderT ImportState IO ()
-loadFromFile path = do
+loadFromURI :: URI -> ReaderT ImportState IO ()
+loadFromURI uri = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
-
-    result <- runExceptT $ runConduitRes (pipeline repo db path)
+    result <- runExceptT $ runConduitRes (pipeline repo db uri)
     case result of
-        Right True -> liftIO $ putStrLn $ "Imported " ++ path
+        Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
         _          -> return ()
  where
-    pipeline r d f = getFromFile f .| parseRPMC .| consume r d
-
-loadFromURL :: Request -> ReaderT ImportState IO ()
-loadFromURL request = do
-    db <- stDB <$> ask
-    repo <- stRepo <$> ask
-
-    result <- runExceptT $ runConduitRes (pipeline repo db request)
-    case result of
-        Right True -> liftIO $ C8.putStrLn $ BS.concat ["Imported ", path request]
-        _          -> return ()
- where
-    pipeline r d q = getFromURL q .| parseRPMC .| consume r d
+    pipeline r d f = getFromURI f .| parseRPMC .| consume r d

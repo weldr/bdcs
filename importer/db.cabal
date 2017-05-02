@@ -34,7 +34,8 @@ library
                        Import.Conduit,
                        Import.RPM,
                        Import.Repodata,
-                       Import.State
+                       Import.State,
+                       Import.URI
 
   build-depends:       base >=4.9 && <5.0,
                        bytestring,
@@ -54,6 +55,7 @@ library
                        http-conduit,
                        lzma-conduit,
                        mtl >= 2.2.1,
+                       network-uri,
                        persistent,
                        persistent-sqlite,
                        persistent-template,
