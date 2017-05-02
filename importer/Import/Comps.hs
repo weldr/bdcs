@@ -91,7 +91,7 @@ loadFromURL metadataRequest = do
     -- code doesn't get lost.
     return ()
  where
-    readMetadataPipeline request = getFromURL request .| ungzipIfCompressed (C8.unpack $ path request) .| sinkDoc def
+    readMetadataPipeline request = getFromURL request .| ungzipIfCompressed .| sinkDoc def
 
 loadFromFile :: FilePath -> ReaderT ImportState IO ()
 loadFromFile metadataPath = do
@@ -101,4 +101,4 @@ loadFromFile metadataPath = do
     -- code doesn't get lost.
     return ()
  where
-    readMetadataPipeline p = getFromFile p .| ungzipIfCompressed p .| sinkDoc def
+    readMetadataPipeline p = getFromFile p .| ungzipIfCompressed .| sinkDoc def

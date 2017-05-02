@@ -20,12 +20,14 @@ module Import.Conduit(getFromFile,
                       ungzipIfCompressed)
  where
 
-import           Conduit(ConduitM, Producer, mapC, sourceFile)
+import           Conduit(Conduit, Producer, (.|), leftover, mapC, sourceFile)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString as BS
+import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Conduit.Binary as CB(take)
 import           Data.Conduit.Zlib(ungzip)
+import           Data.Word(Word8)
 import           Network.HTTP.Simple(Request, getResponseBody, httpSource)
-import           System.FilePath(takeExtension)
 
 -- Load data from a given file into a conduit.
 getFromFile :: MonadResource m => FilePath -> Producer m BS.ByteString
@@ -36,8 +38,19 @@ getFromURL :: MonadResource m => Request -> Producer m BS.ByteString
 getFromURL request = httpSource request getResponseBody
 
 -- If a conduit is compressed, pass it through ungzip to uncompress it.  Otherwise, pass it
--- through without doing anything.  We can only tell if a conduit is compressed by also being
--- given the path to the thing being processed.
-ungzipIfCompressed :: MonadResource m => FilePath -> ConduitM BS.ByteString BS.ByteString m ()
-ungzipIfCompressed path | takeExtension path == ".gz" = ungzip
-                        | otherwise                   = mapC id
+-- through without doing anything. Determine whether a stream is compressed by looking for
+-- the gzip magic bytes at the start of the stream.
+ungzipIfCompressed :: MonadResource m => Conduit BS.ByteString m BS.ByteString
+ungzipIfCompressed = do
+    magic <- CB.take 2
+    let nextPipe = if BSL.unpack magic == gzipMagic then ungzip else identityC
+
+    -- send the two bytes we consumed as a leftover, then continue the conduit
+    leftover (BSL.toStrict magic) .| nextPipe
+    nextPipe
+ where
+    identityC :: Monad m => Conduit a m a
+    identityC = mapC id
+
+    gzipMagic :: [Word8]
+    gzipMagic = [0x1f, 0x8b]
