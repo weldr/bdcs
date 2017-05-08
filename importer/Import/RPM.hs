@@ -21,9 +21,11 @@
 
 module Import.RPM(consume,
                   loadIntoMDDB,
-                  loadFromURI)
+                  loadFromURI,
+                  rpmExistsInMDDB)
  where
 
+import           Control.Conditional(ifM)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -73,54 +75,57 @@ buildImported sigs =
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
 consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m Bool
 consume repo db = await >>= \case
-    Just rpm@RPM{..} -> do
-        -- Query the MDDB to see if the package has already been imported.  If so, quit now to
-        -- prevent it from being added to the content store a second time.  Note that load also
-        -- performs this check, but both of these functions are public and therefore both need
-        -- to prevent duplicate imports.
-        let sigHeaders = headerTags $ head rpmSignatures
-        existsInMDDB <- liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
+    Just rpm -> liftIO $ ifM (rpmExistsInMDDB db rpm)
+                             (return False)
+                             (unsafeConsume repo db rpm)
+    Nothing  -> return False
 
-        if existsInMDDB then return False
-        else liftIO $ do
-            let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
+-- Like consume, but does not first check to see if the RPM has previously been imported.  Running
+-- this could result in a very confused, incorrect mddb.  It is currently for internal use only,
+-- but that might change in the future.  If so, its type should also change to be a Consumer.
+unsafeConsume :: IsRepo a => a -> FilePath -> RPM -> IO Bool
+unsafeConsume repo db rpm@RPM{..} = do
+   let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
 
-            checksum <- withTransaction repo $ \r -> do
-                f <- store r rpmArchive
-                commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+   checksum <- withTransaction repo $ \r -> do
+       f <- store r rpmArchive
+       commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
 
-            checksums <- execStateT (commitContents repo checksum) []
-            loadIntoMDDB db rpm checksums
-
-    Nothing -> return False
+   checksums <- execStateT (commitContents repo checksum) []
+   loadIntoMDDB db rpm checksums
 
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
 -- package already exists in the mddb.
 loadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO Bool
-loadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
+loadIntoMDDB db rpm checksums =
+    ifM (rpmExistsInMDDB db rpm)
+        (return False)
+        (unsafeLoadIntoMDDB db rpm checksums)
+
+-- Like loadIntoMDDB, but does not first check to see if the RPM has previously been imported.  Running
+-- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
+-- that might change in the future.
+unsafeLoadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO Bool
+unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
     let sigHeaders = headerTags $ head rpmSignatures
     let tagHeaders = headerTags $ head rpmHeaders
 
-    existsInMDDB <- buildImported sigHeaders
+    projectId <- insertProject $ mkProject tagHeaders
+    sourceId  <- insertSource $ mkSource tagHeaders projectId
+    buildId   <- insertBuild $ mkBuild tagHeaders sourceId
+    void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
+    filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
+    pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
-    if existsInMDDB then return False
-    else do
-        projectId <- insertProject $ mkProject tagHeaders
-        sourceId  <- insertSource $ mkSource tagHeaders projectId
-        buildId   <- insertBuild $ mkBuild tagHeaders sourceId
-        void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
-        filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
-        pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
+    void $ associateFilesWithBuild filesIds buildId
+    void $ associateFilesWithPackage filesIds pkgNameId
+    void $ associateBuildWithPackage buildId pkgNameId
 
-        void $ associateFilesWithBuild filesIds buildId
-        void $ associateFilesWithPackage filesIds pkgNameId
-        void $ associateBuildWithPackage buildId pkgNameId
-
-        -- groups and reqs
-        -- groupId <- createGroup filesIds tagHeaders
-        void $ createGroup filesIds tagHeaders
-        return True
+    -- groups and reqs
+    -- groupId <- createGroup filesIds tagHeaders
+    void $ createGroup filesIds tagHeaders
+    return True
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do
@@ -132,3 +137,11 @@ loadFromURI uri = do
         _          -> return ()
  where
     pipeline r d f = getFromURI f .| parseRPMC .| consume r d
+
+-- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
+-- from being added to the content store a second time.  Note that loadIntoMDDB also performs this
+-- check, but both of these functions are public and therefore both need to prevent duplicate imports.
+rpmExistsInMDDB :: FilePath -> RPM -> IO Bool
+rpmExistsInMDDB db RPM{..} = do
+    let sigHeaders = headerTags $ head rpmSignatures
+    liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
