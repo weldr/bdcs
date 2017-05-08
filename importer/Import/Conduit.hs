@@ -17,6 +17,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Import.Conduit(getFromURI,
+                      identityC,
                       ungzipIfCompressed)
  where
 
@@ -41,6 +42,10 @@ getFromURI uri@URI{..} =
         request <- parseRequest $ showURI uri
         httpSource request getResponseBody
 
+-- A conduit that takes its input and returns that as its output.
+identityC :: Monad m => Conduit a m a
+identityC = mapC id
+
 -- If a conduit is compressed, pass it through ungzip to uncompress it.  Otherwise, pass it
 -- through without doing anything. Determine whether a stream is compressed by looking for
 -- the gzip magic bytes at the start of the stream.
@@ -53,8 +58,5 @@ ungzipIfCompressed = do
     leftover (BSL.toStrict magic) .| nextPipe
     nextPipe
  where
-    identityC :: Monad m => Conduit a m a
-    identityC = mapC id
-
     gzipMagic :: [Word8]
     gzipMagic = [0x1f, 0x8b]
