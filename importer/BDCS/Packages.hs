@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.Packages(filesInPackage,
@@ -41,9 +40,7 @@ filesInPackage name = do
 
 insertPackageName :: MonadIO m => T.Text -> SqlPersistT m (Key KeyVal)
 insertPackageName packageName =
-    findPackage packageName >>= \case
-        Nothing -> insertKeyValue "packageName" packageName Nothing
-        Just p  -> return p
+    findPackage packageName `orDo` insertKeyValue "packageName" packageName Nothing
 
 findPackage :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key KeyVal))
 findPackage name = do

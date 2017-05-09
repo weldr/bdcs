@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Requirements(insertRequirement,
@@ -23,17 +22,13 @@ module BDCS.Requirements(insertRequirement,
 import Control.Monad.IO.Class(MonadIO)
 import Database.Esqueleto
 
-import BDCS.DB(GroupRequirements(..), Requirements(..))
+import BDCS.DB(GroupRequirements(..), Requirements(..), orInsert)
 import BDCS.Groups(findRequires, findGroupRequirements)
 
 insertGroupRequirement :: MonadIO m => GroupRequirements -> SqlPersistT m (Key GroupRequirements)
 insertGroupRequirement gr@GroupRequirements{..} =
-    findGroupRequirements groupRequirementsGroup_id groupRequirementsReq_id >>= \case
-        Nothing  -> insert gr
-        Just gid -> return gid
+    findGroupRequirements groupRequirementsGroup_id groupRequirementsReq_id `orInsert` gr
 
 insertRequirement :: MonadIO m => Requirements -> SqlPersistT m (Key Requirements)
 insertRequirement req@Requirements{..} =
-    findRequires requirementsReq_language requirementsReq_context requirementsReq_strength requirementsReq_expr >>= \case
-        Nothing  -> insert req
-        Just rid -> return rid
+    findRequires requirementsReq_language requirementsReq_context requirementsReq_strength requirementsReq_expr `orInsert` req

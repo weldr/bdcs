@@ -13,8 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
-
 module BDCS.GroupKeyValue(insertGroupKeyValue)
  where
 
@@ -27,6 +25,6 @@ import BDCS.KeyValue(findKeyValue, insertKeyValue)
 
 insertGroupKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> Key Groups -> SqlPersistT m (Key GroupKeyValues)
 insertGroupKeyValue k v e groupId =
-    findKeyValue k v e >>= \case
-        Nothing -> insertKeyValue k v e >>= \kvId -> insert $ GroupKeyValues groupId kvId
-        Just kv -> insert $ GroupKeyValues groupId kv
+    maybeKey (insertKeyValue k v e >>= \kvId -> insert $ GroupKeyValues groupId kvId)
+             (insert . GroupKeyValues groupId)
+             (findKeyValue k v e)

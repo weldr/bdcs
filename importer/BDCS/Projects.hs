@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Projects(findProject,
@@ -37,6 +36,4 @@ findProject name = do
 
 insertProject :: MonadIO m => Projects -> SqlPersistT m (Key Projects)
 insertProject project@Projects{..} =
-    findProject projectsName >>= \case
-        Nothing   -> insert project
-        Just proj -> return proj
+    findProject projectsName `orInsert` project
