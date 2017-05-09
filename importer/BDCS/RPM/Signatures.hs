@@ -21,7 +21,6 @@ module BDCS.RPM.Signatures(mkRSASignature,
 
 import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack)
-import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB(Builds, BuildSignatures(..))

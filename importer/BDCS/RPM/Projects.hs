@@ -18,7 +18,6 @@
 module BDCS.RPM.Projects(mkProject)
  where
 
-import           Data.ByteString.Char8(unpack)
 import           Data.List(elemIndices)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
