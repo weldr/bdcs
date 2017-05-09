@@ -53,7 +53,8 @@ import-centos7:
 	mkdir rpms/
 	sqlite3 centos-metadata.db < schema.sql
 	pip install -r tests/requirements.txt
-	for REPO in http://mirror.centos.org/centos/7/os/x86_64; do \
+	for REPO in http://mirror.centos.org/centos/7/os/x86_64 \
+	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
 	    export IMPORT_URL="$$REPO"; \
 	    export KEEP_MDDB=1; \
 	    export MDDB="centos-metadata.db"; \
