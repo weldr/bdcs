@@ -20,21 +20,19 @@ module BDCS.Sources(findSource,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
 
 findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
-findSource version projectId = do
+findSource version projectId = firstResult $
     -- FIXME:  Is (project_id, version) unique in Sources?
-    ndx <- select $ from $ \src -> do
-           where_ $ src ^. SourcesProject_id ==. val projectId &&.
-                    src ^. SourcesVersion    ==. val version
-           limit 1
-           return $ src ^. SourcesId
-    return $ listToMaybe (map unValue ndx)
+    select $ from $ \src -> do
+    where_ $ src ^. SourcesProject_id ==. val projectId &&.
+             src ^. SourcesVersion    ==. val version
+    limit 1
+    return $ src ^. SourcesId
 
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)
 insertSource source@Sources{..} =

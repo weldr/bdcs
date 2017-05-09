@@ -21,7 +21,6 @@ module BDCS.Packages(filesInPackage,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
@@ -43,10 +42,9 @@ insertPackageName packageName =
     findPackage packageName `orDo` insertKeyValue "packageName" packageName Nothing
 
 findPackage :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key KeyVal))
-findPackage name = do
-    ndx <- select $ from $ \pkg -> do
-           where_ $ pkg ^. KeyValKey_value ==. val "packageName" &&.
-                    pkg ^. KeyValVal_value ==. val name
-           limit 1
-           return $ pkg ^. KeyValId
-    return $ listToMaybe (map unValue ndx)
+findPackage name = firstResult $
+    select $ from $ \pkg -> do
+    where_ $ pkg ^. KeyValKey_value ==. val "packageName" &&.
+             pkg ^. KeyValVal_value ==. val name
+    limit 1
+    return $ pkg ^. KeyValId

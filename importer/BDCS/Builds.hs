@@ -21,23 +21,21 @@ module BDCS.Builds(associateBuildWithPackage,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
 
 findBuild :: MonadIO m => Int -> T.Text -> T.Text -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
-findBuild epoch release arch sourceId = do
+findBuild epoch release arch sourceId = firstResult $
     -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
-    ndx <- select $ from $ \build -> do
-           where_ $ build ^. BuildsSource_id ==. val sourceId &&.
-                    build ^. BuildsEpoch ==. val epoch &&.
-                    build ^. BuildsRelease ==. val release &&.
-                    build ^. BuildsArch ==. val arch
-           limit 1
-           return $ build ^. BuildsId
-    return $ listToMaybe (map unValue ndx)
+    select $ from $ \build -> do
+    where_ $ build ^. BuildsSource_id ==. val sourceId &&.
+             build ^. BuildsEpoch ==. val epoch &&.
+             build ^. BuildsRelease ==. val release &&.
+             build ^. BuildsArch ==. val arch
+    limit 1
+    return $ build ^. BuildsId
 
 insertBuild :: MonadIO m => Builds -> SqlPersistT m (Key Builds)
 insertBuild build@Builds{..} =
