@@ -30,9 +30,9 @@ import           Control.Monad.Reader(ReaderT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadThrow)
 import           Data.Conduit((.|), runConduitRes)
 import           Data.Data(Typeable)
-import           Data.Maybe(fromJust, listToMaybe)
+import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
-import           Network.URI(URI(..), parseURIReference, relativeTo)
+import           Network.URI(URI)
 import           Text.XML(Document, sinkDoc)
 import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
@@ -41,7 +41,7 @@ import qualified Import.Comps as Comps
 import           Import.Conduit(getFromURI, ungzipIfCompressed)
 import qualified Import.RPM as RPM
 import           Import.State(ImportState(..))
-import           Import.URI(appendURI)
+import           Import.URI(appendURI, baseURI)
 
 import           BDCS.Exceptions(throwIfNothing)
 
@@ -102,10 +102,5 @@ loadFromURI metadataURI = do
     let locations = map appendOrThrow $ extractLocations document
     mapM_ RPM.loadFromURI locations
  where
-    -- the path is, e.g., /path/to/repo/repodata/primary.xml. Go up one directory.
-    baseURI :: URI
-    baseURI = let upOne = fromJust $ parseURIReference ".." in
-        relativeTo upOne metadataURI
-
     appendOrThrow :: T.Text -> URI
-    appendOrThrow path = appendURI baseURI (T.unpack path) `throwIfNothing` RepoException
+    appendOrThrow path = appendURI (baseURI metadataURI) (T.unpack path) `throwIfNothing` RepoException
