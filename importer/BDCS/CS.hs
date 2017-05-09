@@ -4,7 +4,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module BDCS.CS(Object(..),
+module BDCS.CS(ChecksumMap,
+               Object(..),
                Metadata(..),
                FileContents(..),
                commit,
@@ -17,13 +18,12 @@ module BDCS.CS(Object(..),
 
 import           Control.Conditional(condM, ifM, otherwiseM)
 import           Control.Exception(SomeException, bracket_, catch)
-import           Control.Monad(forM_, when)
+import           Control.Monad(forM_)
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.State(StateT, lift, modify)
 import qualified Data.ByteString as BS
 import           Data.GI.Base.ManagedPtr(unsafeCastTo)
-import           Data.Maybe(fromJust, isJust)
 import qualified Data.Text as T
 import           Data.Word(Word32)
 import           GI.Gio
@@ -32,6 +32,9 @@ import           System.Directory(doesDirectoryExist)
 import           System.Endian(fromBE32)
 import           System.IO(hClose)
 import           System.IO.Temp(withSystemTempFile)
+
+-- A mapping from a file path to its checksum in an ostree repo.
+type ChecksumMap = [(T.Text, T.Text)]
 
 data Object = DirMeta Metadata
             | FileObject FileContents
@@ -47,6 +50,12 @@ data FileContents = FileContents { metadata :: Metadata,
                                    symlink :: Maybe T.Text,
                                    contents :: InputStream }
 
+-- Given a commit, return the parent of it or Nothing if no parent exists.
+parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
+parentCommit repo commit =
+    catch (Just <$> repoResolveRev repo commit False)
+          (\(_ :: SomeException) -> return Nothing)
+
 -- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
 -- function also requires a commit subject and optionally a commit body.  The subject and body are
 -- visible if you use "ostree log master".  Returns the checksum of the commit.
@@ -56,63 +65,57 @@ commit repo repoFile subject body =
         -- Get the parent, which should always be whatever "master" points to.  If there is no parent
         -- (likely because nothing has been imported into this repo before), just return Nothing.
         -- ostree will know what to do.
-        parent <- catch (Just <$> repoResolveRev repo "master" False)
-                        (\(_ :: SomeException) -> return Nothing)
-
+        parent <- parentCommit repo "master"
         checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
         repoTransactionSetRef repo Nothing "master" checksum
         return checksum
 
--- Given an open ostree repo and a checksum to some commit, return an association list mapping a file
--- path to its checksum.  This is useful for creating a mapping in the MDDB from the MDDB to the
--- ostree content store.
-commitContents :: IsRepo a => a -> T.Text -> StateT [(T.Text, T.Text)] IO ()
+-- Given an open ostree repo and a checksum to some commit, return a ChecksumMap.  This is useful for
+-- creating a mapping in the MDDB from some MDDB object to its content in the ostree store.
+commitContents :: IsRepo a => a -> T.Text -> StateT ChecksumMap IO ()
 commitContents repo commit = do
     (root, _) <- repoReadCommit repo commit noCancellable
     file <- fileResolveRelativePath root "/"
     info <- fileQueryInfo file "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
     walk file info
  where
-    walk :: File -> FileInfo -> StateT [(T.Text, T.Text)] IO ()
-    walk f i = do
-        ty <- lift $ fileInfoGetFileType i
-        case ty of
-            FileTypeDirectory -> do (p, c) <- lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
-                                        -- this needs to be called before repoFileTreeGetContentsChecksum to populate the data
-                                        repoFileEnsureResolved repoFile
+    walk :: File -> FileInfo -> StateT ChecksumMap IO ()
+    walk f i = lift (fileInfoGetFileType i) >>= \case
+        FileTypeDirectory -> do getPathAndChecksum FileTypeDirectory f >>= addPathAndChecksum
 
-                                        checksum <- repoFileTreeGetMetadataChecksum repoFile
-                                        path <- fileGetPath f
-                                        return (fmap T.pack path, checksum)
+                                -- Grab the info for everything in this directory.
+                                dirEnum <- fileEnumerateChildren f "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
+                                childrenInfo <- getAllChildren dirEnum []
 
-                                    -- Add the name and checksum of this directory.
-                                    when (isJust p) $
-                                        modify (++ [(fromJust p, c)])
+                                -- Examine the contents of this directory recursively - this results in all
+                                -- the files being added by the other branch of the case, and other directories
+                                -- being handled recusrively.  Thus, we do this depth-first.
+                                forM_ childrenInfo $ \childInfo -> do
+                                    child <- fileInfoGetName childInfo >>= fileGetChild f
+                                    walk child childInfo
 
-                                    -- Grab the info for everything in this directory.
-                                    dirEnum <- fileEnumerateChildren f "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
-                                    childrenInfo <- getAllChildren dirEnum []
+        ty                -> getPathAndChecksum ty f >>= addPathAndChecksum
 
-                                    -- Examine the contents of this directory recursively - this results in all
-                                    -- the files being added by the other branch of the case, and other directories
-                                    -- being handled recusrively.  Thus, we do this depth-first.
-                                    forM_ childrenInfo $ \childInfo -> do
-                                        child <- fileInfoGetName childInfo >>= fileGetChild f
-                                        walk child childInfo
+    addPathAndChecksum :: (Maybe T.Text, T.Text) -> StateT ChecksumMap IO ()
+    addPathAndChecksum (Just p, c) = modify (++ [(p, c)])
+    addPathAndChecksum _           = return ()
 
-            _                 -> do (p, c) <- lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
-                                        checksum <- repoFileGetChecksum repoFile
-                                        path <- fileGetPath f
-                                        return (fmap T.pack path, checksum)
-
-                                    when (isJust p) $
-                                        modify (++ [(fromJust p, c)])
-
-    getAllChildren :: FileEnumerator -> [FileInfo] -> StateT [(T.Text, T.Text)] IO [FileInfo]
+    getAllChildren :: FileEnumerator -> [FileInfo] -> StateT ChecksumMap IO [FileInfo]
     getAllChildren enum accum =
         fileEnumeratorNextFile enum noCancellable >>= \case
             Just next -> getAllChildren enum (accum ++ [next])
             Nothing   -> return accum
+
+    getPathAndChecksum :: FileType -> File -> StateT ChecksumMap IO (Maybe T.Text, T.Text)
+    getPathAndChecksum ty f = lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
+        checksum <- case ty of
+                        FileTypeDirectory -> do -- this needs to be called before repoFileTreeGetMetadataChecksum to populate the data
+                                                repoFileEnsureResolved repoFile
+                                                repoFileTreeGetMetadataChecksum repoFile
+                        _                 -> repoFileGetChecksum repoFile
+
+        path <- fileGetPath f
+        return (fmap T.pack path, checksum)
 
 -- Open the named ostree repo.  If the repo does not already exist, it will first be created.
 -- It is created in Z2 mode because that can be modified without being root.
