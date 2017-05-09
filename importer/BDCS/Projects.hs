@@ -20,19 +20,17 @@ module BDCS.Projects(findProject,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
 
 findProject :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Projects))
-findProject name = do
-    ndx <- select $ from $ \proj -> do
-           where_ $ proj ^. ProjectsName ==. val name
-           limit 1
-           return $ proj ^. ProjectsId
-    return $ listToMaybe (map unValue ndx)
+findProject name = firstResult $
+    select $ from $ \proj -> do
+    where_ $ proj ^. ProjectsName ==. val name
+    limit 1
+    return $ proj ^. ProjectsId
 
 insertProject :: MonadIO m => Projects -> SqlPersistT m (Key Projects)
 insertProject project@Projects{..} =

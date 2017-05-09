@@ -28,9 +28,10 @@ module BDCS.DB where
 
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.ByteString(ByteString)
+import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
-import           Database.Esqueleto(Key, PersistEntity, SqlBackend, SqlPersistT, ToBackendKey, insert)
+import           Database.Esqueleto(Key, PersistEntity, SqlBackend, SqlPersistT, ToBackendKey, Value, insert,  unValue)
 import           Database.Persist.TH
 
 import BDCS.ReqType
@@ -126,6 +127,12 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     req_id RequirementsId
     deriving Eq Show
  |]
+
+-- Run a sql query, returning the first value as a Maybe.
+firstResult :: Monad m => m [Value a] -> m (Maybe a)
+firstResult query = do
+    ret <- query
+    return $ listToMaybe (map unValue ret)
 
 -- Like maybe, but for keys - take a default value, a function, potentially the key given
 -- by some other database query.  If the key is Nothing, return the default value.  Otherwise,

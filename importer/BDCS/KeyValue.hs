@@ -19,20 +19,18 @@ module BDCS.KeyValue(findKeyValue,
 
 import           Control.Monad.IO.Class(MonadIO)
 import qualified Data.Text as T
-import           Data.Maybe(listToMaybe)
 import           Database.Esqueleto
 
 import BDCS.DB
 
 findKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> SqlPersistT m (Maybe (Key KeyVal))
-findKeyValue k v e = do
-    ndx <- select $ from $ \kv -> do
-           where_ $ kv ^. KeyValKey_value ==. val k &&.
-                    kv ^. KeyValVal_value ==. val v &&.
-                    kv ^. KeyValExt_value ==. val e
-           limit 1
-           return $ kv ^. KeyValId
-    return $ listToMaybe (map unValue ndx)
+findKeyValue k v e = firstResult $
+    select $ from $ \kv -> do
+    where_ $ kv ^. KeyValKey_value ==. val k &&.
+             kv ^. KeyValVal_value ==. val v &&.
+             kv ^. KeyValExt_value ==. val e
+    limit 1
+    return $ kv ^. KeyValId
 
 insertKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v e =

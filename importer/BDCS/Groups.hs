@@ -19,7 +19,6 @@ module BDCS.Groups(findGroupRequirements,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
@@ -27,34 +26,31 @@ import           BDCS.DB
 import qualified BDCS.ReqType as RT
 
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
-findGroupRequirements groupId reqId = do
-    ndx  <- select $ from $ \r -> do
-            where_ $ r ^. GroupRequirementsGroup_id ==. val groupId &&.
-                     r ^. GroupRequirementsReq_id ==. val reqId
-            limit 1
-            return $ r ^. GroupRequirementsId
-    return $ listToMaybe (map unValue ndx)
+findGroupRequirements groupId reqId = firstResult $
+    select $ from $ \r -> do
+    where_ $ r ^. GroupRequirementsGroup_id ==. val groupId &&.
+             r ^. GroupRequirementsReq_id ==. val reqId
+    limit 1
+    return $ r ^. GroupRequirementsId
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> T.Text -> SqlPersistT m (Maybe (Key Requirements))
-findRequires reqLang reqCtx reqStrength reqExpr = do
-    ndx <- select $ from $ \r -> do
-           where_ $ r ^. RequirementsReq_language ==. val reqLang &&.
-                    r ^. RequirementsReq_context ==. val reqCtx &&.
-                    r ^. RequirementsReq_strength ==. val reqStrength &&.
-                    r ^. RequirementsReq_expr ==. val reqExpr
-           limit 1
-           return $ r ^. RequirementsId
-    return $ listToMaybe (map unValue ndx)
+findRequires reqLang reqCtx reqStrength reqExpr = firstResult $
+    select $ from $ \r -> do
+    where_ $ r ^. RequirementsReq_language ==. val reqLang &&.
+             r ^. RequirementsReq_context ==. val reqCtx &&.
+             r ^. RequirementsReq_strength ==. val reqStrength &&.
+             r ^. RequirementsReq_expr ==. val reqExpr
+    limit 1
+    return $ r ^. RequirementsId
 
 -- Given a group name, return a group id
 nameToGroupId :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Groups))
-nameToGroupId name = do
-    ndx <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
-           on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
-                    group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
-           where_ $ keyval ^. KeyValKey_value ==. val (T.pack "name") &&.
-                    keyval ^. KeyValVal_value ==. val name &&.
-                    groups ^. GroupsGroup_type ==. val (T.pack "rpm")
-           limit 1
-           return $ groups ^. GroupsId
-    return $ listToMaybe (map unValue ndx)
+nameToGroupId name = firstResult $
+    select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
+    on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
+             group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
+    where_ $ keyval ^. KeyValKey_value ==. val (T.pack "name") &&.
+             keyval ^. KeyValVal_value ==. val name &&.
+             groups ^. GroupsGroup_type ==. val (T.pack "rpm")
+    limit 1
+    return $ groups ^. GroupsId
