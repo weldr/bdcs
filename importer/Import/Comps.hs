@@ -58,13 +58,13 @@ parseCompsPkg cursor = do
         [] -> [""]
         x  -> x
 
-    toCompsPkg (t, n, r) = case t of
-        "mandatory"     -> CPMandatory n
-        "default"       -> CPDefault n
-        "optional"      -> CPOptional n
-        "conditional"   -> if r == "" then CPUnknown n else n `CPRequires` r
-        -- Shouldn't happen, but this marks them so we'll know there's something to look into.
-        _               -> CPUnknown n
+    toCompsPkg ("mandatory", n, _)    = CPMandatory n
+    toCompsPkg ("default", n, _)      = CPDefault n
+    toCompsPkg ("optional", n, _)     = CPOptional n
+    toCompsPkg ("conditional", n, "") = CPUnknown n
+    toCompsPkg ("conditional", n, r)  = n `CPRequires` r
+    -- Shouldn't happen, but this marks them so we'll know there's something to look into.
+    toCompsPkg (_, n, _)              = CPUnknown n
 
 parseCompsGroup :: Cursor -> CompsGroup
 parseCompsGroup cursor = do

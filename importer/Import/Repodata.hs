@@ -81,7 +81,7 @@ loadRepoFromURI uri = do
     repomd <- fetchAndParse (appendOrThrow "repodata/repomd.xml")
 
     -- Import primary.xml
-    let primary = throwIfNothing (extractType repomd "primary") RepoException
+    let primary = extractType repomd "primary" `throwIfNothing` RepoException
     loadFromURI $ appendOrThrow primary
 
     -- Import comps if it exists
@@ -91,9 +91,10 @@ loadRepoFromURI uri = do
     case groupURI of
         Just u -> Comps.loadFromURI u
         Nothing -> return ()
+
  where
     appendOrThrow :: T.Text -> URI
-    appendOrThrow path = throwIfNothing (appendURI uri (T.unpack path)) RepoException
+    appendOrThrow path = appendURI uri (T.unpack path) `throwIfNothing` RepoException
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI metadataURI = do
@@ -107,4 +108,4 @@ loadFromURI metadataURI = do
         relativeTo upOne metadataURI
 
     appendOrThrow :: T.Text -> URI
-    appendOrThrow path = throwIfNothing (appendURI baseURI (T.unpack path)) RepoException
+    appendOrThrow path = appendURI baseURI (T.unpack path) `throwIfNothing` RepoException

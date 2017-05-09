@@ -35,12 +35,9 @@ import           Import.URI(showURI, uriToPath)
 
 -- Load data from a given file: or http: URL
 getFromURI :: MonadResource m => URI -> Producer m BS.ByteString
-getFromURI uri@URI{..} =
-    if uriScheme == "file:" then
-        sourceFile $ uriToPath uri
-    else do
-        request <- parseRequest $ showURI uri
-        httpSource request getResponseBody
+getFromURI uri@URI{..} | uriScheme == "file:" = sourceFile $ uriToPath uri
+                       | otherwise            = do request <- parseRequest $ showURI uri
+                                                   httpSource request getResponseBody
 
 -- A conduit that takes its input and returns that as its output.
 identityC :: Monad m => Conduit a m a
