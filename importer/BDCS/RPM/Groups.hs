@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -29,10 +28,30 @@ import           Data.Word(Word32)
 import           Database.Esqueleto
 
 import           BDCS.DB
-import           BDCS.Groups(findRequires, findGroupRequirements)
-import           BDCS.KeyValue(findKeyValue, insertKeyValue)
+import           BDCS.GroupKeyValue(insertGroupKeyValue)
+import           BDCS.Requirements(insertGroupRequirement, insertRequirement)
 import qualified BDCS.ReqType as RT
+import           BDCS.RPM.Requirements(mkGroupRequirement, mkRequirement)
 import           RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
+
+addPRCO :: MonadIO m => [Tag] -> Key Groups -> T.Text -> T.Text -> SqlPersistT m ()
+addPRCO tags groupId tagBase keyName =
+    withPRCO tagBase tags $ \expr -> let
+        -- split out the name part of "name >= version"
+        exprBase = T.takeWhile (/= ' ')  expr
+      in
+        insertGroupKeyValue keyName exprBase (Just expr) groupId
+
+prcoExpressions :: T.Text -> [Tag] -> [T.Text]
+prcoExpressions ty tags = let
+    ty'   = T.toTitle ty
+
+    names = map T.pack $ findStringListTag (T.unpack ty' ++ "Name") tags
+    flags =              findWord32ListTag (T.unpack ty' ++ "Flags") tags
+    vers  = map T.pack $ findStringListTag (T.unpack ty' ++ "Version") tags
+ in
+    map (\(n, f, v) -> T.stripEnd $ T.concat [n, " ", rpmFlagsToOperator f, " ", v])
+        (zip3 names flags vers)
 
 rpmFlagsToOperator :: Word32 -> T.Text
 rpmFlagsToOperator f =
@@ -42,6 +61,10 @@ rpmFlagsToOperator f =
        | f `testBit` 2                  -> ">"
        | f `testBit` 3                  -> "="
        | otherwise                      -> ""
+
+withPRCO :: Monad m => T.Text -> [Tag] -> (T.Text -> m a) -> m ()
+withPRCO ty tags fn =
+    mapM_ fn (prcoExpressions ty tags)
 
 -- Ignore the suggestion to not use lambda for creating GroupFiles rows, since
 -- the lambda makes it more clear what's actually happening
@@ -63,58 +86,25 @@ createGroup fileIds rpm = do
 
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
-    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $
-        insertKeyValueIfMissing groupId
+    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \tup ->
+        uncurry insertGroupKeyValue tup Nothing groupId
 
     -- Add the epoch attribute, when it exists.
     when (isJust epoch) $ void $
-        insertKeyValueIfMissing groupId ("epoch", fromJust epoch)
+        insertGroupKeyValue "epoch" (fromJust epoch) Nothing groupId
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
-        uncurry (basicAddPRCO rpm groupId) tup
+        uncurry (addPRCO rpm groupId) tup
 
     -- Create the Requires attributes
     forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
            ("Supplement", RT.ShouldIfInstalled), ("Enhance", RT.MayIfInstalled)] $ \tup ->
-        addPRCO (fst tup) rpm $ \expr -> do
-            reqId <- findRequires RT.RPM RT.Runtime (snd tup) expr >>= \case
-                         Nothing  -> insert $ Requirements RT.RPM RT.Runtime (snd tup) expr
-                         Just rid -> return rid
+        withPRCO (fst tup) rpm $ \expr -> do
+            reqId <- insertRequirement $ mkRequirement (snd tup) expr
 
             -- Don't insert a requirement for a group more than once.  RPMs can have the same
             -- requirement listed multiple times, for whatever reason, but we want to reduce
             -- duplication.
-            findGroupRequirements groupId reqId >>= \case
-                Nothing -> void $ insert $ GroupRequirements groupId reqId
-                Just _  -> return ()
+            void $ insertGroupRequirement $ mkGroupRequirement groupId reqId
 
     return groupId
- where
-    insertKeyValueIfMissing groupId (k, v) =
-        findKeyValue k v Nothing >>= \case
-            Nothing -> insertKeyValue k v Nothing >>= \kvId -> insert $ GroupKeyValues groupId kvId
-            Just kv -> insert $ GroupKeyValues groupId kv
-
-    basicAddPRCO tags groupId tagBase keyName =
-        addPRCO tagBase tags $ \expr -> let
-            -- split out the name part of "name >= version"
-            exprBase = T.takeWhile (/= ' ')  expr
-          in
-            findKeyValue keyName exprBase (Just expr) >>= \case
-                Nothing -> insertKeyValue keyName exprBase (Just expr) >>= \kvId -> insert $ GroupKeyValues groupId kvId
-                Just kv -> insert $ GroupKeyValues groupId kv
-
-    addPRCO :: Monad m => T.Text -> [Tag] -> (T.Text -> m a) -> m ()
-    addPRCO ty tags fn = do
-        let names = map T.pack $ findStringListTag (T.unpack ty' ++ "Name") tags
-        let flags =              findWord32ListTag (T.unpack ty' ++ "Flags") tags
-        let vers  = map T.pack $ findStringListTag (T.unpack ty' ++ "Version") tags
-
-        -- TODO How to handle everything from RPMSENSE_POSTTRANS and beyond?
-        forM_ (zip3 names flags vers) $ \(n, f, v) -> do
-            let cmp  = rpmFlagsToOperator f
-            let expr = T.stripEnd $ T.concat [n, " ", cmp, " ", v]
-
-            fn expr
-     where
-        ty' = T.toTitle ty
