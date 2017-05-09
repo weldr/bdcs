@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-} 
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Sources(findSource,
@@ -39,6 +38,4 @@ findSource version projectId = do
 
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)
 insertSource source@Sources{..} =
-    findSource sourcesVersion sourcesProject_id >>= \case
-        Nothing  -> insert source
-        Just src -> return src
+    findSource sourcesVersion sourcesProject_id `orInsert` source

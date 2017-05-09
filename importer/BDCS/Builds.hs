@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Builds(associateBuildWithPackage,
@@ -42,9 +41,7 @@ findBuild epoch release arch sourceId = do
 
 insertBuild :: MonadIO m => Builds -> SqlPersistT m (Key Builds)
 insertBuild build@Builds{..} =
-    findBuild buildsEpoch buildsRelease buildsArch buildsSource_id >>= \case
-        Nothing  -> insert build
-        Just bld -> return bld
+    findBuild buildsEpoch buildsRelease buildsArch buildsSource_id `orInsert` build
 
 associateBuildWithPackage :: MonadIO m => Key Builds -> Key KeyVal -> SqlPersistT m (Key BuildKeyValues)
 associateBuildWithPackage buildId kvId =

@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -17,6 +17,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs  #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
@@ -25,9 +26,11 @@
 
 module BDCS.DB where
 
+import           Control.Monad.IO.Class(MonadIO)
 import           Data.ByteString(ByteString)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
+import           Database.Esqueleto(Key, PersistEntity, SqlBackend, SqlPersistT, ToBackendKey, insert)
 import           Database.Persist.TH
 
 import BDCS.ReqType
@@ -123,3 +126,23 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     req_id RequirementsId
     deriving Eq Show
  |]
+
+-- Like maybe, but for keys - take a default value, a function, potentially the key given
+-- by some other database query.  If the key is Nothing, return the default value.  Otherwise,
+-- run the function on the key and return that value.
+maybeKey :: MonadIO m => m b -> (t -> m b) -> m (Maybe t) -> m b
+maybeKey def fn val = val >>= \case
+    Nothing -> def
+    Just v  -> fn v
+
+-- Attempt to find a record in some table of the database.  If it exists, return its key.
+-- If it doesn't exist, perform some other action and return the key given by that action.
+orDo :: MonadIO m => m (Maybe b) -> m b -> m b
+orDo findFn doFn =
+    findFn >>= maybe doFn return
+
+-- Attempt to find a record in some table of the database.  If it exists, return its key.
+-- If it doesn't exist, insert the given object and return its key.
+orInsert :: (MonadIO m, PersistEntity a, ToBackendKey SqlBackend a) => SqlPersistT m (Maybe (Key a)) -> a -> SqlPersistT m (Key a)
+orInsert findFn obj =
+    findFn >>= maybe (insert obj) return
