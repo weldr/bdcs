@@ -14,12 +14,15 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 module Import.URI(appendURI,
+                  isCompsFile,
+                  isPrimaryXMLFile,
                   showURI,
                   uriToPath)
  where
 
+import Data.List(isInfixOf, isSuffixOf)
 import Network.URI(URI(..), escapeURIString, isUnescapedInURI,
-                   parseURIReference, relativeTo, unEscapeString, uriToString)
+                   parseURIReference, pathSegments, relativeTo, unEscapeString, uriToString)
 
 -- convert a file:// URI to a FilePath
 -- This does not check that the URI is a file:// URI, assumes posix-style paths
@@ -38,3 +41,10 @@ appendURI base path = let
 -- Convert a URI to string with no obfuscation
 showURI :: URI -> String
 showURI uri = uriToString id uri ""
+
+isCompsFile :: URI -> Bool
+isCompsFile uri = let path = last (pathSegments uri) in
+    "-comps" `isInfixOf` path && (".xml" `isSuffixOf` path || ".xml.gz" `isSuffixOf` path)
+
+isPrimaryXMLFile :: URI -> Bool
+isPrimaryXMLFile uri = "primary.xml" `isInfixOf` last (pathSegments uri)

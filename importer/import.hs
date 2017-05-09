@@ -24,8 +24,8 @@ import Control.Exception(catch)
 import Control.Monad(void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(ReaderT, runReaderT)
-import Data.List(isInfixOf, isSuffixOf)
-import Network.URI(URI(..), parseURI, pathSegments)
+import Data.List(isSuffixOf)
+import Network.URI(URI(..), parseURI)
 import System.Directory(doesFileExist)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
@@ -36,6 +36,7 @@ import           BDCS.Exceptions(DBException)
 import qualified Import.Comps as Comps
 import qualified Import.RPM as RPM
 import qualified Import.Repodata as Repodata
+import           Import.URI(isCompsFile, isPrimaryXMLFile)
 import           Import.State(ImportState(..))
 
 processThing :: String -> ReaderT ImportState IO ()
@@ -45,13 +46,6 @@ processThing url = case parseURI url of
                            | ".rpm" `isSuffixOf` uriPath    -> RPM.loadFromURI uri
                            | otherwise                      -> Repodata.loadRepoFromURI uri
     _ -> liftIO usage
- where
-    isPrimaryXMLFile :: URI -> Bool
-    isPrimaryXMLFile uri = "primary.xml" `isInfixOf` last (pathSegments uri)
-
-    isCompsFile :: URI -> Bool
-    isCompsFile uri = let path = last (pathSegments uri) in
-        "-comps" `isInfixOf` path && (".xml" `isSuffixOf` path || ".xml.gz" `isSuffixOf` path)
 
 usage :: IO ()
 usage = do
