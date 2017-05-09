@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 module Import.URI(appendURI,
+                  baseURI,
                   isCompsFile,
                   isPrimaryXMLFile,
                   showURI,
@@ -21,6 +22,7 @@ module Import.URI(appendURI,
  where
 
 import Data.List(isInfixOf, isSuffixOf)
+import Data.Maybe(fromJust)
 import Network.URI(URI(..), escapeURIString, isUnescapedInURI,
                    parseURIReference, pathSegments, relativeTo, unEscapeString, uriToString)
 
@@ -28,6 +30,11 @@ import Network.URI(URI(..), escapeURIString, isUnescapedInURI,
 -- This does not check that the URI is a file:// URI, assumes posix-style paths
 uriToPath :: URI -> FilePath
 uriToPath uri = unEscapeString $ uriPath uri
+
+-- the path is, e.g., /path/to/repo/repodata/primary.xml. Go up one directory.
+baseURI :: URI -> URI
+baseURI uri = let upOne = fromJust $ parseURIReference ".." in
+    relativeTo upOne uri
 
 -- append a path to a URI
 appendURI :: URI -> String -> Maybe URI
