@@ -15,7 +15,11 @@
 
 {-# LANGUAGE RecordWildCards #-}
 
-module RPM.Types
+module RPM.Types(RPM(..),
+                 Lead(..),
+                 Header(..),
+                 SectionHeader(..))
+
  where
 
 import qualified Data.ByteString as BS
