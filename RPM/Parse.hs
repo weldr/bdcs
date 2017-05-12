@@ -1,4 +1,4 @@
--- Copyright (C) 2016 Red Hat, Inc.
+-- Copyright (C) 2016-2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -14,7 +14,6 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# OPTIONS_GHC -fno-warn-unused-do-bind #-}
@@ -27,12 +26,11 @@ module RPM.Parse(parseRPM,
 import           Control.Applicative((<$>))
 #endif
 import           Control.Monad.Except(MonadError, throwError)
-import           Conduit((=$), awaitForever, yield)
+import           Conduit((.|), Conduit, awaitForever, yield)
 import           Data.Attoparsec.Binary
 import           Data.Attoparsec.ByteString(Parser, anyWord8, count, take, takeByteString, word8)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as C
-import           Data.Conduit(Conduit)
 import           Data.Conduit.Attoparsec(ParseError(..), conduitParserEither)
 import           Data.Maybe(mapMaybe)
 import           Prelude hiding(take)
@@ -41,6 +39,8 @@ import RPM.Internal.Numbers(asWord32)
 import RPM.Tags(Tag, mkTag)
 import RPM.Types(Header(..), Lead(..), RPM(..), SectionHeader(..))
 
+-- "a <$> b <$> c" looks better than "a . b <$> c"
+{-# ANN parseLead "HLint: ignore Functor law" #-}
 parseLead :: Parser Lead
 parseLead = do
     -- Verify this is an RPM by checking the first four bytes.
@@ -127,10 +127,8 @@ parseRPM = do
         if remainder > 0 then fromIntegral $ 8 - remainder else 0
 
 -- Like parseRPM, but puts the resulting RPM into a Conduit.
-parseRPMC :: (MonadError String m) => Conduit C.ByteString m RPM
+parseRPMC :: MonadError String m => Conduit C.ByteString m RPM
 parseRPMC =
-    conduitParserEither parseRPM =$ consumer
+    conduitParserEither parseRPM .| consumer
  where
-    consumer = awaitForever $ \case
-        Left err       -> throwError $ errorMessage err
-        Right (_, rpm) -> yield rpm
+    consumer = awaitForever $ either (throwError . errorMessage) (yield . snd)
