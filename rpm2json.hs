@@ -17,7 +17,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-import           Conduit(($$), (=$), awaitForever, stdinC)
+import           Conduit((.|), Conduit, Consumer, awaitForever, runConduit, stdinC, yield)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -25,7 +25,6 @@ import           Data.Aeson(Value(..), toJSON, ToJSON, object, (.=))
 import           Data.Aeson.TH(deriveToJSON, defaultOptions)
 import           Data.Aeson.Encode.Pretty(encodePretty)
 import qualified Data.ByteString.Lazy.Char8 as C
-import           Data.Conduit(Conduit, Consumer, yield)
 import           Data.Data
 import           Data.Word
 import           RPM.Parse(parseRPMC)
@@ -58,7 +57,7 @@ tagType :: Tag -> TypeRep
 tagType = gmapQi 0 typeOf
 
 -- Use a cast to pull the first parameter out of the constructor.
-tagValue :: (Typeable a) => Tag -> Maybe a
+tagValue :: Typeable a => Tag -> Maybe a
 tagValue = gmapQi 0 cast
 
 -- There's probably a better way to do this
@@ -132,4 +131,4 @@ consumer = awaitForever (liftIO . C.putStrLn . encodePretty)
 
 main :: IO ()
 main =
-    void $ runExceptT $ stdinC $$ parseRPMC =$ encodeC =$ consumer
+    void $ runExceptT $ runConduit $ stdinC .| parseRPMC .| encodeC .| consumer
