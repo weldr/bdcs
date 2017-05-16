@@ -19,7 +19,7 @@ library
                         attoparsec-binary,
                         base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
-                        conduit,
+                        conduit >= 1.2.8,
                         conduit-combinators,
                         conduit-extra,
                         mtl >= 2.2.1,
@@ -28,7 +28,7 @@ library
 
     default-language:   Haskell2010
 
-    ghc-options:        -Wall
+    ghc-options:        -Wall -Werror
 
 executable inspect
     main-is:            inspect.hs
@@ -38,7 +38,7 @@ executable inspect
                         attoparsec-binary,
                         base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
-                        conduit,
+                        conduit >= 1.2.8,
                         conduit-combinators,
                         conduit-extra,
                         mtl >= 2.2.1,
@@ -48,7 +48,7 @@ executable inspect
 
     default-language:   Haskell2010
 
-    ghc-options:        -Wall
+    ghc-options:        -Wall -Werror
 
 executable unrpm
     main-is:            unrpm.hs
@@ -58,7 +58,7 @@ executable unrpm
                         attoparsec-binary,
                         base >= 4.7 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
-                        conduit,
+                        conduit >= 1.2.8,
                         conduit-combinators,
                         conduit-extra,
                         cpio-conduit,
@@ -72,7 +72,7 @@ executable unrpm
 
     default-language:   Haskell2010
 
-    ghc-options:        -Wall
+    ghc-options:        -Wall -Werror
 
 executable rpm2json
     main-is:            rpm2json.hs
@@ -84,7 +84,7 @@ executable rpm2json
                         aeson < 1.0,
                         aeson-pretty,
                         bytestring >= 0.10 && < 0.11,
-                        conduit,
+                        conduit >= 1.2.8,
                         conduit-combinators,
                         conduit-extra,
                         mtl >= 2.2.1,
@@ -94,7 +94,7 @@ executable rpm2json
 
     default-language:   Haskell2010
 
-    ghc-options:        -Wall
+    ghc-options:        -Wall -Werror
 
 test-suite tests
     type:               exitcode-stdio-1.0
@@ -108,3 +108,5 @@ test-suite tests
                         rpm
 
     default-language:   Haskell2010
+
+    ghc-options:        -Wall -Werror
