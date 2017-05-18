@@ -1,0 +1,37 @@
+dist: trusty
+sudo: required
+language: c
+
+addons:
+  apt:
+    sources:
+    - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu zesty main universe'
+    - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu zesty-updates main universe'
+    packages:
+    - util-linux # update to work around Debian #817857
+    - liblzma-dev
+    - zlib1g-dev
+    - libglib2.0-dev
+    - libgirepository1.0-dev
+    - libostree-dev
+
+before_install:
+  - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
+  - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
+  - sudo ./install-haskell-platform.sh
+  - cabal update && cabal install hlint hpc-coveralls
+
+script:
+  - ~/.cabal/bin/hlint .
+  - cd haskell-rpm/ && cabal install && cabal clean && cd ../
+  - cd importer/ && cabal install --dependencies-only --enable-tests &&
+    cabal configure --enable-tests --enable-coverage --enable-library-coverage &&
+    cabal build && cabal test --show-details=always
+
+after_script:
+  - ~/.cabal/bin/hpc-coveralls --display-report tests
+
+notifications:
+  email:
+    on_failure: change
+    on_success: change
