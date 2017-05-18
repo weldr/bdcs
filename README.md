@@ -19,6 +19,7 @@ Running locally
 You will first need a directory full of RPMs somewhere.  Here, I assume that
 is the $PWD/Packages directory.  Then run:
 
+```
 $ cd importer
 $ cabal sandbox init
 $ cabal sandbox add-source ../haskell-rpm
@@ -26,7 +27,7 @@ $ cabal install --dependencies-only --enable-tests
 $ cabal build
 $ sqlite3 metadata.db < ../schema.sql
 $ for f in ${PWD}/Packages/*rpm; do dist/build/import/import metadata.db cs.repo file://${f}; done
-
+```
 
 Running with docker
 ===================
@@ -36,12 +37,12 @@ and Dockerfile.  Dockerfile.build is used to compile the program needed to
 build an mddb and produces an image with that program.  Dockerfile then runs
 that image and produces the mddb.
 
-The Dockerfile depends on a base image, named weld/fedora:24, which needs have
+The Dockerfile depends on a base image, named weld/fedora:25, which needs have
 been previously built. If it is not available it can be built from the
-welder-deployment repository by running `make weld-f24`.
+welder-deployment repository by running `make weld-f25`.
 
 The Makefile lays out the exact steps and can be used to simplify all this -
-just run "make importer mddb".  If make is unavailable, just copy the steps
+just run `make importer mddb`.  If make is unavailable, just copy the steps
 out of there and run them manually.
 
 You will first need a volume to store the mddb in and a volume containing all
