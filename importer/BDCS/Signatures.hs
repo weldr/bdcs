@@ -22,5 +22,4 @@ import Database.Esqueleto
 import BDCS.DB
 
 insertBuildSignatures :: MonadIO m => [BuildSignatures] -> SqlPersistT m [Key BuildSignatures]
-insertBuildSignatures sigs =
-    mapM insert sigs
+insertBuildSignatures = mapM insert

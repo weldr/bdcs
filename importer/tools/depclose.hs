@@ -255,8 +255,7 @@ closeRPM db rpms = runSqlite (T.pack db) $
         doit (concat reqs ++ map fst (concat obsoletes) ++ tl) props' seen'
 
 printResult :: [Proposition] -> IO ()
-printResult props =
-    mapM_ (TIO.putStrLn . printOne) props
+printResult = mapM_ (TIO.putStrLn . printOne)
  where
     printOne (left  `Obsoletes` right) = T.concat [left, " obsoletes ", right]
     printOne (nevra `Provides`  thing) = T.concat [printNEVRA nevra, " provides ", thing]
