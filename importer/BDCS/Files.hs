@@ -28,7 +28,7 @@ import           Database.Esqueleto
 import BDCS.DB
 
 insertFiles :: MonadIO m => [Files] -> SqlPersistT m [Key Files]
-insertFiles files = mapM insert files
+insertFiles = mapM insert
 
 associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
 associateFilesWithBuild files build =
