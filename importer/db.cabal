@@ -97,6 +97,7 @@ executable export
   build-depends:       db,
                        base >= 4.9 && < 5.0,
                        bytestring >= 0.10 && < 0.11,
+                       cond,
                        conduit >= 1.2.8,
                        conduit-extra,
                        directory,

@@ -21,6 +21,7 @@
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
+import           Control.Conditional(ifM)
 import           Control.Monad(unless, when)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -38,7 +39,7 @@ import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import           Prelude hiding(writeFile)
-import           System.Directory(createDirectoryIfMissing, setModificationTime)
+import           System.Directory(createDirectoryIfMissing, doesFileExist, setModificationTime)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           System.FilePath((</>), dropDrive, takeDirectory)
@@ -169,6 +170,16 @@ processOneThingToTarEntries repo thing = do
     -- Get all of the files associated with the group, as entries
     runConduit $ groupIdToFiles groupId .| CL.mapMaybeM (checkoutObjectToTarEntry repo) .| CL.consume
 
+-- | Check a list of strings to see if any of them are files
+-- If it is, read it and insert its contents in its place
+expandFileThings :: [String] -> IO [String]
+expandFileThings = concatMapM isThingFile
+  where
+    isThingFile :: String ->  IO [String]
+    isThingFile thing = ifM (doesFileExist thing)
+                            (lines <$> readFile thing)
+                            (return [thing])
+
 usage :: IO ()
 usage = do
     putStrLn "Usage: export metadata.db repo dest thing [thing ...]"
@@ -177,6 +188,7 @@ usage = do
     putStrLn "\t* The name of a .tar file to be created"
     putStrLn "thing can be:"
     putStrLn "\t* The name of an RPM"
+    putStrLn "\t* A path to a file containing names of RPMs, 1 per line."
     -- TODO group id?
     exitFailure
 
@@ -190,7 +202,8 @@ main = do
     let db_path = pack (argv !! 0)
     repo <- CS.open (argv !! 1)
     let out_path = argv !! 2
-    let things = map pack $ drop 3 argv
+    allThings <- expandFileThings $ drop 3 argv
+    let things = map pack allThings
 
     result <- if ".tar" `isSuffixOf` out_path
               then runExceptT $ runResourceT $ processThingsToTar db_path repo out_path things
