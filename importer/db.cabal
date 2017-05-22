@@ -108,8 +108,10 @@ executable export
                        mtl >= 2.2.1,
                        persistent-sqlite,
                        resourcet,
+                       tar,
                        text,
                        time,
+                       transformers,
                        unix
 
   default-language:    Haskell2010
