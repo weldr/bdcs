@@ -39,7 +39,8 @@ library
                        Import.RPM,
                        Import.Repodata,
                        Import.State,
-                       Import.URI
+                       Import.URI,
+                       Utils.Monad
 
   build-depends:       base >=4.9 && <5.0,
                        bytestring,

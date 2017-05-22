@@ -33,8 +33,7 @@ import           Data.Maybe(isNothing, mapMaybe)
 import           Data.Set(Set)
 import qualified Data.Set as Set
 
-concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
-concatMapM fn lst = fmap concat (mapM fn lst)
+import Utils.Monad(concatMapM)
 
 -- A logical proposition in negation normal form
 -- (i.e., NOT is applied only to atoms, not sub-formulas)

@@ -73,9 +73,6 @@ printNEVRA :: NEVRA -> T.Text
 printNEVRA (NEVRA n "" v r a)   = T.concat [        n, "-", v, "-", r, ".", a]
 printNEVRA (NEVRA n e v r a)    = T.concat [e, ":", n, "-", v, "-", r, ".", a]
 
-concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
-concatMapM fn lst = fmap concat (mapM fn lst)
-
 -- Look up a key/value pair for the group with the given GroupsId.  It is assumed there
 -- will only be one key/value pair.
 getValueForGroup :: MonadIO m => GroupsId -> T.Text -> SqlPersistT m (Maybe T.Text)
