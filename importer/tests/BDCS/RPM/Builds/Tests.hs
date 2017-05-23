@@ -31,26 +31,26 @@ raiseTests :: TestTree
 raiseTests = testGroup "Raise Exceptions"
     [ testCase "No Release raises" $
                assertException (MissingRPMTag "Release")
-                               (evaluate $ mkBuild [ Arch "x86-64" 0 0, BuildTime 0 0 0, ChangeLogText [""] 0 0 ]
+                               (evaluate $ mkBuild [ Arch "x86-64", BuildTime 0, ChangeLogText [""] ]
                                                    fakeKey),
       testCase "No Arch raises" $
                assertException (MissingRPMTag "Arch")
-                               (evaluate $ mkBuild [ Release "1" 0 0, BuildTime 0 0 0, ChangeLogText [""] 0 0 ]
+                               (evaluate $ mkBuild [ Release "1", BuildTime 0, ChangeLogText [""] ]
                                                    fakeKey),
       testCase "No BuildTime raises" $
                assertException (MissingRPMTag "BuildTime")
-                               (evaluate $ mkBuild [ Release "1" 0 0, Arch "x86-64" 0 0, ChangeLogText [""] 0 0 ]
+                               (evaluate $ mkBuild [ Release "1", Arch "x86-64", ChangeLogText [""] ]
                                                    fakeKey),
       testCase "No ChangeLogText raises" $
                assertException (MissingRPMTag "ChangeLogText")
-                               (evaluate $ mkBuild [ Release "1" 0 0, Arch "x86-64" 0 0, BuildTime 0 0 0 ]
+                               (evaluate $ mkBuild [ Release "1", Arch "x86-64", BuildTime 0 ]
                                                    fakeKey)
     ]
 
 tests :: TestTree
 tests = testGroup "BDCS.RPM.Builds Tests"
     [ testCase "Handles no Epoch" $
-               0 @=? buildsEpoch (mkBuild [ Release "1" 0 0, Arch "x86-64" 0 0, BuildTime 0 0 0, ChangeLogText [""] 0 0 ]
+               0 @=? buildsEpoch (mkBuild [ Release "1", Arch "x86-64", BuildTime 0, ChangeLogText [""] ]
                                           fakeKey),
       raiseTests
     ]

@@ -32,11 +32,11 @@ raiseTests :: TestTree
 raiseTests = testGroup "Raise Exceptions"
     [ testCase "No License raises" $
                assertException (MissingRPMTag "License")
-                               (evaluate $ mkSource [ Version "" 0 0 ]
+                               (evaluate $ mkSource [ Version "" ]
                                                     fakeKey),
       testCase "No Version raises" $
                assertException (MissingRPMTag "Version")
-                               (evaluate $ mkSource [ License "" 0 0 ]
+                               (evaluate $ mkSource [ License "" ]
                                                     fakeKey)
     ]
 

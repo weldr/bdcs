@@ -33,13 +33,13 @@ raiseTests :: TestTree
 raiseTests = testGroup "Raise Exceptions"
     [ testCase "No SourceRPM raises" $
                assertException (MissingRPMTag "SourceRPM")
-                               (evaluate $ mkProject [ Summary "" 0 0, Description "" 0 0 ]),
+                               (evaluate $ mkProject [ Summary "", Description "" ]),
       testCase "No Summary raises" $
                assertException (MissingRPMTag "Summary")
-                               (evaluate $ mkProject [ SourceRPM "a-1-1.src.rpm" 0 0, Description "" 0 0 ]),
+                               (evaluate $ mkProject [ SourceRPM "a-1-1.src.rpm", Description "" ]),
       testCase "No Description raises" $
                assertException (MissingRPMTag "Description")
-                               (evaluate $ mkProject [ SourceRPM "a-1-1.src.rpm" 0 0, Summary "" 0 0 ])
+                               (evaluate $ mkProject [ SourceRPM "a-1-1.src.rpm", Summary "" ])
     ]
 
 tests :: TestTree
