@@ -53,7 +53,7 @@ import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
 import           BDCS.Groups(nameToGroupId)
-import           Utils.Either(maybeToEither)
+import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
 
 -- Convert a GInputStream to a conduit source
@@ -215,15 +215,13 @@ main = do
     if ".tar" `isSuffixOf` out_path
     then do
         result <- runExceptT $ runResourceT $ processThingsToTar db_path repo out_path things
-        case result of
-            Left e  -> print e >> removeFile out_path
-            Right _ -> return ()
+        whenLeft result $ \e -> do
+            print e
+            removeFile out_path
     else do
         createDirectoryIfMissing True out_path
         result <- runExceptT $ runResourceT $ processThings db_path repo out_path things
-        case result of
-            Left e  -> print e
-            Right _ -> return ()
+        whenLeft result print
  where
     processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
     processThings dbPath repo outPath things = runSqlite dbPath $
