@@ -40,6 +40,7 @@ library
                        Import.Repodata,
                        Import.State,
                        Import.URI,
+                       Utils.Either,
                        Utils.Monad
 
   build-depends:       base >=4.9 && <5.0,
