@@ -67,7 +67,7 @@ commit repo repoFile subject body =
         -- ostree will know what to do.
         parent <- parentCommit repo "master"
         checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
-        repoTransactionSetRef repo Nothing "master" checksum
+        repoTransactionSetRef repo Nothing "master" (Just checksum)
         return checksum
 
 -- Given an open ostree repo and a checksum to some commit, return a ChecksumMap.  This is useful for
