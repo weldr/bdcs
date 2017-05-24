@@ -23,9 +23,8 @@ import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional(ifM)
 import           Control.Monad(unless, when)
-import           Control.Monad.Except(MonadError, runExceptT, throwError)
+import           Control.Monad.Except(ExceptT(..), MonadError, catchError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.Trans.Maybe(MaybeT(..), runMaybeT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource, runResourceT)
 import           Data.ByteString(ByteString)
 import           Data.ByteString.Lazy(writeFile)
@@ -39,7 +38,7 @@ import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import           Prelude hiding(writeFile)
-import           System.Directory(createDirectoryIfMissing, doesFileExist, setModificationTime)
+import           System.Directory(createDirectoryIfMissing, doesFileExist, removeFile, setModificationTime)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           System.FilePath((</>), dropDrive, takeDirectory)
@@ -54,6 +53,7 @@ import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
 import           BDCS.Groups(nameToGroupId)
+import           Utils.Either(maybeToEither)
 import           Utils.Monad(concatMapM)
 
 -- Convert a GInputStream to a conduit source
@@ -108,37 +108,40 @@ checkoutObjectToDisk repo outPath Files{..} =
 
         -- TODO user, group, xattrs
 
-checkoutObjectToTarEntry :: (MonadError String m, MonadIO m, IsRepo a) => a -> Files -> m (Maybe Tar.Entry)
+checkoutObjectToTarEntry :: (MonadError String m, MonadIO m, IsRepo a) => a -> Files -> m Tar.Entry
 checkoutObjectToTarEntry repo Files{..} =
     case filesCs_object of
-        Just checksum -> CS.load repo checksum >>= liftIO . \case
-                            CS.DirMeta dirmeta    -> runMaybeT $ checkoutDir dirmeta
-                            CS.FileObject fileObj -> runMaybeT $ checkoutFile fileObj
-        Nothing       -> return Nothing
- where
-    mkTarPath :: Text -> Bool -> Maybe Tar.TarPath
-    mkTarPath s isDir = case Tar.toTarPath isDir (unpack s) of
-        Left _  -> Nothing
-        Right p -> Just p
+        Just checksum -> do result <- CS.load repo checksum >>= liftIO . \case
+                                CS.DirMeta dirmeta    -> return $ checkoutDir dirmeta
+                                CS.FileObject fileObj -> runExceptT $ checkoutFile fileObj
 
-    checkoutDir :: CS.Metadata -> MaybeT IO Tar.Entry
+                            either (\e -> throwError $ "Could not check out object " ++ unpack filesPath ++ ": " ++ e)
+                                   return
+                                   result
+        Nothing       -> throwError $ "Object has no checksum: " ++ unpack filesPath
+ where
+    checkoutDir :: CS.Metadata -> Either String Tar.Entry
     checkoutDir metadata@CS.Metadata{..} = do
-        path <- MaybeT $ return $ mkTarPath filesPath True
+        path <- Tar.toTarPath True (unpack filesPath)
         return $ setMetadata metadata (Tar.directoryEntry path)
 
-    checkoutFile :: CS.FileContents -> MaybeT IO Tar.Entry
+    checkoutSymlink :: CS.FileContents -> Either String Tar.Entry
+    checkoutSymlink CS.FileContents{symlink=Nothing, ..} =
+        throwError $ unpack filesPath ++ " is not a symbolic link"
+    checkoutSymlink CS.FileContents{symlink=Just target, ..} = do
+        path'   <- Tar.toTarPath False (unpack filesPath)
+        target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ unpack target)
+                                 (Tar.toLinkTarget (unpack target))
+        return $ setMetadata metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
+
+    checkoutFile :: CS.FileContents -> ExceptT String IO Tar.Entry
+    checkoutFile fc@CS.FileContents{symlink=Just _, ..} =
+        ExceptT $ return $ checkoutSymlink fc
     checkoutFile CS.FileContents{symlink=Nothing, ..} = do
-        path         <- MaybeT $ return $ mkTarPath filesPath False
+        path         <- ExceptT $ return $ Tar.toTarPath False (unpack filesPath)
         lazyContents <- runResourceT $ runConduit $ sourceInputStream contents .| sinkLbs
 
         return $ setMetadata metadata (Tar.fileEntry path lazyContents)
-
-    checkoutFile CS.FileContents{symlink=Just t, ..} = do
-        path      <- MaybeT $ return $ mkTarPath filesPath False
-        target    <- MaybeT $ return $ Tar.toLinkTarget (unpack t)
-        let entry  = Tar.simpleEntry path (Tar.SymbolicLink target)
-
-        return $ setMetadata metadata entry
 
     setMetadata :: CS.Metadata -> Tar.Entry -> Tar.Entry
     setMetadata metadata entry =
@@ -160,7 +163,11 @@ processOneThingToDir repo outPath thing = do
     groupId <- getGroupId thing
 
     -- Get all of the files associated with the group
-    runConduit $ groupIdToFiles groupId .| CL.mapM_ (checkoutObjectToDisk repo outPath)
+    runConduit (groupIdToFiles groupId .| CL.mapM_ (checkoutObjectToDisk repo outPath)) `catchError` handler
+ where
+    -- Catch errors from processing a single RPM (or whatever), add the name of the thing to the front
+    -- of the error message, and re-raise.
+    handler err = throwError $ "Error processing " ++ unpack thing ++ ": " ++ err
 
 processOneThingToTarEntries :: (MonadError String m, MonadResource m, IsRepo r) => r -> Text -> SqlPersistT m [Tar.Entry]
 processOneThingToTarEntries repo thing = do
@@ -168,7 +175,7 @@ processOneThingToTarEntries repo thing = do
     groupId <- getGroupId thing
 
     -- Get all of the files associated with the group, as entries
-    runConduit $ groupIdToFiles groupId .| CL.mapMaybeM (checkoutObjectToTarEntry repo) .| CL.consume
+    runConduit $ groupIdToFiles groupId .| CL.mapM (checkoutObjectToTarEntry repo) .| CL.consume
 
 -- | Check a list of strings to see if any of them are files
 -- If it is, read it and insert its contents in its place
@@ -205,14 +212,18 @@ main = do
     allThings <- expandFileThings $ drop 3 argv
     let things = map pack allThings
 
-    result <- if ".tar" `isSuffixOf` out_path
-              then runExceptT $ runResourceT $ processThingsToTar db_path repo out_path things
-              else do createDirectoryIfMissing True out_path
-                      runExceptT $ runResourceT $ processThings db_path repo out_path things
-
-    case result of
-        Left e  -> print e
-        Right _ -> return ()
+    if ".tar" `isSuffixOf` out_path
+    then do
+        result <- runExceptT $ runResourceT $ processThingsToTar db_path repo out_path things
+        case result of
+            Left e  -> print e >> removeFile out_path
+            Right _ -> return ()
+    else do
+        createDirectoryIfMissing True out_path
+        result <- runExceptT $ runResourceT $ processThings db_path repo out_path things
+        case result of
+            Left e  -> print e
+            Right _ -> return ()
  where
     processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
     processThings dbPath repo outPath things = runSqlite dbPath $
