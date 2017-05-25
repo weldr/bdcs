@@ -59,7 +59,8 @@ For development we use the latest upstream versions:
 1) Remove the standard `haskell-platform` and `ghc-*` RPMs if you have them installed
 2) Download version **8.0.2** of the generic Haskell Platform distribution from
    https://www.haskell.org/platform/linux.html#linux-generic
-3) ```
+3)
+```
 $ tar -xzvf haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
 $ sudo ./install-haskell-platform.sh
 ```
