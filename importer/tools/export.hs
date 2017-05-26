@@ -53,6 +53,7 @@ import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
 import           BDCS.Groups(nameToGroupId)
+import           BDCS.Version
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
 
@@ -189,6 +190,7 @@ expandFileThings = concatMapM isThingFile
 
 usage :: IO ()
 usage = do
+    printVersion "export"
     putStrLn "Usage: export metadata.db repo dest thing [thing ...]"
     putStrLn "dest can be:"
     putStrLn "\t* A directory (which may or may not already exist)"

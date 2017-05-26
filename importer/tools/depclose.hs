@@ -60,6 +60,7 @@ import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
 import BDCS.DB
+import BDCS.Version
 
 data Proposition = T.Text `Obsoletes` T.Text
                  | NEVRA  `Provides`  T.Text
@@ -267,6 +268,7 @@ main = do
     argv <- getArgs
 
     when (length argv < 2) $ do
+        printVersion "depclose"
         putStrLn "Usage: depclose metadata.db RPM [RPM ...]"
         exitFailure
 

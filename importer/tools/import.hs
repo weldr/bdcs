@@ -33,6 +33,7 @@ import System.IO(hPutStrLn, stderr)
 
 import qualified BDCS.CS as CS
 import           BDCS.Exceptions(DBException)
+import           BDCS.Version
 import qualified Import.Comps as Comps
 import qualified Import.RPM as RPM
 import qualified Import.Repodata as Repodata
@@ -49,7 +50,8 @@ processThing url = case parseURI url of
 
 usage :: IO ()
 usage = do
-    putStrLn "Usage: test output.db repo thing [thing ...]"
+    printVersion "import"
+    putStrLn "Usage: import output.db repo thing [thing ...]"
     putStrLn "- repo is the path to an already existing content store repo or "
     putStrLn "  the path to a repo to be created"
     putStrLn "- thing can be:"

@@ -34,6 +34,7 @@ library
                        BDCS.RPM.Requirements,
                        BDCS.RPM.Signatures,
                        BDCS.RPM.Sources,
+                       BDCS.Version,
                        Import.Comps,
                        Import.Conduit,
                        Import.RPM,
@@ -58,6 +59,7 @@ library
                        gi-gio,
                        gi-glib,
                        gi-ostree,
+                       gitrev,
                        haskell-gi-base,
                        http-conduit,
                        lzma-conduit,
@@ -73,6 +75,7 @@ library
                        time,
                        transformers,
                        xml-conduit
+  other-modules:       Paths_db
   default-language:    Haskell2010
 
 executable import
