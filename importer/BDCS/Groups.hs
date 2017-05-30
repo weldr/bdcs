@@ -21,10 +21,11 @@ module BDCS.Groups(findGroupRequirements,
                    findRequires,
                    getGroupId,
                    getGroupIdC,
+                   getRequirementsForGroup,
                    groups,
                    groupsC,
                    groupIdToNevra,
-                   nameToGroupId,
+                   nameToGroupIds,
                    nevraToGroupId)
  where
 
@@ -97,17 +98,26 @@ groupIdToNevra groupId = do
     then return Nothing
     else return $ Just $ T.concat [fromMaybe "" e, fromJust n, "-", fromJust v, "-", fromJust r, ".", fromJust a]
 
--- Given a group name, return a group id
-nameToGroupId :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Groups))
-nameToGroupId name = firstResult $
-    select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` grps) -> do
-    on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
-             group_keyval ^. GroupKeyValuesGroup_id ==. grps ^. GroupsId
-    where_ $ keyval ^. KeyValKey_value ==. val (TextKey "name") &&.
-             keyval ^. KeyValVal_value ==. just (val name) &&.
-             grps ^. GroupsGroup_type ==. val "rpm"
-    limit 1
-    return $ grps ^. GroupsId
+getRequirementsForGroup :: MonadIO m => Key Groups -> RT.ReqContext -> SqlPersistT m [Requirements]
+getRequirementsForGroup groupId context = do
+    vals <- select $ from $ \(reqs `InnerJoin` groupreqs) -> do
+            on     $ reqs ^. RequirementsId ==. groupreqs ^. GroupRequirementsReq_id
+            where_ $ groupreqs ^. GroupRequirementsGroup_id ==. val groupId &&.
+                     reqs ^. RequirementsReq_context ==. val context
+            return   reqs
+    return $ map entityVal vals
+
+-- Given a group name, return a list of matching group ids
+nameToGroupIds :: MonadIO m => T.Text -> SqlPersistT m [Key Groups]
+nameToGroupIds name = do
+    result <- select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` group) -> do
+              on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
+                       group_keyval ^. GroupKeyValuesGroup_id ==. group ^. GroupsId
+              where_ $ keyval ^. KeyValKey_value ==. val (TextKey "name") &&.
+                       keyval ^. KeyValVal_value ==. just (val name) &&.
+                       group ^. GroupsGroup_type ==. val "rpm"
+              return $ group ^. GroupsId
+    return $ map unValue result
 
 nevraToGroupId :: MonadIO m => (T.Text, Maybe T.Text, T.Text, T.Text, T.Text) -> SqlPersistT m (Maybe (Key Groups))
 nevraToGroupId (n, e, v, r, a) = firstResult $

@@ -46,6 +46,7 @@ library
     exposed-modules:    BDCS.Builds,
                         BDCS.CS,
                         BDCS.DB,
+                        BDCS.Depclose,
                         BDCS.Depsolve,
                         BDCS.Exceptions,
                         BDCS.Files,
