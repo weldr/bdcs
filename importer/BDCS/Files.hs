@@ -19,13 +19,15 @@ module BDCS.Files(insertFiles,
                   files,
                   filesC,
                   groupIdToFiles,
-                  groupIdToFilesC)
+                  groupIdToFilesC,
+                  pathToGroupId)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Conduit((.|), Conduit, Source, toProducer)
 import qualified Data.Conduit.List as CL
+import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
@@ -68,3 +70,11 @@ groupIdToFiles groupid = do
 
 groupIdToFilesC :: MonadResource m => Conduit (Key Groups) (SqlPersistT m) Files
 groupIdToFilesC = awaitWith $ \groupid -> toProducer (groupIdToFiles groupid) >> groupIdToFilesC
+
+pathToGroupId :: MonadIO m => T.Text -> SqlPersistT m [Key Groups]
+pathToGroupId path = do
+    vals <- select $ distinct $ from $ \(group_files `InnerJoin` fs) -> do
+            on     $ group_files ^. GroupFilesFile_id ==. fs ^. FilesId
+            where_ $ fs ^. FilesPath ==. val path
+            return $ group_files ^. GroupFilesGroup_id
+    return $ map unValue vals
