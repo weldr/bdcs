@@ -226,10 +226,10 @@ main = do
         whenLeft result print
  where
     processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
-    processThings dbPath repo outPath things = runSqlite dbPath $
-        mapM_ (processOneThingToDir repo outPath) things
+    processThings dbPath repo outPath things =
+        mapM_ (runSqlite dbPath . processOneThingToDir repo outPath) things
 
     processThingsToTar :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
-    processThingsToTar dbPath repo outPath things = runSqlite dbPath $ do
-        entries <- concatMapM (processOneThingToTarEntries repo) things
+    processThingsToTar dbPath repo outPath things = do
+        entries <- concatMapM (runSqlite dbPath . processOneThingToTarEntries repo) things
         liftIO $ writeFile outPath (Tar.write entries)
