@@ -5,6 +5,7 @@ d = ${PWD}
 endif
 
 ORG_NAME=weld
+STORE ?= cs.repo
 MDDB ?= metadata.db
 
 weld-f25:
@@ -24,6 +25,8 @@ mddb:
 	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
+	    -e "KEEP_STORE=$(KEEP_STORE)"   \
+	    -e "STORE=$(STORE)"             \
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/import-img
@@ -56,6 +59,8 @@ import-centos7:
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64 \
 	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
 	    export IMPORT_URL="$$REPO"; \
+	    export KEEP_STORE=1; \
+	    export STORE="centos-store.repo"; \
 	    export KEEP_MDDB=1; \
 	    export MDDB="centos-metadata.db"; \
 	    make mddb; \
