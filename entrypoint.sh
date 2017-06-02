@@ -1,6 +1,11 @@
 #!/bin/bash
 
+STORE=$(realpath /mddb/${STORE:-cs.repo})
 MDDB="/mddb/${MDDB:-metadata.db}"
+
+if [[ -e "$STORE" && -z "$KEEP_STORE" && "$STORE" =~ ^/mddb/ ]]; then
+    rm -rf "$STORE"
+fi
 
 if [[ -e "$MDDB" && -z "$KEEP_MDDB" ]]; then
     rm "$MDDB"
@@ -11,10 +16,10 @@ if [ ! -f "$MDDB" ]; then
 fi
 
 for f in /rpms/*rpm; do
-    /usr/local/bin/import "$MDDB" cs.repo file://${f}
+    /usr/local/bin/import "$MDDB" "$STORE" file://${f}
 done
 
 # if URL was passed try to import from there
 if [ -n "$IMPORT_URL" ]; then
-    /usr/local/bin/import "$MDDB" cs.repo $IMPORT_URL
+    /usr/local/bin/import "$MDDB" "$STORE" $IMPORT_URL
 fi
