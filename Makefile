@@ -27,7 +27,7 @@ mddb:
 	    mkdir ${d}/mddb; \
 	fi;
 	docker rm -f mddb-container || true
-	docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label:disable" \
+	docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label=disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
 	    -e "KEEP_STORE=$(KEEP_STORE)"   \
