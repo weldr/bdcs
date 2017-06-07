@@ -49,7 +49,8 @@ You will first need a volume to store the mddb in and a volume containing all
 the RPMs.  The Makefile expects that the mddb will be put into $PWD/mddb, and
 that the RPMs are in $PWD/rpms.
 
-After completion, the mddb will be in $PWD/mddb/metadata.db.
+After completion, the mddb will be in $PWD/mddb/metadata.db and the ostree
+based content store will be in $PWD/mddb/cs.repo/
 
 Preparing local development environment for Haskell
 ===================================================

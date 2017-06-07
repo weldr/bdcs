@@ -11,6 +11,7 @@ MDDB ?= metadata.db
 weld-f25:
 	git clone https://github.com/weldr/welder-deployment
 	$(MAKE) -C welder-deployment weld-f25
+	-rm -rf ./welder-deployment
 
 importer:
 	docker build -t $(ORG_NAME)/build-img -f Dockerfile.build .
@@ -19,10 +20,14 @@ importer:
 	docker rm build-cont
 	docker build -t $(ORG_NAME)/import-img .
 
+# NOTE: The mddb and content store under ./mddb/ will be removed
+#       Unless KEEP_STORE=1 and KEEP_MDDB=1 are set.
 mddb:
-	docker volume create -d local --name bdcs-mddb-volume
+	@if [ ! -e ${d}/mddb ]; then \
+	    mkdir ${d}/mddb; \
+	fi;
 	docker rm -f mddb-container || true
-	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" \
+	docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label:disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
 	    -e "KEEP_STORE=$(KEEP_STORE)"   \
@@ -30,7 +35,6 @@ mddb:
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/import-img
-	docker cp mddb-container:/mddb/$(MDDB) ./$(MDDB)
 	docker rm mddb-container
 
 api-mddb:
