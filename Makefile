@@ -1,7 +1,7 @@
 ifdef WORKSPACE
 d = ${WORKSPACE}
 else
-d = ${PWD}
+d = ${CURDIR}
 endif
 
 ORG_NAME=weld
