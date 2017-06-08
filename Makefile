@@ -20,6 +20,8 @@ importer:
 	docker build -t $(ORG_NAME)/import-img .
 
 mddb:
+	-rm -rf ./$(MDDB)
+	-rm -rf ./$(STORE)
 	docker volume create -d local --name bdcs-mddb-volume
 	docker rm -f mddb-container || true
 	docker run -v bdcs-mddb-volume:/mddb -v ${d}/rpms:/rpms:z,ro --security-opt="label:disable" \
@@ -31,6 +33,7 @@ mddb:
 	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/import-img
 	docker cp mddb-container:/mddb/$(MDDB) ./$(MDDB)
+	docker cp mddb-container:/mddb/$(STORE) ./$(STORE)
 	docker rm mddb-container
 
 api-mddb:
