@@ -14,22 +14,23 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 --
 
+module BDCS.RPM.SourcesSpec(spec)
+ where
 
-module Main where
+import Control.Exception(evaluate)
+import Test.Hspec
 
-import Test.Tasty(defaultMain, testGroup)
+import BDCS.DB(Projects(..))
+import BDCS.Exceptions(DBException(..))
+import BDCS.RPM.Sources(mkSource)
+import RPM.Tags(Tag(..))
 
-import qualified BDCS.RPM.Builds.Tests
-import qualified BDCS.RPM.Projects.Tests
-import qualified BDCS.RPM.Signatures.Tests
-import qualified BDCS.RPM.Sources.Tests
+import Utils(fakeKey)
 
-{-# ANN module "HLint: ignore Use module export list" #-}
+spec :: Spec
+spec = describe "BDCS.RPM.Sources Tests" $ do
+    it "No License raises" $
+        evaluate (mkSource [ Version "" ] fakeKey) `shouldThrow` (== MissingRPMTag "License")
 
-main :: IO ()
-main = defaultMain $ testGroup "BDCS.RPM Tests" [
-    BDCS.RPM.Builds.Tests.tests,
-    BDCS.RPM.Projects.Tests.tests,
-    BDCS.RPM.Signatures.Tests.tests,
-    BDCS.RPM.Sources.Tests.tests
- ]
+    it "No Version raises" $
+        evaluate (mkSource [ License "" ] fakeKey) `shouldThrow` (== MissingRPMTag "Version")

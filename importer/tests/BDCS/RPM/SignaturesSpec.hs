@@ -12,35 +12,24 @@
 --
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
---
-{-# LANGUAGE OverloadedStrings #-}
 
-module BDCS.RPM.Signatures.Tests(tests)
+module BDCS.RPM.SignaturesSpec(spec)
  where
 
 import Control.Exception(evaluate)
-import Test.Tasty(TestTree, testGroup)
-import Test.Tasty.HUnit((@=?), testCase)
+import Test.Hspec
 
 import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..))
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import RPM.Tags(Tag(..))
 
-import Utils(assertException, fakeKey)
+import Utils(fakeKey)
 
-raiseTests :: TestTree
-raiseTests = testGroup "Raise Exceptions"
-    [ testCase "No RSAHeader raises" $
-               assertException (MissingRPMTag "RSAHeader")
-                               (evaluate $ mkRSASignature [ ]
-                                                          fakeKey),
-      testCase "No SHA1Header raises" $
-               assertException (MissingRPMTag "SHA1Header")
-                               (evaluate $ mkSHASignature [ ]
-                                                          fakeKey)
-    ]
+spec :: Spec
+spec = describe "BDCS.RPM.Signatures Tests" $ do
+    it "No RSAHeader raises" $
+        evaluate (mkRSASignature [ ] fakeKey) `shouldThrow` (== MissingRPMTag "RSAHeader")
 
-tests :: TestTree
-tests = testGroup "BDCS.RPM.Signatures Tests"
-    [ raiseTests ]
+    it "No SHA1Header raises" $
+        evaluate (mkSHASignature [ ] fakeKey) `shouldThrow` (== MissingRPMTag "SHA1Header")

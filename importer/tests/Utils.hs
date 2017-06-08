@@ -15,22 +15,10 @@
 --
 {-# LANGUAGE FlexibleContexts #-}
 
-module Utils(assertException,
-             fakeKey)
+module Utils(fakeKey)
  where
 
-import Control.Exception(Exception, handleJust)
-import Control.Monad(guard)
 import Database.Persist.Sql(Key, SqlBackend, ToBackendKey, toSqlKey)
-import Test.Tasty.HUnit(Assertion, assertFailure)
-
-assertException :: (Eq e, Exception e) => e -> IO a -> Assertion
-assertException ex action =
-    handleJust isWanted (const $ return ()) $ do
-        action
-        assertFailure $ "Expected exception: " ++ show ex
-  where
-    isWanted = guard . (== ex)
 
 fakeKey :: ToBackendKey SqlBackend a => Key a
 fakeKey = toSqlKey 0    
