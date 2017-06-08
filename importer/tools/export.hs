@@ -33,7 +33,7 @@ import           Data.Conduit.Binary(sinkFile, sinkLbs)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf)
 import           Data.Maybe(fromMaybe)
-import           Data.Text(Text, pack, unpack)
+import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
@@ -79,7 +79,7 @@ checkoutObjectToDisk repo outPath Files{..} =
   where
     checkoutDir :: CS.Metadata -> IO ()
     checkoutDir metadata = do
-        let fullPath = outPath </> dropDrive (unpack filesPath)
+        let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
         -- create the directory if it isn't there already
         createDirectoryIfMissing True fullPath
@@ -88,13 +88,13 @@ checkoutObjectToDisk repo outPath Files{..} =
 
     checkoutFile :: CS.FileContents -> IO ()
     checkoutFile CS.FileContents{..} = do
-        let fullPath = outPath </> dropDrive (unpack filesPath)
+        let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
         createDirectoryIfMissing True $ takeDirectory fullPath
 
         -- Write the data or the symlink, depending
         case symlink of
-            Just symlinkTarget -> createSymbolicLink (unpack symlinkTarget) fullPath
+            Just symlinkTarget -> createSymbolicLink (T.unpack symlinkTarget) fullPath
             Nothing -> runResourceT $ runConduit $ sourceInputStream contents .| sinkFile fullPath
 
         setMetadata fullPath metadata
@@ -116,30 +116,30 @@ checkoutObjectToTarEntry repo Files{..} =
                                 CS.DirMeta dirmeta    -> return $ checkoutDir dirmeta
                                 CS.FileObject fileObj -> runExceptT $ checkoutFile fileObj
 
-                            either (\e -> throwError $ "Could not check out object " ++ unpack filesPath ++ ": " ++ e)
+                            either (\e -> throwError $ "Could not check out object " ++ T.unpack filesPath ++ ": " ++ e)
                                    return
                                    result
-        Nothing       -> throwError $ "Object has no checksum: " ++ unpack filesPath
+        Nothing       -> throwError $ "Object has no checksum: " ++ T.unpack filesPath
  where
     checkoutDir :: CS.Metadata -> Either String Tar.Entry
     checkoutDir metadata@CS.Metadata{..} = do
-        path <- Tar.toTarPath True (unpack filesPath)
+        path <- Tar.toTarPath True (T.unpack filesPath)
         return $ setMetadata metadata (Tar.directoryEntry path)
 
     checkoutSymlink :: CS.FileContents -> Either String Tar.Entry
     checkoutSymlink CS.FileContents{symlink=Nothing, ..} =
-        throwError $ unpack filesPath ++ " is not a symbolic link"
+        throwError $ T.unpack filesPath ++ " is not a symbolic link"
     checkoutSymlink CS.FileContents{symlink=Just target, ..} = do
-        path'   <- Tar.toTarPath False (unpack filesPath)
-        target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ unpack target)
-                                 (Tar.toLinkTarget (unpack target))
+        path'   <- Tar.toTarPath False (T.unpack filesPath)
+        target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ T.unpack target)
+                                 (Tar.toLinkTarget (T.unpack target))
         return $ setMetadata metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
 
     checkoutFile :: CS.FileContents -> ExceptT String IO Tar.Entry
     checkoutFile fc@CS.FileContents{symlink=Just _, ..} =
         ExceptT $ return $ checkoutSymlink fc
     checkoutFile CS.FileContents{symlink=Nothing, ..} = do
-        path         <- ExceptT $ return $ Tar.toTarPath False (unpack filesPath)
+        path         <- ExceptT $ return $ Tar.toTarPath False (T.unpack filesPath)
         lazyContents <- runResourceT $ runConduit $ sourceInputStream contents .| sinkLbs
 
         return $ setMetadata metadata (Tar.fileEntry path lazyContents)
@@ -153,12 +153,12 @@ checkoutObjectToTarEntry repo Files{..} =
                                                        Tar.groupName = "" },
                 Tar.entryTime = fromIntegral filesMtime }
 
-getGroupId :: (MonadError String m, MonadIO m) => Text -> SqlPersistT m (Key Groups)
+getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
 getGroupId thing = nameToGroupId thing >>= \case
     Just gid -> return gid
-    Nothing  -> throwError $ "No such group " ++ unpack thing
+    Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
-processOneThingToDir :: (MonadError String m, MonadResource m, IsRepo r) => r -> FilePath -> Text -> SqlPersistT m ()
+processOneThingToDir :: (MonadError String m, MonadResource m, IsRepo r) => r -> FilePath -> T.Text -> SqlPersistT m ()
 processOneThingToDir repo outPath thing = do
     -- Get the group id of the thing
     groupId <- getGroupId thing
@@ -168,9 +168,9 @@ processOneThingToDir repo outPath thing = do
  where
     -- Catch errors from processing a single RPM (or whatever), add the name of the thing to the front
     -- of the error message, and re-raise.
-    handler err = throwError $ "Error processing " ++ unpack thing ++ ": " ++ err
+    handler err = throwError $ "Error processing " ++ T.unpack thing ++ ": " ++ err
 
-processOneThingToTarEntries :: (MonadError String m, MonadResource m, IsRepo r) => r -> Text -> SqlPersistT m [Tar.Entry]
+processOneThingToTarEntries :: (MonadError String m, MonadResource m, IsRepo r) => r -> T.Text -> SqlPersistT m [Tar.Entry]
 processOneThingToTarEntries repo thing = do
     -- Get the group id of the thing
     groupId <- getGroupId thing
@@ -208,11 +208,11 @@ main = do
 
     when (length argv < 4) usage
 
-    let db_path = pack (argv !! 0)
+    let db_path = T.pack (argv !! 0)
     repo <- CS.open (argv !! 1)
     let out_path = argv !! 2
     allThings <- expandFileThings $ drop 3 argv
-    let things = map pack allThings
+    let things = map T.pack allThings
 
     if ".tar" `isSuffixOf` out_path
     then do
@@ -225,11 +225,11 @@ main = do
         result <- runExceptT $ runResourceT $ processThings db_path repo out_path things
         whenLeft result print
  where
-    processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
+    processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => T.Text -> a -> FilePath -> [T.Text] -> m ()
     processThings dbPath repo outPath things =
         mapM_ (runSqlite dbPath . processOneThingToDir repo outPath) things
 
-    processThingsToTar :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => Text -> a -> FilePath -> [Text] -> m ()
+    processThingsToTar :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => T.Text -> a -> FilePath -> [T.Text] -> m ()
     processThingsToTar dbPath repo outPath things = do
         entries <- concatMapM (runSqlite dbPath . processOneThingToTarEntries repo) things
         liftIO $ writeFile outPath (Tar.write entries)
