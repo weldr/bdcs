@@ -12,34 +12,30 @@
 --
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
---
 
-module BDCS.RPM.Sources.Tests(tests)
+{-# LANGUAGE OverloadedStrings #-}
+
+module BDCS.RPM.ProjectsSpec(spec)
  where
 
 import Control.Exception(evaluate)
-import Test.Tasty(TestTree, testGroup)
-import Test.Tasty.HUnit((@=?), testCase)
+import Test.Hspec
 
 import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..))
-import BDCS.RPM.Sources(mkSource)
+import BDCS.RPM.Projects(mkProject)
 import RPM.Tags(Tag(..))
 
-import Utils(assertException, fakeKey)
+spec :: Spec
+spec = describe "BDCS.RPM.Projects Tests" $ do
+    it "No SourceRPM raises" $
+        evaluate (mkProject [ Summary "", Description "" ]) `shouldThrow` (== MissingRPMTag "SourceRPM")
 
-raiseTests :: TestTree
-raiseTests = testGroup "Raise Exceptions"
-    [ testCase "No License raises" $
-               assertException (MissingRPMTag "License")
-                               (evaluate $ mkSource [ Version "" ]
-                                                    fakeKey),
-      testCase "No Version raises" $
-               assertException (MissingRPMTag "Version")
-                               (evaluate $ mkSource [ License "" ]
-                                                    fakeKey)
-    ]
+    it "No Summary raises" $
+        evaluate (mkProject [ SourceRPM "a-1-1.src.rpm", Description "" ]) `shouldThrow` (== MissingRPMTag "Summary")
 
-tests :: TestTree
-tests = testGroup "BDCS.RPM.Sources Tests"
-    [ raiseTests ]
+    it "No Description raises" $
+        evaluate (mkProject [ SourceRPM "a-1-1.src.rpm", Summary "" ]) `shouldThrow` (== MissingRPMTag "Description")
+
+    -- FIXME:  TESTS TO ADD:
+    -- * srpmToName in BDCS/RPM/Projects.hs assumes the string it's given is properly formatted

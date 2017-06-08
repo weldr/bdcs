@@ -147,8 +147,9 @@ executable depclose
 Test-Suite test-db
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
-  main-is:             Main.hs
-  build-depends:       HUnit,
+  main-is:             Spec.hs
+
+  build-depends:       hspec,
                        base >= 4.8 && < 5.0,
                        persistent,
                        persistent-sqlite,
@@ -156,4 +157,5 @@ Test-Suite test-db
                        tasty-hunit,
                        db,
                        rpm >= 1
+
   default-language:    Haskell2010
