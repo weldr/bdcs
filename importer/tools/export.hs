@@ -52,7 +52,7 @@ import GI.OSTree hiding(on)
 import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
-import           BDCS.Groups(nameToGroupId)
+import           BDCS.Groups(nvraToGroupId)
 import           BDCS.Version
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
@@ -154,7 +154,7 @@ checkoutObjectToTarEntry repo Files{..} =
                 Tar.entryTime = fromIntegral filesMtime }
 
 getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
-getGroupId thing = nameToGroupId thing >>= \case
+getGroupId thing = nvraToGroupId (splitFilename thing) >>= \case
     Just gid -> return gid
     Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
@@ -187,6 +187,18 @@ expandFileThings = concatMapM isThingFile
     isThingFile thing = ifM (doesFileExist thing)
                             (lines <$> readFile thing)
                             (return [thing])
+
+-- Turn an RPM filename into a tuple of (name, epoch, version, release, and arch).
+splitFilename :: T.Text -> (T.Text, Maybe T.Text, T.Text, T.Text, T.Text)
+splitFilename rpm_ = let
+    rpm = if ".rpm" `T.isSuffixOf` rpm_ then T.dropEnd 4 rpm_ else rpm_
+
+    (front,  a) = T.breakOnEnd "." rpm
+    (front2, r) = T.breakOnEnd "-" $ T.dropWhileEnd (== '.') front
+    (front3, v) = T.breakOnEnd "-" $ T.dropWhileEnd (== '-') front2
+    (n,      e) = T.breakOn    ":" $ T.dropWhileEnd (== '-') front3
+ in
+    (T.dropWhile (== ':') n, if e == "" then Nothing else Just e, v, r, a)
 
 usage :: IO ()
 usage = do
