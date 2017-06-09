@@ -16,7 +16,7 @@
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
                    nameToGroupId,
-                   nvraToGroupId)
+                   nevraToGroupId)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
@@ -56,31 +56,44 @@ nameToGroupId name = firstResult $
     limit 1
     return $ groups ^. GroupsId
 
-nvraToGroupId :: MonadIO m => (T.Text, Maybe T.Text, T.Text, T.Text, T.Text) -> SqlPersistT m (Maybe (Key Groups))
-nvraToGroupId (n, e, v, r, a) = firstResult $
-    -- FIXME:  Doesn't work - query's all wrong.  Either adapt the giant thing below to work or remove all
-    -- but the name clause from the where_ block.  That will at least make it work as well as nameToGroupId.
-    select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
-    on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
-             group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
-    where_ $ keyval ^. KeyValKey_value ==. val (T.pack "name") &&.  keyval ^. KeyValVal_value ==. val n &&.
-             keyval ^. KeyValKey_value ==. val (T.pack "version") &&. keyval ^. KeyValVal_value ==. val v &&.
-             keyval ^. KeyValKey_value ==. val (T.pack "release") &&. keyval ^. KeyValVal_value ==. val r &&.
-             keyval ^. KeyValKey_value ==. val (T.pack "arch") &&. keyval ^. KeyValVal_value ==. val a &&.
-             groups ^. GroupsGroup_type ==. val (T.pack "rpm")
-    limit 1
-    return $ groups ^. GroupsId
-
--- FIXME:  Here's the giant query that needs to be adapted.
---         select groups.id
---         from groups
---         join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'name') name on groups.id == name.group_id
---         join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'version') ver  on groups.id == ver.group_id
---         join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'release') rel on groups.id == rel.group_id
---         join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'arch') arch on groups.id == arch.group_id
---         left outer join (group_key_values join key_val on group_key_values.key_val_id == key_val.id and key_val.key_value == 'epoch') epoch on groups.id == epoch.group_id
---         where name.val_value == :name and
---               epoch.val_value is :epoch and
---               ver.val_value  == :version and
---               rel.val_value  == :release and
---               arch.val_value == :arch
+nevraToGroupId :: MonadIO m => (T.Text, Maybe T.Text, T.Text, T.Text, T.Text) -> SqlPersistT m (Maybe (Key Groups))
+nevraToGroupId (n, e, v, r, a) = firstResult $
+    -- Each key/val pair to match against is a separate row in key_val, so each one needs to be joined into the
+    -- query as if it were a separate table.
+    -- The idea here is to create a key_val/group_key_values join for each key_val.key_value we're looking up, and
+    -- then join that to the previous key_val/group_key_values in the chain. The one for epoch is an outer join since
+    -- epoch is optional.
+    -- As far as esqueleto quirks: "on" is applied in reverse order, so the first "on" attaches to the last join, then
+    -- the next to the one before that, and so on.
+    select $ distinct $ from $ \((gkv_name  `InnerJoin` kv_name) `InnerJoin`
+                                 (gkv_ver   `InnerJoin` kv_ver)  `InnerJoin`
+                                 (gkv_rel   `InnerJoin` kv_rel)  `InnerJoin`
+                                 (gkv_arch  `InnerJoin` kv_arch) `LeftOuterJoin`
+                                 (gkv_epoch `InnerJoin` kv_epoch)) -> do
+        on     $ kv_epoch ?. KeyValId ==. gkv_epoch ?. GroupKeyValuesKey_val_id &&.
+                 kv_epoch ?. KeyValKey_value ==. just (val (T.pack "epoch"))
+        on     $ gkv_epoch ?. GroupKeyValuesGroup_id ==. just (gkv_arch ^. GroupKeyValuesGroup_id)
+        on     $ kv_arch ^. KeyValId ==. gkv_arch ^. GroupKeyValuesKey_val_id &&.
+                 kv_arch ^. KeyValKey_value ==. val (T.pack "arch")
+        on     $ gkv_arch ^. GroupKeyValuesGroup_id ==. gkv_rel ^. GroupKeyValuesGroup_id
+        on     $ kv_rel ^. KeyValId ==. gkv_rel ^. GroupKeyValuesKey_val_id &&.
+                 kv_rel ^. KeyValKey_value ==. val (T.pack "release")
+        on     $ gkv_rel ^. GroupKeyValuesGroup_id ==. gkv_ver ^. GroupKeyValuesGroup_id
+        on     $ kv_ver ^. KeyValId ==. gkv_ver ^. GroupKeyValuesKey_val_id &&.
+                 kv_ver ^. KeyValKey_value ==. val (T.pack "version")
+        on     $ gkv_ver ^. GroupKeyValuesGroup_id ==. gkv_name ^. GroupKeyValuesGroup_id
+        on     $ kv_name ^. KeyValId ==. gkv_name ^. GroupKeyValuesKey_val_id &&.
+                 kv_name ^. KeyValKey_value ==. val (T.pack "name")
+        where_ $ kv_name  ^. KeyValVal_value ==. val n &&.
+                 kv_ver   ^. KeyValVal_value ==. val v &&.
+                 kv_rel   ^. KeyValVal_value ==. val r &&.
+                 kv_arch  ^. KeyValVal_value ==. val a &&.
+                 cmpEpoch (kv_epoch ?. KeyValVal_value)
+        limit 1
+        return $ gkv_name ^. GroupKeyValuesGroup_id
+ where
+    -- If there is an epoch, do 'key_val.val_value == <epoch>'
+    -- If there is no epoch, do 'key_val.val_value is null'
+    cmpEpoch = case e of
+        Nothing -> isNothing
+        Just _  -> (==. val e)

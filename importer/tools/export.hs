@@ -52,7 +52,7 @@ import GI.OSTree hiding(on)
 import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
-import           BDCS.Groups(nvraToGroupId)
+import           BDCS.Groups(nevraToGroupId)
 import           BDCS.Version
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
@@ -154,7 +154,7 @@ checkoutObjectToTarEntry repo Files{..} =
                 Tar.entryTime = fromIntegral filesMtime }
 
 getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
-getGroupId thing = nvraToGroupId (splitFilename thing) >>= \case
+getGroupId thing = nevraToGroupId (splitFilename thing) >>= \case
     Just gid -> return gid
     Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
