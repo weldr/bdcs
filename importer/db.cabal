@@ -52,21 +52,17 @@ library
                        conduit >= 1.2.8,
                        conduit-combinators,
                        conduit-extra,
-                       cpio-conduit,
                        cpu,
                        directory,
                        esqueleto,
                        filepath,
                        gi-gio,
-                       gi-glib,
                        gi-ostree,
                        gitrev,
                        haskell-gi-base,
                        http-conduit,
-                       lzma-conduit,
                        mtl >= 2.2.1,
                        network-uri,
-                       persistent,
                        persistent-sqlite,
                        persistent-template,
                        resourcet,
@@ -74,7 +70,6 @@ library
                        temporary,
                        text,
                        time,
-                       transformers,
                        xml-conduit
   other-modules:       Paths_db
   default-language:    Haskell2010
@@ -88,8 +83,7 @@ executable import
                        cond,
                        directory,
                        mtl >= 2.2.1,
-                       network-uri,
-                       unix
+                       network-uri
 
   default-language:    Haskell2010
 
@@ -117,7 +111,6 @@ executable export
                        tar,
                        text,
                        time,
-                       transformers,
                        unix
 
   default-language:    Haskell2010
@@ -134,8 +127,7 @@ executable depclose
                        containers,
                        esqueleto,
                        persistent-sqlite,
-                       text,
-                       transformers
+                       text
 
   default-language:    Haskell2010
 
@@ -153,9 +145,6 @@ Test-Suite test-db
   build-depends:       hspec,
                        base >= 4.8 && < 5.0,
                        persistent,
-                       persistent-sqlite,
-                       tasty,
-                       tasty-hunit,
                        db,
                        rpm >= 1
 
