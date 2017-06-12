@@ -120,7 +120,7 @@ checkoutObjectToTarEntry repo Files{..} =
                             either (\e -> throwError $ "Could not check out object " ++ T.unpack filesPath ++ ": " ++ e)
                                    return
                                    result
-        Nothing       -> throwError $ "Object has no checksum: " ++ T.unpack filesPath
+        Nothing       -> return ()
  where
     checkoutDir :: CS.Metadata -> Either String Tar.Entry
     checkoutDir metadata@CS.Metadata{..} = do
