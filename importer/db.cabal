@@ -34,6 +34,7 @@ library
                        BDCS.RPM.Requirements,
                        BDCS.RPM.Signatures,
                        BDCS.RPM.Sources,
+                       BDCS.RPM.Utils,
                        BDCS.Version,
                        Import.Comps,
                        Import.Conduit,

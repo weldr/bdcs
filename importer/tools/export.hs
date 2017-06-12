@@ -53,6 +53,7 @@ import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFiles)
 import           BDCS.Groups(nevraToGroupId)
+import           BDCS.RPM.Utils(splitFilename)
 import           BDCS.Version
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
@@ -187,18 +188,6 @@ expandFileThings = concatMapM isThingFile
     isThingFile thing = ifM (doesFileExist thing)
                             (lines <$> readFile thing)
                             (return [thing])
-
--- Turn an RPM filename into a tuple of (name, epoch, version, release, and arch).
-splitFilename :: T.Text -> (T.Text, Maybe T.Text, T.Text, T.Text, T.Text)
-splitFilename rpm_ = let
-    rpm = if ".rpm" `T.isSuffixOf` rpm_ then T.dropEnd 4 rpm_ else rpm_
-
-    (front,  a) = T.breakOnEnd "." rpm
-    (front2, r) = T.breakOnEnd "-" $ T.dropWhileEnd (== '.') front
-    (front3, v) = T.breakOnEnd "-" $ T.dropWhileEnd (== '-') front2
-    (n,      e) = T.breakOn    ":" $ T.dropWhileEnd (== '-') front3
- in
-    (T.dropWhile (== ':') n, if e == "" then Nothing else Just e, v, r, a)
 
 usage :: IO ()
 usage = do
