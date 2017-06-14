@@ -34,6 +34,7 @@ import           Data.Time(UTCTime)
 import           Database.Esqueleto(Key, PersistEntity, SqlBackend, SqlPersistT, ToBackendKey, Value, insert,  unValue)
 import           Database.Persist.TH
 
+import BDCS.KeyType
 import BDCS.ReqType
 
 {-# ANN module ("HLint: ignore Use module export list" :: String) #-}
@@ -80,7 +81,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_id FilesId
     deriving Eq Show
  KeyVal
-    key_value T.Text
+    key_value KeyType
     val_value T.Text Maybe
     ext_value T.Text Maybe
     deriving Eq Show
