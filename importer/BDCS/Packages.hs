@@ -33,18 +33,18 @@ filesInPackage name = do
                on $     key_val ^. KeyValId ==. file_key_values ^. FileKeyValuesKey_val_id &&.
                         file_key_values ^. FileKeyValuesFile_id ==. files ^. FilesId
                where_ $ key_val ^. KeyValKey_value ==. val "packageName" &&.
-                        key_val ^. KeyValVal_value ==. val name
+                        key_val ^. KeyValVal_value ==. just (val name)
                return $ files ^. FilesPath
     return $ map unValue results
 
 insertPackageName :: MonadIO m => T.Text -> SqlPersistT m (Key KeyVal)
 insertPackageName packageName =
-    findPackage packageName `orDo` insertKeyValue "packageName" packageName Nothing
+    findPackage packageName `orDo` insertKeyValue "packageName" (Just packageName) Nothing
 
 findPackage :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key KeyVal))
 findPackage name = firstResult $
     select $ from $ \pkg -> do
     where_ $ pkg ^. KeyValKey_value ==. val "packageName" &&.
-             pkg ^. KeyValVal_value ==. val name
+             pkg ^. KeyValVal_value ==. just (val name)
     limit 1
     return $ pkg ^. KeyValId

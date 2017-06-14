@@ -25,6 +25,6 @@ import BDCS.KeyValue(findKeyValue, insertKeyValue)
 
 insertGroupKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> Key Groups -> SqlPersistT m (Key GroupKeyValues)
 insertGroupKeyValue k v e groupId =
-    maybeKey (insertKeyValue k v e >>= \kvId -> insert $ GroupKeyValues groupId kvId)
+    maybeKey (insertKeyValue k (Just v) e >>= \kvId -> insert $ GroupKeyValues groupId kvId)
              (insert . GroupKeyValues groupId)
-             (findKeyValue k v e)
+             (findKeyValue k (Just v) e)

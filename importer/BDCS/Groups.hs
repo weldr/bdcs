@@ -51,7 +51,7 @@ nameToGroupId name = firstResult $
     on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
              group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
     where_ $ keyval ^. KeyValKey_value ==. val (T.pack "name") &&.
-             keyval ^. KeyValVal_value ==. val name &&.
+             keyval ^. KeyValVal_value ==. just (val name) &&.
              groups ^. GroupsGroup_type ==. val (T.pack "rpm")
     limit 1
     return $ groups ^. GroupsId
@@ -84,10 +84,10 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
         on     $ gkv_ver ^. GroupKeyValuesGroup_id ==. gkv_name ^. GroupKeyValuesGroup_id
         on     $ kv_name ^. KeyValId ==. gkv_name ^. GroupKeyValuesKey_val_id &&.
                  kv_name ^. KeyValKey_value ==. val (T.pack "name")
-        where_ $ kv_name  ^. KeyValVal_value ==. val n &&.
-                 kv_ver   ^. KeyValVal_value ==. val v &&.
-                 kv_rel   ^. KeyValVal_value ==. val r &&.
-                 kv_arch  ^. KeyValVal_value ==. val a &&.
+        where_ $ kv_name  ^. KeyValVal_value ==. just (val n) &&.
+                 kv_ver   ^. KeyValVal_value ==. just (val v) &&.
+                 kv_rel   ^. KeyValVal_value ==. just (val r) &&.
+                 kv_arch  ^. KeyValVal_value ==. just (val a) &&.
                  cmpEpoch (kv_epoch ?. KeyValVal_value)
         limit 1
         return $ gkv_name ^. GroupKeyValuesGroup_id
@@ -96,4 +96,4 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
     -- If there is no epoch, do 'key_val.val_value is null'
     cmpEpoch = case e of
         Nothing -> isNothing
-        Just _  -> (==. val e)
+        Just _  -> (==. just (val e))

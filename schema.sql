@@ -182,7 +182,7 @@ create index build_files_file_id_idx on build_files(file_id);
 create table key_val (
     id integer primary key,
     key_value text not null,
-    val_value text not null,
+    val_value text,
     ext_value text
 );
 

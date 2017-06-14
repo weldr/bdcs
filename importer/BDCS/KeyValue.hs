@@ -23,7 +23,7 @@ import           Database.Esqueleto
 
 import BDCS.DB
 
-findKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> SqlPersistT m (Maybe (Key KeyVal))
+findKeyValue :: MonadIO m => T.Text -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Maybe (Key KeyVal))
 findKeyValue k v e = firstResult $
     select $ from $ \kv -> do
     where_ $ kv ^. KeyValKey_value ==. val k &&.
@@ -32,6 +32,6 @@ findKeyValue k v e = firstResult $
     limit 1
     return $ kv ^. KeyValId
 
-insertKeyValue :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
+insertKeyValue :: MonadIO m => T.Text -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v e =
     insert (KeyVal k v e)
