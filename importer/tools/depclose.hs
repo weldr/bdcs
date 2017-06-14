@@ -85,7 +85,7 @@ getValueForGroup grp key = do
                     keyval ^. KeyValKey_value ==. val key
            limit 1
            return $ keyval ^. KeyValVal_value
-    return $ listToMaybe (map unValue ndx)
+    return $ head $ map unValue ndx
 
 -- Given a group id, return the complete NEVRA tuple for it.  Each element
 -- except for the name can potentially be empty.
@@ -118,7 +118,7 @@ findProviderForName thing = do
            -- an exact match (name-only) or a versioned match (name = version).
            -- For provides with versions, ignoring the version and grabbing everything.
            where_ $ keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
-                    keyval ^. KeyValVal_value ==. val baseThing
+                    keyval ^. KeyValVal_value ==. just (val baseThing)
            return (group_keyval ^. GroupKeyValuesGroup_id, keyval ^. KeyValExt_value)
 
     -- unpack the database values into something useful

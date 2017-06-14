@@ -81,7 +81,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     deriving Eq Show
  KeyVal
     key_value T.Text
-    val_value T.Text
+    val_value T.Text Maybe
     ext_value T.Text Maybe
     deriving Eq Show
  ProjectKeyValues
