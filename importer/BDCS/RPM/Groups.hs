@@ -29,6 +29,7 @@ import           Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.GroupKeyValue(insertGroupKeyValue)
+import           BDCS.KeyType
 import           BDCS.Requirements(insertGroupRequirement, insertRequirement)
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Requirements(mkGroupRequirement, mkRequirement)
@@ -40,7 +41,7 @@ addPRCO tags groupId tagBase keyName =
         -- split out the name part of "name >= version"
         exprBase = T.takeWhile (/= ' ')  expr
       in
-        insertGroupKeyValue keyName exprBase (Just expr) groupId
+        insertGroupKeyValue (TextKey keyName) exprBase (Just expr) groupId
 
 prcoExpressions :: T.Text -> [Tag] -> [T.Text]
 prcoExpressions ty tags = let
@@ -86,12 +87,12 @@ createGroup fileIds rpm = do
 
     -- Create the (E)NVRA attributes
     -- FIXME could at least deduplicate name and arch real easy
-    forM_ [("name", name), ("version", version), ("release", release), ("arch", arch)] $ \tup ->
+    forM_ [(TextKey "name", name), (TextKey "version", version), (TextKey "release", release), (TextKey "arch", arch)] $ \tup ->
         uncurry insertGroupKeyValue tup Nothing groupId
 
     -- Add the epoch attribute, when it exists.
     when (isJust epoch) $ void $
-        insertGroupKeyValue "epoch" (fromJust epoch) Nothing groupId
+        insertGroupKeyValue (TextKey "epoch") (fromJust epoch) Nothing groupId
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
         uncurry (addPRCO rpm groupId) tup

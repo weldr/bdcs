@@ -26,6 +26,7 @@ import qualified Data.Text as T
 import           Database.Esqueleto
 
 import           BDCS.DB
+import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
 
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
@@ -52,7 +53,7 @@ nameToGroupId name = firstResult $
     select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
     on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
              group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
-    where_ $ keyval ^. KeyValKey_value ==. val "name" &&.
+    where_ $ keyval ^. KeyValKey_value ==. val (TextKey "name") &&.
              keyval ^. KeyValVal_value ==. just (val name) &&.
              groups ^. GroupsGroup_type ==. val "rpm"
     limit 1
@@ -73,19 +74,19 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
                                  (gkv_arch  `InnerJoin` kv_arch) `LeftOuterJoin`
                                  (gkv_epoch `InnerJoin` kv_epoch)) -> do
         on     $ kv_epoch ?. KeyValId ==. gkv_epoch ?. GroupKeyValuesKey_val_id &&.
-                 kv_epoch ?. KeyValKey_value ==. just (val "epoch")
+                 kv_epoch ?. KeyValKey_value ==. just (val $ TextKey "epoch")
         on     $ gkv_epoch ?. GroupKeyValuesGroup_id ==. just (gkv_arch ^. GroupKeyValuesGroup_id)
         on     $ kv_arch ^. KeyValId ==. gkv_arch ^. GroupKeyValuesKey_val_id &&.
-                 kv_arch ^. KeyValKey_value ==. val "arch"
+                 kv_arch ^. KeyValKey_value ==. val (TextKey "arch")
         on     $ gkv_arch ^. GroupKeyValuesGroup_id ==. gkv_rel ^. GroupKeyValuesGroup_id
         on     $ kv_rel ^. KeyValId ==. gkv_rel ^. GroupKeyValuesKey_val_id &&.
-                 kv_rel ^. KeyValKey_value ==. val "release"
+                 kv_rel ^. KeyValKey_value ==. val (TextKey "release")
         on     $ gkv_rel ^. GroupKeyValuesGroup_id ==. gkv_ver ^. GroupKeyValuesGroup_id
         on     $ kv_ver ^. KeyValId ==. gkv_ver ^. GroupKeyValuesKey_val_id &&.
-                 kv_ver ^. KeyValKey_value ==. val "version"
+                 kv_ver ^. KeyValKey_value ==. val (TextKey "version")
         on     $ gkv_ver ^. GroupKeyValuesGroup_id ==. gkv_name ^. GroupKeyValuesGroup_id
         on     $ kv_name ^. KeyValId ==. gkv_name ^. GroupKeyValuesKey_val_id &&.
-                 kv_name ^. KeyValKey_value ==. val "name"
+                 kv_name ^. KeyValKey_value ==. val (TextKey "name")
         where_ $ kv_name  ^. KeyValVal_value ==. just (val n) &&.
                  kv_ver   ^. KeyValVal_value ==. just (val v) &&.
                  kv_rel   ^. KeyValVal_value ==. just (val r) &&.

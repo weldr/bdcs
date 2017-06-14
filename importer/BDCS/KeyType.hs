@@ -1,4 +1,4 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
+-- Copyright (C) 2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
 -- modify it under the terms of the GNU Lesser General Public
@@ -13,19 +13,16 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-module BDCS.GroupKeyValue(insertGroupKeyValue)
- where
+{-# LANGUAGE TemplateHaskell #-}
 
-import           Control.Monad.IO.Class(MonadIO)
+module BDCS.KeyType where
+
+import           Database.Persist.TH
 import qualified Data.Text as T
-import           Database.Esqueleto
 
-import BDCS.DB
-import BDCS.KeyType
-import BDCS.KeyValue(findKeyValue, insertKeyValue)
+{-# ANN module "HLint: ignore Use module export list" #-}
 
-insertGroupKeyValue :: MonadIO m => KeyType -> T.Text -> Maybe T.Text -> Key Groups -> SqlPersistT m (Key GroupKeyValues)
-insertGroupKeyValue k v e groupId =
-    maybeKey (insertKeyValue k (Just v) e >>= \kvId -> insert $ GroupKeyValues groupId kvId)
-             (insert . GroupKeyValues groupId)
-             (findKeyValue k (Just v) e)
+data KeyType = TextKey T.Text
+ deriving(Eq, Read, Show)
+
+derivePersistField "KeyType"

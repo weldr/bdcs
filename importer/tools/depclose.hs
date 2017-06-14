@@ -60,6 +60,7 @@ import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
 import BDCS.DB
+import BDCS.KeyType
 import BDCS.Version
 
 data Proposition = T.Text `Obsoletes` T.Text
@@ -82,7 +83,7 @@ getValueForGroup grp key = do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
                     group_keyval ^. GroupKeyValuesGroup_id ==. group ^. GroupsId
            where_ $ group ^. GroupsId ==. val grp &&.
-                    keyval ^. KeyValKey_value ==. val key
+               keyval ^. KeyValKey_value ==. val (TextKey key)
            limit 1
            return $ keyval ^. KeyValVal_value
     return $ head $ map unValue ndx
@@ -117,7 +118,7 @@ findProviderForName thing = do
            -- A requirement is satisfied by matching a rpm-provide, which may be
            -- an exact match (name-only) or a versioned match (name = version).
            -- For provides with versions, ignoring the version and grabbing everything.
-           where_ $ keyval ^. KeyValKey_value ==. val "rpm-provide" &&.
+           where_ $ keyval ^. KeyValKey_value ==. val (TextKey "rpm-provide") &&.
                     keyval ^. KeyValVal_value ==. just (val baseThing)
            return (group_keyval ^. GroupKeyValuesGroup_id, keyval ^. KeyValExt_value)
 
@@ -159,7 +160,7 @@ whatObsoletes id = do
            on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
                     group_keyval ^.GroupKeyValuesGroup_id ==. group ^. GroupsId
            where_ $ group ^. GroupsId ==. val id &&.
-                    keyval ^. KeyValKey_value ==. val "rpm-obsolete"
+                    keyval ^. KeyValKey_value ==. val (TextKey "rpm-obsolete")
            return  (group ^. GroupsName, keyval ^. KeyValExt_value)
     return $ mapMaybe (\(a, b) -> case unValue b of
                                       Nothing -> Nothing

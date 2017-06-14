@@ -24,6 +24,7 @@ library
                        BDCS.Files,
                        BDCS.GroupKeyValue,
                        BDCS.Groups,
+                       BDCS.KeyType,
                        BDCS.KeyValue,
                        BDCS.Packages,
                        BDCS.Projects,
