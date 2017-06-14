@@ -13,6 +13,8 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
+
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
                    nameToGroupId,
@@ -50,9 +52,9 @@ nameToGroupId name = firstResult $
     select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
     on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
              group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
-    where_ $ keyval ^. KeyValKey_value ==. val (T.pack "name") &&.
+    where_ $ keyval ^. KeyValKey_value ==. val "name" &&.
              keyval ^. KeyValVal_value ==. just (val name) &&.
-             groups ^. GroupsGroup_type ==. val (T.pack "rpm")
+             groups ^. GroupsGroup_type ==. val "rpm"
     limit 1
     return $ groups ^. GroupsId
 
@@ -71,19 +73,19 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
                                  (gkv_arch  `InnerJoin` kv_arch) `LeftOuterJoin`
                                  (gkv_epoch `InnerJoin` kv_epoch)) -> do
         on     $ kv_epoch ?. KeyValId ==. gkv_epoch ?. GroupKeyValuesKey_val_id &&.
-                 kv_epoch ?. KeyValKey_value ==. just (val (T.pack "epoch"))
+                 kv_epoch ?. KeyValKey_value ==. just (val "epoch")
         on     $ gkv_epoch ?. GroupKeyValuesGroup_id ==. just (gkv_arch ^. GroupKeyValuesGroup_id)
         on     $ kv_arch ^. KeyValId ==. gkv_arch ^. GroupKeyValuesKey_val_id &&.
-                 kv_arch ^. KeyValKey_value ==. val (T.pack "arch")
+                 kv_arch ^. KeyValKey_value ==. val "arch"
         on     $ gkv_arch ^. GroupKeyValuesGroup_id ==. gkv_rel ^. GroupKeyValuesGroup_id
         on     $ kv_rel ^. KeyValId ==. gkv_rel ^. GroupKeyValuesKey_val_id &&.
-                 kv_rel ^. KeyValKey_value ==. val (T.pack "release")
+                 kv_rel ^. KeyValKey_value ==. val "release"
         on     $ gkv_rel ^. GroupKeyValuesGroup_id ==. gkv_ver ^. GroupKeyValuesGroup_id
         on     $ kv_ver ^. KeyValId ==. gkv_ver ^. GroupKeyValuesKey_val_id &&.
-                 kv_ver ^. KeyValKey_value ==. val (T.pack "version")
+                 kv_ver ^. KeyValKey_value ==. val "version"
         on     $ gkv_ver ^. GroupKeyValuesGroup_id ==. gkv_name ^. GroupKeyValuesGroup_id
         on     $ kv_name ^. KeyValId ==. gkv_name ^. GroupKeyValuesKey_val_id &&.
-                 kv_name ^. KeyValKey_value ==. val (T.pack "name")
+                 kv_name ^. KeyValKey_value ==. val "name"
         where_ $ kv_name  ^. KeyValVal_value ==. just (val n) &&.
                  kv_ver   ^. KeyValVal_value ==. just (val v) &&.
                  kv_rel   ^. KeyValVal_value ==. just (val r) &&.
