@@ -21,14 +21,15 @@
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
-import           Control.Conditional(ifM)
+import           Control.Conditional(ifM, whenM)
 import           Control.Monad(unless, when)
-import           Control.Monad.Except(ExceptT(..), MonadError, catchError, runExceptT, throwError)
+import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Trans(lift)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource, runResourceT)
 import           Data.ByteString(ByteString)
 import           Data.ByteString.Lazy(writeFile)
-import           Data.Conduit((.|), Producer, runConduit, yield)
+import           Data.Conduit((.|), Conduit, Consumer, Producer, await, runConduit, yield)
 import           Data.Conduit.Binary(sinkFile, sinkLbs)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
@@ -45,13 +46,12 @@ import           System.FilePath((</>), dropDrive, takeDirectory)
 import           System.Posix.Files(createSymbolicLink, setFileMode)
 import           System.Posix.Types(CMode(..))
 
-import GI.Gio    hiding(on)
-import GI.GLib   hiding(String, on)
-import GI.OSTree hiding(on)
+import           GI.Gio(IsInputStream, inputStreamReadBytes, noCancellable)
+import           GI.GLib(bytesGetData, bytesGetSize)
+import           GI.OSTree(IsRepo)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
-import           BDCS.Files(groupIdToFiles)
 import           BDCS.Groups(nevraToGroupId)
 import           BDCS.RPM.Utils(splitFilename)
 import           BDCS.Version
@@ -69,88 +69,81 @@ sourceInputStream input = do
         yield $ fromMaybe "" bytesData
         sourceInputStream input
 
-checkoutObjectToDisk :: (MonadError String m, MonadIO m, IsRepo a) => a -> FilePath -> Files -> m ()
-checkoutObjectToDisk repo outPath Files{..} =
-    case filesCs_object of
-        Just checksum -> CS.load repo checksum >>= liftIO . \case
-                            CS.DirMeta dirmeta -> checkoutDir dirmeta
-                            CS.FileObject fileObj -> checkoutFile fileObj
-        Nothing       -> return ()
-
-  where
-    checkoutDir :: CS.Metadata -> IO ()
-    checkoutDir metadata = do
-        let fullPath = outPath </> dropDrive (T.unpack filesPath)
-
-        -- create the directory if it isn't there already
-        createDirectoryIfMissing True fullPath
-
-        setMetadata fullPath metadata
-
-    checkoutFile :: CS.FileContents -> IO ()
-    checkoutFile CS.FileContents{..} = do
-        let fullPath = outPath </> dropDrive (T.unpack filesPath)
-
-        createDirectoryIfMissing True $ takeDirectory fullPath
-
-        -- Write the data or the symlink, depending
-        case (symlink, contents) of
-            (Just symlinkTarget, _) -> createSymbolicLink (T.unpack symlinkTarget) fullPath
-            (_, Just c)             -> runResourceT $ runConduit $ sourceInputStream c .| sinkFile fullPath
-            -- TODO?
-            _                       -> return ()
-
-        setMetadata fullPath metadata
-
-    setMetadata :: FilePath -> CS.Metadata -> IO ()
-    setMetadata fullPath CS.Metadata{..} = do
-        -- set the mode
-        setFileMode fullPath (CMode mode)
-
-        -- set the mtime
-        setModificationTime fullPath (posixSecondsToUTCTime $ realToFrac filesMtime)
-
-        -- TODO user, group, xattrs
-
-checkoutObjectToTarEntry :: (MonadError String m, MonadIO m, IsRepo a) => a -> Files -> m Tar.Entry
-checkoutObjectToTarEntry repo Files{..} =
-    case filesCs_object of
-        Just checksum -> do result <- CS.load repo checksum >>= liftIO . \case
-                                CS.DirMeta dirmeta    -> return $ checkoutDir dirmeta
-                                CS.FileObject fileObj -> runExceptT $ checkoutFile fileObj
-
-                            either (\e -> throwError $ "Could not check out object " ++ T.unpack filesPath ++ ": " ++ e)
-                                   return
-                                   result
-        Nothing       -> throwError $ "Object has no checksum: " ++ T.unpack filesPath
+groupIdToFiles :: (MonadBaseControl IO m, MonadIO m) => T.Text -> Conduit (Key Groups) m Files
+groupIdToFiles db_path = await >>= \case
+    Nothing      -> return ()
+    -- TODO: use selectSource
+    Just groupid -> do
+        files <- lift $ runSqlite db_path $ runQuery groupid
+        CL.sourceList files
+        groupIdToFiles db_path
  where
-    checkoutDir :: CS.Metadata -> Either String Tar.Entry
-    checkoutDir metadata@CS.Metadata{..} = do
-        path <- Tar.toTarPath True (T.unpack filesPath)
-        return $ setMetadata metadata (Tar.directoryEntry path)
+    runQuery :: (MonadBaseControl IO m, MonadIO m) => Key Groups -> SqlPersistT m [Files]
+    runQuery groupid = do
+        files <- select $ from $ \(files `InnerJoin` group_files) -> do
+                 on     $ files ^. FilesId ==. group_files ^. GroupFilesFile_id
+                 where_ $ group_files ^. GroupFilesGroup_id ==. val groupid
+                 return files
+        return $ map entityVal files
 
-    checkoutSymlink :: CS.FileContents -> Either String Tar.Entry
-    checkoutSymlink CS.FileContents{symlink=Nothing, ..} =
-        throwError $ T.unpack filesPath ++ " is not a symbolic link"
-    checkoutSymlink CS.FileContents{symlink=Just target, ..} = do
+getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => T.Text -> Conduit T.Text m (Key Groups)
+getGroupIdC db_path = await >>= \case
+    Nothing    -> return ()
+    Just thing -> do
+        maybeId <- lift $ runSqlite db_path $ nevraToGroupId (splitFilename thing)
+        case maybeId of
+            Just gid -> yield gid >> getGroupIdC db_path
+            Nothing  -> throwError $ "No such group " ++ T.unpack thing
+
+filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, CS.Object)
+filesToObjectsC repo = await >>= \case
+    Nothing        -> return ()
+    Just f@Files{..} -> case filesCs_object of
+        Nothing       -> filesToObjectsC repo
+        Just checksum -> do
+            object <- CS.load repo checksum
+            yield (f, object)
+            filesToObjectsC repo
+
+objectToTarEntry :: (MonadError String m, MonadIO m) => Conduit (Files, CS.Object) m Tar.Entry
+objectToTarEntry = await >>= \case
+    Nothing                 -> return ()
+    Just (f@Files{..}, obj) -> do
+        result <- case obj of
+                CS.DirMeta dirmeta    -> return $ checkoutDir f dirmeta
+                CS.FileObject fileObj -> liftIO . runExceptT $ checkoutFile f fileObj
+
+        either (\e -> throwError $ "Could not checkout out object " ++ T.unpack filesPath ++ ": " ++ e)
+               yield
+               result
+
+        objectToTarEntry
+ where
+    checkoutDir :: Files -> CS.Metadata -> Either String Tar.Entry
+    checkoutDir f@Files{..} metadata@CS.Metadata{..} = do
+        path <- Tar.toTarPath True (T.unpack filesPath)
+        return $ setMetadata f metadata (Tar.directoryEntry path)
+
+    checkoutSymlink :: Files -> CS.Metadata -> T.Text -> Either String Tar.Entry
+    checkoutSymlink f@Files{..} metadata target = do
         path'   <- Tar.toTarPath False (T.unpack filesPath)
         target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ T.unpack target)
                                  (Tar.toLinkTarget (T.unpack target))
-        return $ setMetadata metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
+        return $ setMetadata f metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
 
-    checkoutFile :: CS.FileContents -> ExceptT String IO Tar.Entry
-    checkoutFile fc@CS.FileContents{symlink=Just _, ..} =
-        ExceptT $ return $ checkoutSymlink fc
-    checkoutFile CS.FileContents{symlink=Nothing, contents=Just c, ..} = do
+    checkoutFile :: Files -> CS.FileContents -> ExceptT String IO Tar.Entry
+    checkoutFile f CS.FileContents{symlink=Just target, ..} =
+        ExceptT $ return $ checkoutSymlink f metadata target
+    checkoutFile f@Files{..} CS.FileContents{symlink=Nothing, contents=Just c, ..} = do
         path         <- ExceptT $ return $ Tar.toTarPath False (T.unpack filesPath)
         lazyContents <- runResourceT $ runConduit $ sourceInputStream c .| sinkLbs
 
-        return $ setMetadata metadata (Tar.fileEntry path lazyContents)
+        return $ setMetadata f metadata (Tar.fileEntry path lazyContents)
     -- TODO?
-    checkoutFile _ = throwError "Unhandled file type"
+    checkoutFile _ _ = throwError "Unhandled file type"
 
-    setMetadata :: CS.Metadata -> Tar.Entry -> Tar.Entry
-    setMetadata metadata entry =
+    setMetadata :: Files -> CS.Metadata -> Tar.Entry -> Tar.Entry
+    setMetadata Files{..} metadata entry =
         entry { Tar.entryPermissions = CMode (CS.mode metadata),
                 Tar.entryOwnership   = Tar.Ownership { Tar.ownerId = fromIntegral (CS.uid metadata),
                                                        Tar.groupId = fromIntegral (CS.gid metadata),
@@ -158,30 +151,50 @@ checkoutObjectToTarEntry repo Files{..} =
                                                        Tar.groupName = "" },
                 Tar.entryTime = fromIntegral filesMtime }
 
-getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
-getGroupId thing = nevraToGroupId (splitFilename thing) >>= \case
-    Just gid -> return gid
-    Nothing  -> throwError $ "No such group " ++ T.unpack thing
+tarSink :: MonadIO m => FilePath -> Consumer Tar.Entry m ()
+tarSink out_path = do
+    entries <- CL.consume
+    liftIO $ writeFile out_path (Tar.write entries)
 
-processOneThingToDir :: (MonadError String m, MonadResource m, IsRepo r) => r -> FilePath -> T.Text -> SqlPersistT m ()
-processOneThingToDir repo outPath thing = do
-    -- Get the group id of the thing
-    groupId <- getGroupId thing
-
-    -- Get all of the files associated with the group
-    runConduit (groupIdToFiles groupId .| CL.mapM_ (checkoutObjectToDisk repo outPath)) `catchError` handler
+directorySink :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
+directorySink outPath = await >>= \case
+    Nothing                         -> return ()
+    Just (f, CS.DirMeta dirmeta)    -> liftIO (checkoutDir f dirmeta)  >> directorySink outPath
+    Just (f, CS.FileObject fileObj) -> liftIO (checkoutFile f fileObj) >> directorySink outPath
  where
-    -- Catch errors from processing a single RPM (or whatever), add the name of the thing to the front
-    -- of the error message, and re-raise.
-    handler err = throwError $ "Error processing " ++ T.unpack thing ++ ": " ++ err
+    checkoutDir :: Files -> CS.Metadata -> IO ()
+    checkoutDir f@Files{..} metadata = do
+        let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
-processOneThingToTarEntries :: (MonadError String m, MonadResource m, IsRepo r) => r -> T.Text -> SqlPersistT m [Tar.Entry]
-processOneThingToTarEntries repo thing = do
-    -- Get the group id of the thing
-    groupId <- getGroupId thing
+        -- create the directory if it isn't there already
+        createDirectoryIfMissing True fullPath
 
-    -- Get all of the files associated with the group, as entries
-    runConduit $ groupIdToFiles groupId .| CL.mapM (checkoutObjectToTarEntry repo) .| CL.consume
+        setMetadata f fullPath metadata
+
+    checkoutFile :: Files -> CS.FileContents -> IO ()
+    checkoutFile f@Files{..} CS.FileContents{..} = do
+        let fullPath = outPath </> dropDrive (T.unpack filesPath)
+
+        createDirectoryIfMissing True $ takeDirectory fullPath
+
+        -- Write the data or the symlink, depending
+        case (symlink, contents) of
+            (Just symlinkTarget, _) -> createSymbolicLink (T.unpack symlinkTarget) fullPath
+            (_, Just c)             -> do
+                runResourceT $ runConduit $ sourceInputStream c .| sinkFile fullPath
+                setMetadata f fullPath metadata
+            -- TODO?
+            _                       -> return ()
+
+    setMetadata :: Files -> FilePath -> CS.Metadata -> IO ()
+    setMetadata Files{..} fullPath CS.Metadata{..} = do
+        -- set the mode
+        setFileMode fullPath (CMode mode)
+
+        -- set the mtime
+        setModificationTime fullPath (posixSecondsToUTCTime $ realToFrac filesMtime)
+
+        -- TODO user, group, xattrs
 
 -- | Check a list of strings to see if any of them are files
 -- If it is, read it and insert its contents in its place
@@ -228,22 +241,14 @@ main = do
     when (length match < 1) needFilesystem
     let things = map T.pack $ match !! 0 : otherThings
 
-    if ".tar" `isSuffixOf` out_path
-    then do
-        result <- runExceptT $ runResourceT $ processThingsToTar db_path repo out_path things
-        whenLeft result $ \e -> do
-            print e
-            removeFile out_path
-    else do
-        createDirectoryIfMissing True out_path
-        result <- runExceptT $ runResourceT $ processThings db_path repo out_path things
-        whenLeft result print
- where
-    processThings :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => T.Text -> a -> FilePath -> [T.Text] -> m ()
-    processThings dbPath repo outPath things =
-        mapM_ (runSqlite dbPath . processOneThingToDir repo outPath) things
+    let (handler, objectSink) = if ".tar" `isSuffixOf` out_path
+            then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), objectToTarEntry .| tarSink out_path)
+            else (print, directorySink out_path)
 
-    processThingsToTar :: (MonadError String m, MonadBaseControl IO m, MonadResource m, IsRepo a) => T.Text -> a -> FilePath -> [T.Text] -> m ()
-    processThingsToTar dbPath repo outPath things = do
-        entries <- concatMapM (runSqlite dbPath . processOneThingToTarEntries repo) things
-        liftIO $ writeFile outPath (Tar.write entries)
+    result <- runExceptT $ runConduit $ CL.sourceList things
+        .| getGroupIdC db_path
+        .| groupIdToFiles db_path
+        .| filesToObjectsC repo
+        .| objectSink
+
+    whenLeft result handler
