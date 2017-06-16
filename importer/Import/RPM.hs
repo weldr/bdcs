@@ -44,6 +44,7 @@ import BDCS.CS(commit, commitContents, store, withTransaction)
 import BDCS.DB
 import BDCS.Exceptions(DBException(..), throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
+import BDCS.Label.FileLabels(apply)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
 import BDCS.Signatures(insertBuildSignatures)
@@ -115,8 +116,14 @@ unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
     sourceId  <- insertSource $ mkSource tagHeaders projectId
     buildId   <- insertBuild $ mkBuild tagHeaders sourceId
     void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
-    filesIds  <- mkFiles tagHeaders checksums >>= insertFiles
     pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
+
+    files     <- mkFiles tagHeaders checksums
+    filesIds  <- insertFiles files
+
+    -- Pair up files with their IDs in the Files table.  Then use this mapping to add all the
+    -- various file-based labels to the KeyVal table.
+    apply (zip files filesIds)
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId
