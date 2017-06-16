@@ -1,5 +1,5 @@
 FROM juhp/fedora-haskell-ghc:8.0.2
-RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel ostree-devel && dnf clean all
+RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel ostree-devel sqlite-devel && dnf clean all
 
 ENV PATH ~/.cabal/bin:$PATH
 
