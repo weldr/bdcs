@@ -13,19 +13,17 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BDCS.KeyType where
+module BDCS.Label.Docs(matches)
+ where
 
-import           Database.Persist.TH
 import qualified Data.Text as T
 
-import BDCS.Label.Types(Label)
+import BDCS.DB(Files(..))
 
-{-# ANN module "HLint: ignore Use module export list" #-}
-
-data KeyType = LabelKey Label
-             | TextKey T.Text
- deriving(Eq, Read, Show)
-
-derivePersistField "KeyType"
+matches :: Files -> Bool
+matches Files{..} =
+    -- FIXME:  Are man pages and info pages also documentation?  They certainly could be.
+    "/usr/share/doc/" `T.isPrefixOf` filesPath

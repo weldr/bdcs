@@ -13,19 +13,20 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE TemplateHaskell #-}
+module BDCS.Label.Utils(addLabelKey)
+ where
 
-module BDCS.KeyType where
-
-import           Database.Persist.TH
+import           Control.Monad.IO.Class(MonadIO)
 import qualified Data.Text as T
+import           Database.Esqueleto(Key, SqlPersistT, insert)
 
+import BDCS.DB(Files, FileKeyValues(..), KeyVal, maybeKey)
+import BDCS.KeyValue(findKeyValue, insertKeyValue)
+import BDCS.KeyType(KeyType(..))
 import BDCS.Label.Types(Label)
 
-{-# ANN module "HLint: ignore Use module export list" #-}
-
-data KeyType = LabelKey Label
-             | TextKey T.Text
- deriving(Eq, Read, Show)
-
-derivePersistField "KeyType"
+addLabelKey :: MonadIO m => Key Files -> Label -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Key FileKeyValues)
+addLabelKey fileId k v e =
+    maybeKey (insertKeyValue (LabelKey k) v e >>= \kvId -> insert $ FileKeyValues fileId kvId)
+             (insert . FileKeyValues fileId)
+             (findKeyValue (LabelKey k) v e)
