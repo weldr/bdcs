@@ -32,7 +32,7 @@ import           Data.ByteString.Lazy(writeFile)
 import           Data.Conduit((.|), Conduit, Consumer, Producer, await, runConduit, yield)
 import           Data.Conduit.Binary(sinkFile, sinkLbs)
 import qualified Data.Conduit.List as CL
-import           Data.List(isSuffixOf)
+import           Data.List(isSuffixOf, isPrefixOf, partition)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
@@ -215,6 +215,12 @@ usage = do
     -- TODO group id?
     exitFailure
 
+needFilesystem :: IO ()
+needFilesystem = do
+    printVersion "export"
+    putStrLn "ERROR: The tar needs to have the filesystem package included"
+    exitFailure
+
 {-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
 main = do
@@ -226,7 +232,10 @@ main = do
     repo <- CS.open (argv !! 1)
     let out_path = argv !! 2
     allThings <- expandFileThings $ drop 3 argv
-    let things = map T.pack allThings
+
+    let (match, otherThings) = partition (isPrefixOf "filesystem-") allThings
+    when (length match < 1) needFilesystem
+    let things = map T.pack $ match !! 0 : otherThings
 
     let (handler, objectSink) = if ".tar" `isSuffixOf` out_path
             then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), objectToTarEntry .| tarSink out_path)
