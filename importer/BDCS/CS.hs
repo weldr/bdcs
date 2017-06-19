@@ -16,7 +16,7 @@ module BDCS.CS(ChecksumMap,
                withTransaction)
  where
 
-import           Control.Conditional(condM, ifM, otherwiseM)
+import           Control.Conditional((<&&>), condM, ifM, otherwiseM, whenM)
 import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(forM_)
 import           Control.Monad.Except(MonadError, throwError)
@@ -24,6 +24,7 @@ import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.State(StateT, lift, modify)
 import qualified Data.ByteString as BS
 import           Data.GI.Base.ManagedPtr(unsafeCastTo)
+import           Data.Maybe(isNothing)
 import qualified Data.Text as T
 import           Data.Word(Word32)
 import           GI.Gio
@@ -48,7 +49,7 @@ data Metadata = Metadata { uid :: Word32,
 -- metadata + contents for a file
 data FileContents = FileContents { metadata :: Metadata,
                                    symlink :: Maybe T.Text,
-                                   contents :: InputStream }
+                                   contents :: Maybe InputStream }
 
 -- Given a commit, return the parent of it or Nothing if no parent exists.
 parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
@@ -176,13 +177,21 @@ load repo checksum =
     loadFile = do
         (contents, info, xattrsVariant) <- repoLoadFile repo checksum noCancellable
 
-        -- Fetch the useful parts out the fileinfo
-        uid <- fileInfoGetAttributeUint32 info "unix::uid"
-        gid <- fileInfoGetAttributeUint32 info "unix::gid"
-        mode <- fileInfoGetAttributeUint32 info "unix::mode"
+        -- All of the outputs are Maybe, but some situations don't make any sense
+        -- We always need a fileinfo, since we at least need the mode out of that to tell what kind of file it is.
+        -- If the file is a regular file, contents must be set.
+        info' <- maybe (throwError $ "No file info for " ++ show checksum) return info
 
-        symlink <- ifM (fileInfoGetIsSymlink info)
-                       (fmap Just (fileInfoGetSymlinkTarget info))
+        whenM (((== FileTypeRegular) <$> fileInfoGetFileType info') <&&> return (isNothing contents))
+              (throwError $ "No file contents for " ++ show checksum)
+
+        -- Fetch the useful parts out the fileinfo
+        uid <- fileInfoGetAttributeUint32 info' "unix::uid"
+        gid <- fileInfoGetAttributeUint32 info' "unix::gid"
+        mode <- fileInfoGetAttributeUint32 info' "unix::mode"
+
+        symlink <- ifM (fileInfoGetIsSymlink info')
+                       (fmap Just (fileInfoGetSymlinkTarget info'))
                        (return Nothing)
 
         -- the xattrs is a GVariant of type a(ayay), i.e., [(ByteString, ByteString)]
@@ -193,8 +202,9 @@ load repo checksum =
     variantToDirMeta :: GVariant -> IO (Maybe (Word32, Word32, Word32, [(BS.ByteString, BS.ByteString)]))
     variantToDirMeta = fromGVariant
 
-    variantToXattrs :: GVariant -> IO (Maybe [(BS.ByteString, BS.ByteString)])
-    variantToXattrs = fromGVariant
+    variantToXattrs :: Maybe GVariant -> IO (Maybe [(BS.ByteString, BS.ByteString)])
+    variantToXattrs (Just v)  = fromGVariant v
+    variantToXattrs Nothing   = return $ Just []
 
 -- Wrap some repo-manipulating function in a transaction, committing it if the function succeeds.
 -- Returns the checksum of the commit.

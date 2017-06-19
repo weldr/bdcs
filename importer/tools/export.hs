@@ -94,9 +94,11 @@ checkoutObjectToDisk repo outPath Files{..} =
         createDirectoryIfMissing True $ takeDirectory fullPath
 
         -- Write the data or the symlink, depending
-        case symlink of
-            Just symlinkTarget -> createSymbolicLink (T.unpack symlinkTarget) fullPath
-            Nothing -> runResourceT $ runConduit $ sourceInputStream contents .| sinkFile fullPath
+        case (symlink, contents) of
+            (Just symlinkTarget, _) -> createSymbolicLink (T.unpack symlinkTarget) fullPath
+            (_, Just c)             -> runResourceT $ runConduit $ sourceInputStream c .| sinkFile fullPath
+            -- TODO?
+            _                       -> return ()
 
         setMetadata fullPath metadata
 
@@ -139,11 +141,13 @@ checkoutObjectToTarEntry repo Files{..} =
     checkoutFile :: CS.FileContents -> ExceptT String IO Tar.Entry
     checkoutFile fc@CS.FileContents{symlink=Just _, ..} =
         ExceptT $ return $ checkoutSymlink fc
-    checkoutFile CS.FileContents{symlink=Nothing, ..} = do
+    checkoutFile CS.FileContents{symlink=Nothing, contents=Just c, ..} = do
         path         <- ExceptT $ return $ Tar.toTarPath False (T.unpack filesPath)
-        lazyContents <- runResourceT $ runConduit $ sourceInputStream contents .| sinkLbs
+        lazyContents <- runResourceT $ runConduit $ sourceInputStream c .| sinkLbs
 
         return $ setMetadata metadata (Tar.fileEntry path lazyContents)
+    -- TODO?
+    checkoutFile _ = throwError "Unhandled file type"
 
     setMetadata :: CS.Metadata -> Tar.Entry -> Tar.Entry
     setMetadata metadata entry =
