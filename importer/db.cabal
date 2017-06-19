@@ -57,7 +57,7 @@ library
                        esqueleto,
                        filepath,
                        gi-gio,
-                       gi-ostree,
+                       gi-ostree >= 1.0.3,
                        gitrev,
                        haskell-gi-base,
                        http-conduit,
