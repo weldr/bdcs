@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/weldr/bdcs.svg?branch=master)](https://travis-ci.org/weldr/bdcs)
+[![Coverage Status](https://coveralls.io/repos/github/weldr/bdcs/badge.svg?branch=master)](https://coveralls.io/github/weldr/bdcs?branch=master)
+
 This code requires haskell-rpm which is a separate git repo, but is also
 a subtree in this git repo.  So you don't really need to go get it separately.
 
