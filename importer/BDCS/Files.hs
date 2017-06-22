@@ -13,15 +13,18 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE LambdaCase #-}
+
 module BDCS.Files(insertFiles,
                   associateFilesWithBuild,
                   associateFilesWithPackage,
-                  groupIdToFiles)
+                  groupIdToFiles,
+                  groupIdToFilesC)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Trans.Resource(MonadResource)
-import           Data.Conduit((.|), Source)
+import           Data.Conduit((.|), Conduit, Source, await, toProducer)
 import qualified Data.Conduit.List as CL
 import           Database.Esqueleto
 
@@ -47,3 +50,8 @@ groupIdToFiles groupid = do
                        where_ $ group_files ^. GroupFilesGroup_id ==. val groupid
                        return files
     source .| CL.map entityVal
+
+groupIdToFilesC :: MonadResource m => Conduit (Key Groups) (SqlPersistT m) Files
+groupIdToFilesC = await >>= \case
+    Nothing      -> return ()
+    Just groupid -> toProducer (groupIdToFiles groupid) >> groupIdToFilesC

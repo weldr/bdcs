@@ -36,7 +36,7 @@ import           Data.List(isSuffixOf, isPrefixOf, partition)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import           Database.Esqueleto
+import           Database.Persist.Sql(SqlPersistT)
 import           Database.Persist.Sqlite(runSqlite)
 import           Prelude hiding(writeFile)
 import           System.Directory(createDirectoryIfMissing, doesFileExist, removeFile, setModificationTime)
@@ -52,6 +52,7 @@ import           GI.OSTree(IsRepo)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
+import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(nevraToGroupId)
 import           BDCS.RPM.Utils(splitFilename)
 import           BDCS.Version
@@ -69,30 +70,13 @@ sourceInputStream input = do
         yield $ fromMaybe "" bytesData
         sourceInputStream input
 
-groupIdToFiles :: (MonadBaseControl IO m, MonadIO m) => T.Text -> Conduit (Key Groups) m Files
-groupIdToFiles db_path = await >>= \case
-    Nothing      -> return ()
-    -- TODO: use selectSource
-    Just groupid -> do
-        files <- lift $ runSqlite db_path $ runQuery groupid
-        CL.sourceList files
-        groupIdToFiles db_path
- where
-    runQuery :: (MonadBaseControl IO m, MonadIO m) => Key Groups -> SqlPersistT m [Files]
-    runQuery groupid = do
-        files <- select $ from $ \(files `InnerJoin` group_files) -> do
-                 on     $ files ^. FilesId ==. group_files ^. GroupFilesFile_id
-                 where_ $ group_files ^. GroupFilesGroup_id ==. val groupid
-                 return files
-        return $ map entityVal files
-
-getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => T.Text -> Conduit T.Text m (Key Groups)
-getGroupIdC db_path = await >>= \case
+getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
+getGroupIdC = await >>= \case
     Nothing    -> return ()
     Just thing -> do
-        maybeId <- lift $ runSqlite db_path $ nevraToGroupId (splitFilename thing)
+        maybeId <- lift $ nevraToGroupId (splitFilename thing)
         case maybeId of
-            Just gid -> yield gid >> getGroupIdC db_path
+            Just gid -> yield gid >> getGroupIdC
             Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
 filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, CS.Object)
@@ -245,9 +229,9 @@ main = do
             then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), objectToTarEntry .| tarSink out_path)
             else (print, directorySink out_path)
 
-    result <- runExceptT $ runConduit $ CL.sourceList things
-        .| getGroupIdC db_path
-        .| groupIdToFiles db_path
+    result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
+        .| getGroupIdC
+        .| groupIdToFilesC
         .| filesToObjectsC repo
         .| objectSink
 
