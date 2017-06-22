@@ -39,7 +39,7 @@ script:
 
 after_success:
   - cabal install hpc-coveralls
-  - ~/.cabal/bin/hpc-coveralls --display-report tests
+  - ~/.cabal/bin/hpc-coveralls --display-report test-db
 
 notifications:
   email:
