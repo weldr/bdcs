@@ -1,0 +1,9 @@
+.git
+**/.cabal
+**/.cabal-sandbox
+**/cabal.sandbox.config
+mddb/
+rpms/
+Dockerfile
+Dockerfile.build
+welder-deployment/
