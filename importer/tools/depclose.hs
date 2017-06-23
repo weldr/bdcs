@@ -213,7 +213,7 @@ closeRPM db rpms = runSqlite (T.pack db) $
         providers <- findProviderForName hd
 #if DEBUG
         liftIO $ do
-            putStrLn $ "Providers for " ++ hd ++ " are:"
+            TIO.putStrLn $ T.concat ["Providers for ", hd, " are:"]
             mapM_ (putStrLn . show . snd) providers
             putStrLn "Gathering requirements"
 #endif
@@ -230,23 +230,23 @@ closeRPM db rpms = runSqlite (T.pack db) $
             putStrLn "Requirements are:"
             forM_ (zip providers' reqs) $ \((_, thing), rs) -> do
                 putStrLn $ "Requirements for " ++ (show thing) ++ ":"
-                mapM_ putStrLn rs
+                mapM_ TIO.putStrLn rs
             putStrLn "Gathering group names"
 #endif
         nevras <- mapM (getNEVRAForGroupId . fst) providers'
 #if DEBUG
         liftIO $ do
             putStrLn "Groups are:"
-            mapM_ (putStrLn . printNEVRA) nevras
+            mapM_ (TIO.putStrLn . printNEVRA) nevras
             putStrLn "Gathering obsoletes"
 #endif
         obsoletes <- mapM (whatObsoletes . fst) providers'
 #if DEBUG
         liftIO $ do
             putStrLn "Obsoletes are:"
-            forM_ (zip providers' obsoletes) $ (\thing, obs) -> do
-                putStrLn $ "Obsoletes " ++ thing ++ ":"
-                mapM_ putStrLn obs
+            forM_ (zip providers' obsoletes) $ \(thing, obs) -> do
+                TIO.putStrLn $ T.concat ["Obsoletes ", fst (head obs), ":"]
+                mapM_ (TIO.putStrLn . snd) obs
 #endif
         let props' = props `Set.union` Set.fromList (map snd providers')
                            `Set.union` Set.fromList (concatMap (\(t, rs) -> map (t `Requires`) rs)
