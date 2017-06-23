@@ -11,6 +11,10 @@ flag debug
   description:       Enable debugging spew
   default:           False
 
+flag scripts
+  description:       Enable importing package scripts to the database
+  default:           False
+
 library
   exposed-modules:     BDCS.Builds,
                        BDCS.CS,
@@ -25,6 +29,7 @@ library
                        BDCS.Projects,
                        BDCS.ReqType,
                        BDCS.Requirements,
+                       BDCS.Scripts,
                        BDCS.Signatures,
                        BDCS.Sources,
                        BDCS.RPM.Builds,
@@ -32,6 +37,7 @@ library
                        BDCS.RPM.Groups,
                        BDCS.RPM.Projects,
                        BDCS.RPM.Requirements,
+                       BDCS.RPM.Scripts,
                        BDCS.RPM.Signatures,
                        BDCS.RPM.Sources,
                        BDCS.RPM.Utils,
@@ -73,6 +79,12 @@ library
                        xml-conduit
   other-modules:       Paths_db
   default-language:    Haskell2010
+
+  if flag(scripts)
+    cpp-options:       -Wall -DSCRIPTS
+    cc-options:        "-DSCRIPTS"
+  else
+    cpp-options:       -Wall
 
 executable import
   main-is:             import.hs
