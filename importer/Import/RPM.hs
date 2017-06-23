@@ -13,6 +13,7 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -46,12 +47,14 @@ import BDCS.Exceptions(DBException(..), throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
+import BDCS.Scripts(insertScript)
 import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
 import BDCS.RPM.Builds(mkBuild)
 import BDCS.RPM.Files(mkFiles)
 import BDCS.RPM.Groups(createGroup)
 import BDCS.RPM.Projects(mkProject)
+import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromURI)
@@ -122,9 +125,17 @@ unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
     void $ associateFilesWithPackage filesIds pkgNameId
     void $ associateBuildWithPackage buildId pkgNameId
 
+#ifdef SCRIPTS
     -- groups and reqs
-    -- groupId <- createGroup filesIds tagHeaders
+    groupId <- createGroup filesIds tagHeaders
+
+    -- scripts - These are here temporarily, just so we can figure out how widely they are
+    -- used.  Once we are done, they are going away.
+    mapM_ (insertScript groupId) (mkScripts tagHeaders ++ mkTriggerScripts tagHeaders)
+#else
     void $ createGroup filesIds tagHeaders
+#endif
+
     return True
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
