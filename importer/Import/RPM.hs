@@ -37,7 +37,8 @@ import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
-import           GI.OSTree(IsRepo)
+import           GI.Gio(noCancellable)
+import           GI.OSTree(IsRepo, repoRegenerateSummary)
 import           Network.URI(URI(..))
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
@@ -93,6 +94,8 @@ unsafeConsume repo db rpm@RPM{..} = do
    checksum <- withTransaction repo $ \r -> do
        f <- store r rpmArchive
        commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+
+   repoRegenerateSummary repo Nothing noCancellable
 
    checksums <- execStateT (commitContents repo checksum) []
    loadIntoMDDB db rpm checksums
