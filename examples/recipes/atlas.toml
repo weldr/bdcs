@@ -1,0 +1,14 @@
+name = "atlas"
+description = "Automatically Tuned Linear Algebra Software"
+
+[[modules]]
+name = "atlas"
+version = "3.10.*"
+
+[[modules]]
+name = "lapack"
+version = "3.4.*"
+
+[[modules]]
+name = "blas"
+version = "3.4.*"
