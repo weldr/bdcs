@@ -18,6 +18,8 @@ addons:
     - e2fslibs-dev
     - libgpgme-dev
     - libfuse-dev
+    # used for testing
+    - realpath
 
 before_install:
   # latest libostree-dev isn't available in Ubuntu yet so build it from source
@@ -38,9 +40,14 @@ script:
     cabal build && cabal test --show-details=always
 
   # test binaries
-  - ./tests/test_depclose.sh
   - ./tests/test_import.sh
   - ./tests/test_export.sh
+
+  # depclose tests
+  - wget https://s3.amazonaws.com/atodorov/metadata_centos7.db.gz
+  - gunzip ./metadata_centos7.db.gz
+  - pip install -r ./tests/requirements.txt
+  - METADATA_DB=`realpath ./metadata_centos7.db` ./tests/test_depclose.sh
 
   # collect coverage data from binaries
   - mkdir ./dist/hpc/vanilla/tix/depclose/ ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
