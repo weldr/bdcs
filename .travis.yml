@@ -37,9 +37,21 @@ script:
     cabal configure --enable-tests --enable-coverage &&
     cabal build && cabal test --show-details=always
 
+  # test binaries
+  - ./tests/test_depclose.sh
+  - ./tests/test_import.sh
+  - ./tests/test_export.sh
+
+  # collect coverage data from binaries
+  - mkdir ./dist/hpc/vanilla/tix/depclose/ ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
+  - mv depclose.tix ./dist/hpc/vanilla/tix/depclose/
+  - mv import.tix ./dist/hpc/vanilla/tix/import/
+  - mv export.tix ./dist/hpc/vanilla/tix/export/
+
+
 after_success:
   - cabal install hpc-coveralls
-  - ~/.cabal/bin/hpc-coveralls --display-report test-db
+  - ~/.cabal/bin/hpc-coveralls --display-report test-db depclose import export
 
 notifications:
   email:
