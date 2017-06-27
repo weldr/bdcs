@@ -16,6 +16,7 @@ module BDCS.CS(ChecksumMap,
                objectToTarEntry,
                open,
                store,
+               storeDirectory,
                withTransaction)
  where
 
@@ -211,6 +212,15 @@ store repo content =
 
         repoWriteArchiveToMtree repo archive mtree Nothing True noCancellable
         repoWriteMtree repo mtree noCancellable
+
+-- Same as store, but takes a path to a directory to import
+storeDirectory :: IsRepo a => a -> FilePath -> IO File
+storeDirectory repo path = do
+    importFile <- fileNewForPath path
+    mtree <- mutableTreeNew
+
+    repoWriteDirectoryToMtree repo importFile mtree Nothing noCancellable
+    repoWriteMtree repo mtree noCancellable
 
 -- Given an open ostree repo and a checksum, read an object from the content store.
 -- The checksums stored in the mddb can be either dirmeta objects, which will contain

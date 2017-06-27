@@ -17,8 +17,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
-import           Control.Conditional(cond, ifM, whenM)
-import           Control.Monad(when)
+import           Control.Conditional(cond, ifM)
+import           Control.Monad(unless, when)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit(Consumer, (.|), runConduit)
@@ -26,7 +26,7 @@ import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
 import           Database.Persist.Sqlite(runSqlite)
-import           System.Directory(doesFileExist, removeFile)
+import           System.Directory(doesFileExist, removePathForcibly)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
@@ -37,6 +37,7 @@ import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
 import qualified Export.Directory as Directory
 import qualified Export.Qcow2 as Qcow2
+import qualified Export.Ostree as Ostree
 import qualified Export.Tar as Tar
 import           Export.Utils(runHacks, runTmpfiles)
 import           Utils.Either(whenLeft)
@@ -59,6 +60,7 @@ usage = do
     putStrLn "dest can be:"
     putStrLn "\t* A directory (which may or may not already exist)"
     putStrLn "\t* The name of a .tar file to be created"
+    putStrLn "\t* A directory ending in .repo, which will create a new ostree repo"
     putStrLn "thing can be:"
     putStrLn "\t* The NEVRA of an RPM, e.g. filesystem-3.2-21.el7.x86_64"
     putStrLn "\t* A path to a file containing NEVRA of RPMs, 1 per line."
@@ -69,6 +71,12 @@ needFilesystem :: IO ()
 needFilesystem = do
     printVersion "export"
     putStrLn "ERROR: The tar needs to have the filesystem package included"
+    exitFailure
+
+needKernel :: IO ()
+needKernel = do
+    printVersion "export"
+    putStrLn "ERROR: ostree exports need a kernel package included"
     exitFailure
 
 {-# ANN main ("HLint: ignore Use head" :: String) #-}
@@ -87,8 +95,12 @@ main = do
     when (length match < 1) needFilesystem
     let things = map T.pack $ match !! 0 : otherThings
 
+    when (".repo" `isSuffixOf` out_path) $
+        unless (any ("kernel-" `T.isPrefixOf`) things) needKernel
+
     let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (cleanupHandler out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
                                       (".qcow2" `isSuffixOf` out_path, (cleanupHandler out_path, Qcow2.qcow2Sink out_path)),
+                                      (".repo" `isSuffixOf` out_path,  (cleanupHandler out_path, Ostree.ostreeSink out_path)),
                                       (otherwise,                      (print, directoryOutput out_path))]
 
     result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
@@ -108,5 +120,4 @@ main = do
         liftIO $ runHacks path
 
     cleanupHandler :: Show a => FilePath -> a -> IO ()
-    cleanupHandler path e = print e >>
-        whenM (doesFileExist path) (removeFile path)
+    cleanupHandler path e = print e >> removePathForcibly path
