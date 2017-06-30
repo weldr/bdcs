@@ -34,7 +34,6 @@ before_install:
 
 script:
   - cd importer/ && ~/.cabal/bin/hlint . && cd ../
-  - cd haskell-rpm/ && cabal install && cabal clean && cd ../
   - cd importer/ && cabal install --dependencies-only --enable-tests &&
     cabal configure --enable-tests --enable-coverage &&
     cabal build && cabal test --show-details=always
