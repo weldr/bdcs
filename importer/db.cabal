@@ -59,6 +59,7 @@ library
 
   build-depends:       base >=4.9 && <5.0,
                        bytestring,
+                       codec-rpm >= 0.1.1 && < 0.2,
                        cond,
                        containers,
                        conduit >= 1.2.8,
@@ -78,7 +79,6 @@ library
                        persistent-sqlite,
                        persistent-template,
                        resourcet,
-                       rpm >= 1,
                        temporary,
                        text,
                        time,
@@ -163,8 +163,8 @@ Test-Suite test-db
 
   build-depends:       hspec,
                        base >= 4.8 && < 5.0,
+                       codec-rpm >= 0.1.1 && < 0.2,
                        persistent,
-                       db,
-                       rpm >= 1
+                       db
 
   default-language:    Haskell2010
