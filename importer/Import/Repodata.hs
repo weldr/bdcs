@@ -32,7 +32,7 @@ import           Data.Conduit((.|), runConduitRes)
 import           Data.Data(Typeable)
 import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
-import           Network.URI(URI)
+import           Network.URI(URI(..))
 import           Text.XML(Document, sinkDoc)
 import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
@@ -75,6 +75,15 @@ extractType doc dataType = let
 fetchAndParse :: (MonadThrow m, MonadIO m, MonadBaseControl IO m) => URI -> m Document
 fetchAndParse uri = runConduitRes $ getFromURI uri .| ungzipIfCompressed .| sinkDoc def
 
+addSlash :: URI -> URI
+addSlash u = let
+      path = uriPath u
+  in
+      if last path /= '/' then
+        u { uriPath = path ++ "/" }
+      else
+        u
+
 loadRepoFromURI :: URI -> ReaderT ImportState IO ()
 loadRepoFromURI uri = do
     -- Fetch and parse repomd.xml
@@ -94,7 +103,7 @@ loadRepoFromURI uri = do
 
  where
     appendOrThrow :: T.Text -> URI
-    appendOrThrow path = appendURI uri (T.unpack path) `throwIfNothing` RepoException
+    appendOrThrow path = appendURI (addSlash uri) (T.unpack path) `throwIfNothing` RepoException
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI metadataURI = do
