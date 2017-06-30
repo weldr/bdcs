@@ -18,13 +18,13 @@
 module BDCS.RPM.ProjectsSpec(spec)
  where
 
+import Codec.RPM.Tags(Tag(..))
 import Control.Exception(evaluate)
 import Test.Hspec
 
 import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..))
 import BDCS.RPM.Projects(mkProject)
-import RPM.Tags(Tag(..))
 
 spec :: Spec
 spec = describe "BDCS.RPM.Projects Tests" $ do

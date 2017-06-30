@@ -26,6 +26,9 @@ module Import.RPM(consume,
                   rpmExistsInMDDB)
  where
 
+import           Codec.RPM.Parse(parseRPMC)
+import           Codec.RPM.Tags
+import           Codec.RPM.Types
 import           Control.Conditional(ifM)
 import           Control.Monad(void)
 import           Control.Monad.Except(runExceptT)
@@ -61,9 +64,6 @@ import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromURI)
 import Import.State(ImportState(..))
-import RPM.Parse(parseRPMC)
-import RPM.Tags
-import RPM.Types
 
 buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
 buildImported sigs =

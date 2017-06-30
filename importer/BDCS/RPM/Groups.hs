@@ -19,6 +19,7 @@
 module BDCS.RPM.Groups(createGroup)
  where
 
+import           Codec.RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
 import           Control.Monad(forM_, void, when)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Bits(testBit)
@@ -33,7 +34,6 @@ import           BDCS.KeyType
 import           BDCS.Requirements(insertGroupRequirement, insertRequirement)
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Requirements(mkGroupRequirement, mkRequirement)
-import           RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
 
 addPRCO :: MonadIO m => [Tag] -> Key Groups -> T.Text -> T.Text -> SqlPersistT m ()
 addPRCO tags groupId tagBase keyName =

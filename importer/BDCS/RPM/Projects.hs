@@ -18,13 +18,13 @@
 module BDCS.RPM.Projects(mkProject)
  where
 
+import           Codec.RPM.Tags(Tag, findByteStringTag, findStringTag)
 import           Data.List(elemIndices)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 
 import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..), throwIfNothingOtherwise)
-import RPM.Tags(Tag, findByteStringTag, findStringTag)
 
 mkProject :: [Tag] -> Projects
 mkProject tags = let

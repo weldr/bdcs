@@ -19,13 +19,13 @@ module BDCS.RPM.Signatures(mkRSASignature,
                            mkSHASignature)
  where
 
+import           Codec.RPM.Tags(Tag, findTag, tagValue)
 import qualified Data.ByteString as BS
 import           Data.ByteString.Char8(pack)
 import           Database.Esqueleto
 
 import BDCS.DB(Builds, BuildSignatures(..))
 import BDCS.Exceptions(DBException(..), throwIfNothing)
-import RPM.Tags(Tag, findTag, tagValue)
 
 mkRSASignature :: [Tag] -> Key Builds -> BuildSignatures
 mkRSASignature tags buildId = let
