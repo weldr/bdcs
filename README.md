@@ -1,9 +1,6 @@
 [![Build Status](https://travis-ci.org/weldr/bdcs.svg?branch=master)](https://travis-ci.org/weldr/bdcs)
 [![Coverage Status](https://coveralls.io/repos/github/weldr/bdcs/badge.svg?branch=master)](https://coveralls.io/github/weldr/bdcs?branch=master)
 
-This code requires haskell-rpm which is a separate git repo, but is also
-a subtree in this git repo.  So you don't really need to go get it separately.
-
 This code generates a metadata database (mddb) given an input directory of
 RPMs.  You can generate this either by running locally or running under docker.
 It's really best if you have the RPMs stored locally, too, not under some NFS
@@ -25,7 +22,6 @@ is the $PWD/Packages directory.  Then run:
 ```
 $ cd importer
 $ cabal sandbox init
-$ cabal sandbox add-source ../haskell-rpm
 $ cabal install --dependencies-only --enable-tests
 $ cabal build
 $ sqlite3 metadata.db < ../schema.sql
@@ -83,7 +79,6 @@ Building the project locally
 `cabal` is used to install and manage Haskell dependencies from upstream.
 
 ```
-$ cd haskell-rpm/ && cabal sandbox init && cabal install
 $ cd importer/ && cabal sandbox init && cabal install
 ```
 
