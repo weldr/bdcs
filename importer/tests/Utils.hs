@@ -14,11 +14,50 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 --
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-module Utils(fakeKey)
+module Utils(fakeKey,
+             withDb)
  where
 
-import Database.Persist.Sql(Key, SqlBackend, ToBackendKey, toSqlKey)
+import Control.Monad(void)
+import Control.Monad.IO.Class(MonadIO)
+import Control.Monad.Trans.Resource(MonadBaseControl, MonadResource, ResourceT)
+import Control.Monad.Logger(NoLoggingT)
+import Database.Persist.Sql(Key, SqlBackend, SqlPersistT, ToBackendKey, insertKey, runMigrationSilent, toSqlKey)
+import Database.Persist.Sqlite(runSqlite)
+
+import BDCS.DB
+import BDCS.GroupKeyValue
+import BDCS.KeyType
+
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 fakeKey :: ToBackendKey SqlBackend a => Key a
 fakeKey = toSqlKey 0    
+
+-- Run a database action within an in-memory test database
+withDb :: (MonadBaseControl IO m, MonadIO m) => SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
+withDb action = runSqlite ":memory:" (initDb >> action)
+ where
+    initDb :: (MonadBaseControl IO m, MonadIO m) => SqlPersistT m ()
+    initDb = do
+        void $ runMigrationSilent migrateAll
+
+        -- For nevraToGroupId:
+        -- hasEpoch-7:1.0-1.el7.x86_64
+        let gid_1 = toSqlKey 1
+        insertKey gid_1 $ Groups "hasEpoch" "rpm"
+        void $ insertGroupKeyValue (TextKey "name")    "hasEpoch" Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "epoch")   "7"        Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "release") "1.el7"    Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "arch")    "x86_64"   Nothing gid_1
+
+        -- noEpoch-1.0-1.el7.x86_64
+        let gid_2 = toSqlKey 2
+        insertKey gid_2 $ Groups "noEpoch" "rpm"
+        void $ insertGroupKeyValue (TextKey "name")    "noEpoch"  Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "release") "1.el7"    Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "arch")    "x86_64"   Nothing gid_2
