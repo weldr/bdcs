@@ -89,12 +89,10 @@ Executing unit tests
     $ cabal sandbox init
     $ cabal install --dependencies-only --enable-tests
     $ cabal test
-    Preprocessing library rpm-1...
-    Preprocessing test suite 'tests' for rpm-1...
     Running 1 test suites...
     Test suite tests: RUNNING...
     Test suite tests: PASS
-    Test suite logged to: dist/test/rpm-1-tests.log
+    Test suite logged to: dist/test/db-0.1.0.0-test-db.log
     1 of 1 test suites (1 of 1 test cases) passed.
 
 Produce code coverage report
