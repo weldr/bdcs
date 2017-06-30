@@ -18,6 +18,7 @@
 module BDCS.RPM.Files(mkFiles)
  where
 
+import           Codec.RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.List(zip4)
 import           Data.Maybe(fromMaybe)
@@ -27,7 +28,6 @@ import           Database.Esqueleto
 import           System.FilePath.Posix((</>))
 
 import BDCS.DB
-import RPM.Tags(Tag, findStringListTag, findTag, tagValue)
 
 type FileTuple = (T.Text, T.Text, T.Text, Int)
 

@@ -19,6 +19,7 @@ module BDCS.RPM.Scripts(mkScripts,
                         mkTriggerScripts)
  where
 
+import Codec.RPM.Tags(Tag, findStringListTag, findTag, findWord32ListTag, tagValue)
 import Data.List(zip6)
 import Data.Maybe(catMaybes)
 import Data.Text(pack)
@@ -26,7 +27,6 @@ import Database.Esqueleto
 
 import BDCS.DB(Scripts(..))
 import BDCS.Exceptions(DBException(..), throwIfNothing)
-import RPM.Tags(Tag, findStringListTag, findTag, findWord32ListTag, tagValue)
 
 mkScripts :: [Tag] -> [Scripts]
 mkScripts tags = catMaybes [

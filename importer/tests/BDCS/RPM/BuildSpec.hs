@@ -16,13 +16,13 @@
 module BDCS.RPM.BuildSpec(spec)
  where
 
+import Codec.RPM.Tags(Tag(..))
 import Control.Exception(evaluate)
 import Test.Hspec
 
 import BDCS.DB(Builds(..))
 import BDCS.Exceptions(DBException(..))
 import BDCS.RPM.Builds(mkBuild)
-import RPM.Tags(Tag(..))
 
 import Utils(fakeKey)
 

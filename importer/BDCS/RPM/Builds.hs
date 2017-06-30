@@ -18,6 +18,7 @@
 module BDCS.RPM.Builds(mkBuild)
  where
 
+import           Codec.RPM.Tags(Tag, findStringTag, findStringListTag, findTag, tagValue)
 import           Data.ByteString.Char8(pack)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
@@ -26,7 +27,6 @@ import           Database.Esqueleto(Key)
 
 import BDCS.DB(Builds(..), Sources)
 import BDCS.Exceptions(DBException(..), throwIfNothing)
-import RPM.Tags(Tag, findStringTag, findStringListTag, findTag, tagValue)
 
 mkBuild :: [Tag] -> Key Sources -> Builds
 mkBuild tags sourceId = let

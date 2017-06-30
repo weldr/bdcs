@@ -18,12 +18,12 @@
 module BDCS.RPM.Sources(mkSource)
  where
 
+import           Codec.RPM.Tags(Tag, findStringTag)
 import           Database.Esqueleto(Key)
 import qualified Data.Text as T
 
 import BDCS.DB(Projects, Sources(..))
 import BDCS.Exceptions(DBException(..), throwIfNothing)
-import RPM.Tags(Tag, findStringTag)
 
 mkSource :: [Tag] -> Key Projects -> Sources
 mkSource tags projectId = let
