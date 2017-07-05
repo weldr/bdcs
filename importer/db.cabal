@@ -45,6 +45,7 @@ library
                        BDCS.RPM.Utils,
                        BDCS.Version,
                        Export.Directory,
+                       Export.Qcow2,
                        Export.Tar,
                        Import.Comps,
                        Import.Conduit,
@@ -78,6 +79,7 @@ library
                        network-uri,
                        persistent-sqlite,
                        persistent-template,
+                       process,
                        resourcet,
                        tar,
                        temporary,
@@ -120,10 +122,8 @@ executable export
                        base >= 4.9 && < 5.0,
                        cond,
                        conduit >= 1.2.8,
-                       conduit-extra,
                        directory,
                        mtl >= 2.2.1,
-                       persistent,
                        persistent-sqlite,
                        text
 

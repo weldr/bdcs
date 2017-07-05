@@ -17,7 +17,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
-import           Control.Conditional(ifM, whenM)
+import           Control.Conditional(cond, ifM, whenM)
 import           Control.Monad(when)
 import           Control.Monad.Except(runExceptT)
 import           Data.Conduit((.|), runConduit)
@@ -34,6 +34,7 @@ import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
 import qualified Export.Directory as Directory
+import qualified Export.Qcow2 as Qcow2
 import qualified Export.Tar as Tar
 import           Utils.Either(whenLeft)
 import           Utils.Monad(concatMapM)
@@ -83,9 +84,9 @@ main = do
     when (length match < 1) needFilesystem
     let things = map T.pack $ match !! 0 : otherThings
 
-    let (handler, objectSink) = if ".tar" `isSuffixOf` out_path
-            then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), CS.objectToTarEntry .| Tar.tarSink out_path)
-            else (print, Directory.directorySink out_path)
+    let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (cleanupHandler out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
+                                      (".qcow2" `isSuffixOf` out_path, (cleanupHandler out_path, Qcow2.qcow2Sink out_path)),
+                                      (otherwise,                      (print, Directory.directorySink out_path))]
 
     result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
         .| getGroupIdC
@@ -94,3 +95,7 @@ main = do
         .| objectSink
 
     whenLeft result handler
+ where
+    cleanupHandler :: Show a => FilePath -> a -> IO ()
+    cleanupHandler path e = print e >>
+        whenM (doesFileExist path) (removeFile path)
