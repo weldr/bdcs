@@ -42,22 +42,15 @@ script:
   - ./tests/test_import.sh
   - ./tests/test_export.sh
 
-  # depclose tests
-  - wget https://s3.amazonaws.com/atodorov/metadata_centos7.db.gz
-  - gunzip ./metadata_centos7.db.gz
-  - pip install -r ./tests/requirements.txt
-  - METADATA_DB=`realpath ./metadata_centos7.db` ./tests/test_depclose.sh
-
   # collect coverage data from binaries
-  - mkdir ./dist/hpc/vanilla/tix/depclose/ ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
-  - mv depclose.tix ./dist/hpc/vanilla/tix/depclose/
+  - mkdir ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
   - mv import.tix ./dist/hpc/vanilla/tix/import/
   - mv export.tix ./dist/hpc/vanilla/tix/export/
 
 
 after_success:
   - cabal install hpc-coveralls
-  - ~/.cabal/bin/hpc-coveralls --display-report test-db depclose import export
+  - ~/.cabal/bin/hpc-coveralls --display-report test-db import export
 
 notifications:
   email:
