@@ -7,10 +7,6 @@ cabal-version:       >=1.10
 license:             LGPL
 license-file:        LICENSE
 
-flag debug
-  description:       Enable debugging spew
-  default:           False
-
 flag scripts
   description:       Enable importing package scripts to the database
   default:           False
