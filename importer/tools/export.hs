@@ -22,7 +22,7 @@
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional(ifM, whenM)
-import           Control.Monad(unless, void, when)
+import           Control.Monad(unless, when)
 import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans(lift)
@@ -32,12 +32,10 @@ import           Data.ByteString.Lazy(writeFile)
 import           Data.Conduit((.|), Conduit, Consumer, Producer, await, runConduit, yield)
 import           Data.Conduit.Binary(sinkFile, sinkLbs)
 import qualified Data.Conduit.List as CL
-import           Data.List(inits, isSuffixOf, isPrefixOf, partition)
-import qualified Data.Map as Map
+import           Data.List(isSuffixOf, isPrefixOf, partition)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import           Data.Tree(Forest, Tree(..), unfoldTree)
 import           Database.Persist.Sql(SqlPersistT)
 import           Database.Persist.Sqlite(runSqlite)
 import           Prelude hiding(writeFile)
@@ -142,98 +140,12 @@ tarSink out_path = do
     entries <- CL.consume
     liftIO $ writeFile out_path (Tar.write entries)
 
--- Write to a directory in two passes: first, write the files, creating directories
--- as needed. This way the current user will be able to write files to the new
--- directories and not have to worry about, for instance, /usr/bin being 0555.
--- After the files are done, arrange the directory entries into a tree and
--- apply permissions depth-first, post-order so that we don't lock ourselves
--- out of higher nodes.
 directorySink :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
-directorySink outPath = do
-    directoryPairs <- processFiles .| CL.consume
-
-    -- Arrange the paths into a tree
-    let directoryPaths = map (filesPath . fst) directoryPairs
-    let directoryTree = foldl addPathToTree (Node "/" []) directoryPaths
-
-    -- Create a map from the path to the (Files, Object) pair
-    let directoryMap = foldl (\acc pair@(f, _) -> Map.insert (filesPath f) pair acc) Map.empty directoryPairs
-
-    -- Walk the tree and apply the directory permissions
-    liftIO $ walkTreeM_ (\path -> case Map.lookup path directoryMap of
-                            Just (f, metadata) -> checkoutDir f metadata
-                            -- Warn about directories in the tree but not the map, this means that there
-                            -- this is no package owning a parent of something in a recipe, which could
-                            -- be a bug in the recipe
-                            Nothing -> putStrLn $ "No metadata found for " ++ show path ++
-                                                    ", this may be due to a package missing from a recipe."
-                        )
-                        directoryTree
+directorySink outPath = await >>= \case
+    Nothing                         -> return ()
+    Just (f, CS.DirMeta dirmeta)    -> liftIO (checkoutDir f dirmeta)  >> directorySink outPath
+    Just (f, CS.FileObject fileObj) -> liftIO (checkoutFile f fileObj) >> directorySink outPath
  where
-    walkTreeM_ :: Monad m => (a -> m b) -> Tree a -> m ()
-    walkTreeM_ action Node{subForest=[], ..} = void $ action rootLabel
-    walkTreeM_ action Node{..} = do
-        -- traverse over the children first
-        mapM_ (walkTreeM_ action) subForest
-
-        -- Act on this one
-        void $ action rootLabel
-
-    -- If it's a file, write the file and continue
-    -- If it's a directory, pass it downstream
-    processFiles :: MonadIO m => Conduit (Files, CS.Object) m (Files, CS.Metadata)
-    processFiles = await >>= \case
-        Nothing                         -> return ()
-        Just (f, CS.DirMeta dirmeta)    -> yield (f, dirmeta)              >> processFiles
-        Just (f, CS.FileObject fileObj) -> liftIO (checkoutFile f fileObj) >> processFiles
-
-    addPathToTree :: Tree T.Text -> T.Text -> Tree T.Text
-    -- All paths start with a /, and we already seeded the root of the tree with a / node,
-    -- so skip the head of the list returned by splitPath
-    addPathToTree tree path = addPathToTree' tree (tail $ splitPath path)
-     where
-        addPathToTree' :: Tree T.Text -> [T.Text] -> Tree T.Text
-        addPathToTree' t [] = t
-        addPathToTree' Node{..} p@(x:rest) =
-            case findRoot [] subForest x of
-                -- There is no node for this path element, so unfold the rest of the path into a new branch
-                (Nothing, _)      -> Node rootLabel (unfoldTree pathToBranch p:subForest)
-                -- Existing node, replace it with the recursive result
-                (Just n, notPath) -> Node rootLabel (addPathToTree' n rest:notPath)
-
-        -- for example, /usr/share/whatever becomes [/, /usr, /usr/share, /usr/share/whatever]
-        splitPath :: T.Text -> [T.Text]
-        splitPath p = let
-            -- split into ["", "usr", "share", "whatever"]
-            bases = T.splitOn "/" p
-
-            -- inits will expand into [[], [""], ["", "usr"], ...]
-            -- drop the empty list at the front
-            pathLists = tail $ inits bases
-
-            -- put the lists of path components back together
-            paths = map (T.intercalate "/") pathLists
-         in
-            -- intercalate leaves the empty path component at the front as "", but it doesn't really matter,
-            -- we're going to ignore it anyway.
-            paths
-
-        -- helper for unfoldTree. Creates a node for the first path element and returns the
-        -- remainder as a single child.
-        pathToBranch :: [T.Text] -> (T.Text, [[T.Text]])
-        pathToBranch pathList = let rest = tail pathList in
-            (head pathList,
-             if null rest then [] else [rest])
-
-        -- Kind of like partition, returns (is thing, not thing), but stops at the first thing found
-        findRoot :: Eq a => Forest a -> Forest a -> a -> (Maybe (Tree a), [Tree a])
-        findRoot acc [] _ = (Nothing, acc)
-        findRoot acc (n@Node{..}:rest) thing =
-            if thing == rootLabel then
-                (Just n, acc ++ rest)
-            else
-                findRoot (n:acc) rest thing
-
     checkoutDir :: Files -> CS.Metadata -> IO ()
     checkoutDir f@Files{..} metadata = do
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
@@ -247,7 +159,6 @@ directorySink outPath = do
     checkoutFile f@Files{..} CS.FileContents{..} = do
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
-        -- TODO: set permissions to something not globally readable?
         createDirectoryIfMissing True $ takeDirectory fullPath
 
         -- Write the data or the symlink, depending

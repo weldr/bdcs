@@ -113,7 +113,6 @@ executable export
                        cond,
                        conduit >= 1.2.8,
                        conduit-extra,
-                       containers,
                        directory,
                        filepath,
                        gi-gio,
