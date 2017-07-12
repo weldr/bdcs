@@ -7,6 +7,9 @@ cabal-version:       >=1.10
 license:             LGPL
 license-file:        LICENSE
 
+data-dir:            data
+data-files:          sysusers-default.conf
+
 flag scripts
   description:       Enable importing package scripts to the database
   default:           False
@@ -81,6 +84,7 @@ library
                        persistent-template,
                        process,
                        resourcet,
+                       split,
                        tar,
                        temporary,
                        text,
