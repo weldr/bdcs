@@ -21,14 +21,18 @@ module Export.Qcow2(qcow2Sink)
 import Control.Monad.IO.Class(MonadIO, liftIO)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
-import System.Directory(removePathForcibly)
-import System.FilePath(takeDirectory)
+import Data.List(intercalate)
+import Data.List.Split(splitOn)
+import System.Directory(createDirectoryIfMissing, removePathForcibly, renameFile)
+import System.FilePath((</>), takeDirectory)
 import System.IO.Temp(createTempDirectory)
 import System.Process(callProcess)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
+
+import Paths_db(getDataFileName)
 
 qcow2Sink :: (MonadResource m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =
@@ -42,6 +46,33 @@ qcow2Sink outPath =
             -- Run the sink to create a directory export
             directorySink tmpDir
 
+            -- Make the direcotry export something usable, hopefully
+            liftIO $ runHacks tmpDir
+
             -- Run virt-make-fs to generate the qcow2
             liftIO $ callProcess "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
         )
+ where
+    runHacks :: FilePath -> IO ()
+    runHacks exportPath = do
+        -- set a root password
+        -- pre-crypted from "redhat"
+        shadowRecs <- map (splitOn ":") <$> lines <$> readFile (exportPath </> "etc" </> "shadow")
+        let newRecs = map (\rec -> if head rec == "root" then
+                                    ["root", "$6$3VLMX3dyCGRa.JX3$RpveyimtrKjqcbZNTanUkjauuTRwqAVzRK8GZFkEinbjzklo7Yj9Z6FqXNlyajpgCdsLf4FEQQKH6tTza35xs/"] ++ drop 2 rec
+                                   else
+                                    rec) shadowRecs
+        writeFile (exportPath </> "etc" </> "shadow.new") (unlines $ map (intercalate ":") newRecs)
+        renameFile (exportPath </> "etc" </> "shadow.new") (exportPath </> "etc" </> "shadow")
+
+        -- create an empty machine-id
+        writeFile (exportPath </> "etc" </> "machine-id") ""
+
+        -- Install a sysusers.d config file, and run systemd-sysusers to implement it
+        let sysusersDir = exportPath </> "usr" </> "lib" </> "sysusers.d"
+        createDirectoryIfMissing True sysusersDir
+        getDataFileName "sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
+        callProcess "systemd-sysusers" ["--root", exportPath]
+
+        -- Create a fstab stub
+        writeFile (exportPath </> "etc" </> "fstab") "LABEL=composer / ext2 defaults 0 0"
