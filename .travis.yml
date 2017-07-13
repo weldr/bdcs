@@ -23,9 +23,8 @@ addons:
 
 before_install:
   # latest libostree-dev isn't available in Ubuntu yet so build it from source
-  - wget https://github.com/ostreedev/ostree/releases/download/v2017.6/libostree-2017.6.tar.xz
-  - tar -xJvf ./libostree-2017.6.tar.xz
-  - cd ./libostree-2017.6 && env NOCONFIGURE=1 ./autogen.sh && ./configure --prefix=/usr && make && sudo make install && cd ../
+  - git clone --recurse-submodules --branch v2017.8 --depth 1 https://github.com/ostreedev/ostree.git
+  - cd ./ostree && env NOCONFIGURE=1 ./autogen.sh && ./configure --prefix=/usr && make && sudo make install && cd ../
 
   - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
