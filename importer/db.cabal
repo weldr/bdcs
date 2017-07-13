@@ -44,6 +44,8 @@ library
                        BDCS.RPM.Sources,
                        BDCS.RPM.Utils,
                        BDCS.Version,
+                       Export.Directory,
+                       Export.Tar,
                        Import.Comps,
                        Import.Conduit,
                        Import.RPM,
@@ -81,6 +83,7 @@ library
                        temporary,
                        text,
                        time,
+                       unix,
                        xml-conduit
 
   pkgconfig-depends:   ostree-1 >= 2017.8
@@ -115,22 +118,14 @@ executable export
 
   build-depends:       db,
                        base >= 4.9 && < 5.0,
-                       bytestring >= 0.10 && < 0.11,
                        cond,
                        conduit >= 1.2.8,
                        conduit-extra,
                        directory,
-                       filepath,
-                       gi-gio,
-                       gi-ostree,
                        mtl >= 2.2.1,
                        persistent,
                        persistent-sqlite,
-                       resourcet,
-                       tar,
-                       text,
-                       time,
-                       unix
+                       text
 
   default-language:    Haskell2010
 
