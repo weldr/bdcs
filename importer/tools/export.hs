@@ -22,18 +22,16 @@
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional(ifM, whenM)
-import           Control.Monad(unless, when)
+import           Control.Monad(when)
 import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource, runResourceT)
-import           Data.ByteString(ByteString)
+import           Control.Monad.Trans.Resource(MonadBaseControl, runResourceT)
 import           Data.ByteString.Lazy(writeFile)
-import           Data.Conduit((.|), Conduit, Consumer, Producer, await, runConduit, yield)
+import           Data.Conduit((.|), Conduit, Consumer, await, runConduit, yield)
 import           Data.Conduit.Binary(sinkFile, sinkLbs)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
-import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           Database.Persist.Sql(SqlPersistT)
@@ -46,8 +44,6 @@ import           System.FilePath((</>), dropDrive, takeDirectory)
 import           System.Posix.Files(createSymbolicLink, setFileMode)
 import           System.Posix.Types(CMode(..))
 
-import           GI.Gio(IsInputStream, inputStreamReadBytes, noCancellable)
-import           GI.GLib(bytesGetData, bytesGetSize)
 import           GI.OSTree(IsRepo)
 
 import qualified BDCS.CS as CS
@@ -56,20 +52,9 @@ import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(nevraToGroupId)
 import           BDCS.RPM.Utils(splitFilename)
 import           BDCS.Version
-import           Utils.Conduit(awaitWith)
+import           Utils.Conduit(awaitWith, sourceInputStream)
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
-
--- Convert a GInputStream to a conduit source
-sourceInputStream :: (MonadResource m, IsInputStream i) => i -> Producer m ByteString
-sourceInputStream input = do
-    let buf_size = 8096
-    bytes <- liftIO $ inputStreamReadBytes input buf_size noCancellable
-    bytesSize <- liftIO $ bytesGetSize bytes
-    unless (bytesSize == 0) $ do
-        bytesData <- liftIO $ bytesGetData bytes
-        yield $ fromMaybe "" bytesData
-        sourceInputStream input
 
 getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
 getGroupIdC = awaitWith $ \thing ->
