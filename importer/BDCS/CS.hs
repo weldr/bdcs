@@ -2,6 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
 module BDCS.CS(ChecksumMap,
@@ -10,19 +11,26 @@ module BDCS.CS(ChecksumMap,
                FileContents(..),
                commit,
                commitContents,
+               filesToObjectsC,
                load,
+               objectToTarEntry,
                open,
                store,
                withTransaction)
  where
 
+import qualified Codec.Archive.Tar as Tar
+import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional((<&&>), condM, ifM, otherwiseM, whenM)
 import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(forM_)
-import           Control.Monad.Except(MonadError, throwError)
+import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.State(StateT, lift, modify)
+import           Control.Monad.Trans.Resource(runResourceT)
 import qualified Data.ByteString as BS
+import           Data.Conduit((.|), Conduit, runConduit, yield)
+import           Data.Conduit.Binary(sinkLbs)
 import           Data.GI.Base.ManagedPtr(unsafeCastTo)
 import           Data.Maybe(isNothing)
 import qualified Data.Text as T
@@ -33,6 +41,11 @@ import           System.Directory(doesDirectoryExist)
 import           System.Endian(fromBE32)
 import           System.IO(hClose)
 import           System.IO.Temp(withSystemTempFile)
+import           System.Posix.Types(CMode(..))
+
+import BDCS.DB
+import Utils.Conduit(awaitWith, sourceInputStream)
+import Utils.Either(maybeToEither)
 
 -- A mapping from a file path to its checksum in an ostree repo.
 type ChecksumMap = [(T.Text, T.Text)]
@@ -117,6 +130,58 @@ commitContents repo commit = do
 
         path <- fileGetPath f
         return (fmap T.pack path, checksum)
+
+filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, Object)
+filesToObjectsC repo = awaitWith $ \f@Files{..} -> case filesCs_object of
+    Nothing       -> filesToObjectsC repo
+    Just checksum -> do
+        object <- load repo checksum
+        yield (f, object)
+        filesToObjectsC repo
+
+objectToTarEntry :: (MonadError String m, MonadIO m) => Conduit (Files, Object) m Tar.Entry
+objectToTarEntry = awaitWith $ \(f@Files{..}, obj) -> do
+    result <- case obj of
+            DirMeta dirmeta    -> return $ checkoutDir f dirmeta
+            FileObject fileObj -> liftIO . runExceptT $ checkoutFile f fileObj
+
+    either (\e -> throwError $ "Could not checkout out object " ++ T.unpack filesPath ++ ": " ++ e)
+           yield
+           result
+
+    objectToTarEntry
+ where
+    checkoutDir :: Files -> Metadata -> Either String Tar.Entry
+    checkoutDir f@Files{..} metadata@Metadata{..} = do
+        path <- Tar.toTarPath True (T.unpack filesPath)
+        return $ setMetadata f metadata (Tar.directoryEntry path)
+
+    checkoutSymlink :: Files -> Metadata -> T.Text -> Either String Tar.Entry
+    checkoutSymlink f@Files{..} metadata target = do
+        path'   <- Tar.toTarPath False (T.unpack filesPath)
+        target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ T.unpack target)
+                                 (Tar.toLinkTarget (T.unpack target))
+        return $ setMetadata f metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
+
+    checkoutFile :: Files -> FileContents -> ExceptT String IO Tar.Entry
+    checkoutFile f FileContents{symlink=Just target, ..} =
+        ExceptT $ return $ checkoutSymlink f metadata target
+    checkoutFile f@Files{..} FileContents{symlink=Nothing, contents=Just c, ..} = do
+        path         <- ExceptT $ return $ Tar.toTarPath False (T.unpack filesPath)
+        lazyContents <- runResourceT $ runConduit $ sourceInputStream c .| sinkLbs
+
+        return $ setMetadata f metadata (Tar.fileEntry path lazyContents)
+    -- TODO?
+    checkoutFile _ _ = throwError "Unhandled file type"
+
+    setMetadata :: Files -> Metadata -> Tar.Entry -> Tar.Entry
+    setMetadata Files{..} metadata entry =
+        entry { Tar.entryPermissions = CMode (mode metadata),
+                Tar.entryOwnership   = Tar.Ownership { Tar.ownerId = fromIntegral (uid metadata),
+                                                       Tar.groupId = fromIntegral (gid metadata),
+                                                       Tar.ownerName = "",
+                                                       Tar.groupName = "" },
+                Tar.entryTime = fromIntegral filesMtime }
 
 -- Open the named ostree repo.  If the repo does not already exist, it will first be created.
 -- It is created in Z2 mode because that can be modified without being root.
