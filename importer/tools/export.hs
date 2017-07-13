@@ -20,15 +20,14 @@
 {-# LANGUAGE RecordWildCards #-}
 
 import qualified Codec.Archive.Tar as Tar
-import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional(ifM, whenM)
 import           Control.Monad(when)
-import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
+import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(runResourceT)
 import           Data.ByteString.Lazy(writeFile)
-import           Data.Conduit((.|), Conduit, Consumer, await, runConduit, yield)
-import           Data.Conduit.Binary(sinkFile, sinkLbs)
+import           Data.Conduit((.|), Consumer, await, runConduit)
+import           Data.Conduit.Binary(sinkFile)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
@@ -42,68 +41,14 @@ import           System.FilePath((</>), dropDrive, takeDirectory)
 import           System.Posix.Files(createSymbolicLink, setFileMode)
 import           System.Posix.Types(CMode(..))
 
-import           GI.OSTree(IsRepo)
-
 import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
-import           Utils.Conduit(awaitWith, sourceInputStream)
-import           Utils.Either(maybeToEither, whenLeft)
+import           Utils.Conduit(sourceInputStream)
+import           Utils.Either(whenLeft)
 import           Utils.Monad(concatMapM)
-
-filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, CS.Object)
-filesToObjectsC repo = awaitWith $ \f@Files{..} -> case filesCs_object of
-    Nothing       -> filesToObjectsC repo
-    Just checksum -> do
-        object <- CS.load repo checksum
-        yield (f, object)
-        filesToObjectsC repo
-
-objectToTarEntry :: (MonadError String m, MonadIO m) => Conduit (Files, CS.Object) m Tar.Entry
-objectToTarEntry = awaitWith $ \(f@Files{..}, obj) -> do
-    result <- case obj of
-            CS.DirMeta dirmeta    -> return $ checkoutDir f dirmeta
-            CS.FileObject fileObj -> liftIO . runExceptT $ checkoutFile f fileObj
-
-    either (\e -> throwError $ "Could not checkout out object " ++ T.unpack filesPath ++ ": " ++ e)
-           yield
-           result
-
-    objectToTarEntry
- where
-    checkoutDir :: Files -> CS.Metadata -> Either String Tar.Entry
-    checkoutDir f@Files{..} metadata@CS.Metadata{..} = do
-        path <- Tar.toTarPath True (T.unpack filesPath)
-        return $ setMetadata f metadata (Tar.directoryEntry path)
-
-    checkoutSymlink :: Files -> CS.Metadata -> T.Text -> Either String Tar.Entry
-    checkoutSymlink f@Files{..} metadata target = do
-        path'   <- Tar.toTarPath False (T.unpack filesPath)
-        target' <- maybeToEither ("Path is too long or contains invalid characters: " ++ T.unpack target)
-                                 (Tar.toLinkTarget (T.unpack target))
-        return $ setMetadata f metadata (Tar.simpleEntry path' (Tar.SymbolicLink target'))
-
-    checkoutFile :: Files -> CS.FileContents -> ExceptT String IO Tar.Entry
-    checkoutFile f CS.FileContents{symlink=Just target, ..} =
-        ExceptT $ return $ checkoutSymlink f metadata target
-    checkoutFile f@Files{..} CS.FileContents{symlink=Nothing, contents=Just c, ..} = do
-        path         <- ExceptT $ return $ Tar.toTarPath False (T.unpack filesPath)
-        lazyContents <- runResourceT $ runConduit $ sourceInputStream c .| sinkLbs
-
-        return $ setMetadata f metadata (Tar.fileEntry path lazyContents)
-    -- TODO?
-    checkoutFile _ _ = throwError "Unhandled file type"
-
-    setMetadata :: Files -> CS.Metadata -> Tar.Entry -> Tar.Entry
-    setMetadata Files{..} metadata entry =
-        entry { Tar.entryPermissions = CMode (CS.mode metadata),
-                Tar.entryOwnership   = Tar.Ownership { Tar.ownerId = fromIntegral (CS.uid metadata),
-                                                       Tar.groupId = fromIntegral (CS.gid metadata),
-                                                       Tar.ownerName = "",
-                                                       Tar.groupName = "" },
-                Tar.entryTime = fromIntegral filesMtime }
 
 tarSink :: MonadIO m => FilePath -> Consumer Tar.Entry m ()
 tarSink out_path = do
@@ -196,13 +141,13 @@ main = do
     let things = map T.pack $ match !! 0 : otherThings
 
     let (handler, objectSink) = if ".tar" `isSuffixOf` out_path
-            then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), objectToTarEntry .| tarSink out_path)
+            then (\e -> print e >> whenM (doesFileExist out_path) (removeFile out_path), CS.objectToTarEntry .| tarSink out_path)
             else (print, directorySink out_path)
 
     result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
         .| getGroupIdC
         .| groupIdToFilesC
-        .| filesToObjectsC repo
+        .| CS.filesToObjectsC repo
         .| objectSink
 
     whenLeft result handler
