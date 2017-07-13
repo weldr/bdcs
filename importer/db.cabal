@@ -50,6 +50,7 @@ library
                        Import.Repodata,
                        Import.State,
                        Import.URI,
+                       Utils.Conduit,
                        Utils.Either,
                        Utils.Monad
 

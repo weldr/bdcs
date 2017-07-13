@@ -56,6 +56,7 @@ import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(nevraToGroupId)
 import           BDCS.RPM.Utils(splitFilename)
 import           BDCS.Version
+import           Utils.Conduit(awaitWith)
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
 
@@ -71,37 +72,30 @@ sourceInputStream input = do
         sourceInputStream input
 
 getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
-getGroupIdC = await >>= \case
-    Nothing    -> return ()
-    Just thing -> do
-        maybeId <- lift $ nevraToGroupId (splitFilename thing)
-        case maybeId of
-            Just gid -> yield gid >> getGroupIdC
-            Nothing  -> throwError $ "No such group " ++ T.unpack thing
+getGroupIdC = awaitWith $ \thing ->
+    lift (nevraToGroupId $ splitFilename thing) >>= \case
+        Just gid -> yield gid >> getGroupIdC
+        Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
 filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, CS.Object)
-filesToObjectsC repo = await >>= \case
-    Nothing        -> return ()
-    Just f@Files{..} -> case filesCs_object of
-        Nothing       -> filesToObjectsC repo
-        Just checksum -> do
-            object <- CS.load repo checksum
-            yield (f, object)
-            filesToObjectsC repo
+filesToObjectsC repo = awaitWith $ \f@Files{..} -> case filesCs_object of
+    Nothing       -> filesToObjectsC repo
+    Just checksum -> do
+        object <- CS.load repo checksum
+        yield (f, object)
+        filesToObjectsC repo
 
 objectToTarEntry :: (MonadError String m, MonadIO m) => Conduit (Files, CS.Object) m Tar.Entry
-objectToTarEntry = await >>= \case
-    Nothing                 -> return ()
-    Just (f@Files{..}, obj) -> do
-        result <- case obj of
-                CS.DirMeta dirmeta    -> return $ checkoutDir f dirmeta
-                CS.FileObject fileObj -> liftIO . runExceptT $ checkoutFile f fileObj
+objectToTarEntry = awaitWith $ \(f@Files{..}, obj) -> do
+    result <- case obj of
+            CS.DirMeta dirmeta    -> return $ checkoutDir f dirmeta
+            CS.FileObject fileObj -> liftIO . runExceptT $ checkoutFile f fileObj
 
-        either (\e -> throwError $ "Could not checkout out object " ++ T.unpack filesPath ++ ": " ++ e)
-               yield
-               result
+    either (\e -> throwError $ "Could not checkout out object " ++ T.unpack filesPath ++ ": " ++ e)
+           yield
+           result
 
-        objectToTarEntry
+    objectToTarEntry
  where
     checkoutDir :: Files -> CS.Metadata -> Either String Tar.Entry
     checkoutDir f@Files{..} metadata@CS.Metadata{..} = do
