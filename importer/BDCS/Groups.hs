@@ -13,21 +13,30 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
+                   getGroupIdC,
                    nameToGroupId,
                    nevraToGroupId)
  where
 
+import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.Trans(lift)
+import           Control.Monad.Trans.Resource(MonadBaseControl)
+import           Data.Conduit(Conduit, yield)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
+import           BDCS.RPM.Utils(splitFilename)
+import           Utils.Conduit(awaitWith)
 
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
 findGroupRequirements groupId reqId = firstResult $
@@ -46,6 +55,12 @@ findRequires reqLang reqCtx reqStrength reqExpr = firstResult $
              r ^. RequirementsReq_expr ==. val reqExpr
     limit 1
     return $ r ^. RequirementsId
+
+getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
+getGroupIdC = awaitWith $ \thing ->
+    lift (nevraToGroupId $ splitFilename thing) >>= \case
+        Just gid -> yield gid >> getGroupIdC
+        Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
 -- Given a group name, return a group id
 nameToGroupId :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Groups))

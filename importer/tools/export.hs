@@ -25,8 +25,7 @@ import           Control.Conditional(ifM, whenM)
 import           Control.Monad(when)
 import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Resource(MonadBaseControl, runResourceT)
+import           Control.Monad.Trans.Resource(runResourceT)
 import           Data.ByteString.Lazy(writeFile)
 import           Data.Conduit((.|), Conduit, Consumer, await, runConduit, yield)
 import           Data.Conduit.Binary(sinkFile, sinkLbs)
@@ -34,7 +33,6 @@ import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import           Database.Persist.Sql(SqlPersistT)
 import           Database.Persist.Sqlite(runSqlite)
 import           Prelude hiding(writeFile)
 import           System.Directory(createDirectoryIfMissing, doesFileExist, removeFile, setModificationTime)
@@ -49,18 +47,11 @@ import           GI.OSTree(IsRepo)
 import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(groupIdToFilesC)
-import           BDCS.Groups(nevraToGroupId)
-import           BDCS.RPM.Utils(splitFilename)
+import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
 import           Utils.Conduit(awaitWith, sourceInputStream)
 import           Utils.Either(maybeToEither, whenLeft)
 import           Utils.Monad(concatMapM)
-
-getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
-getGroupIdC = awaitWith $ \thing ->
-    lift (nevraToGroupId $ splitFilename thing) >>= \case
-        Just gid -> yield gid >> getGroupIdC
-        Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
 filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, CS.Object)
 filesToObjectsC repo = awaitWith $ \f@Files{..} -> case filesCs_object of
