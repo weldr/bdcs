@@ -97,7 +97,7 @@ main = do
         .| CS.filesToObjectsC repo
         .| objectSink
 
-    whenLeft result handler
+    whenLeft result (\e -> handler e >> exitFailure)
  where
     directoryOutput :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
