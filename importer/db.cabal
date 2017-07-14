@@ -50,6 +50,7 @@ library
                        Export.Directory,
                        Export.Qcow2,
                        Export.Tar,
+                       Export.Utils,
                        Import.Comps,
                        Import.Conduit,
                        Import.RPM,

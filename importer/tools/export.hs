@@ -20,7 +20,8 @@
 import           Control.Conditional(cond, ifM, whenM)
 import           Control.Monad(when)
 import           Control.Monad.Except(runExceptT)
-import           Data.Conduit((.|), runConduit)
+import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Data.Conduit(Consumer, (.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
@@ -30,12 +31,14 @@ import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
 import qualified BDCS.CS as CS
+import           BDCS.DB(Files)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
 import qualified Export.Directory as Directory
 import qualified Export.Qcow2 as Qcow2
 import qualified Export.Tar as Tar
+import           Export.Utils(runHacks)
 import           Utils.Either(whenLeft)
 import           Utils.Monad(concatMapM)
 
@@ -86,7 +89,7 @@ main = do
 
     let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (cleanupHandler out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
                                       (".qcow2" `isSuffixOf` out_path, (cleanupHandler out_path, Qcow2.qcow2Sink out_path)),
-                                      (otherwise,                      (print, Directory.directorySink out_path))]
+                                      (otherwise,                      (print, directoryOutput out_path))]
 
     result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
         .| getGroupIdC
@@ -96,6 +99,11 @@ main = do
 
     whenLeft result handler
  where
+    directoryOutput :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
+    directoryOutput path = do
+        Directory.directorySink path
+        liftIO $ runHacks path
+
     cleanupHandler :: Show a => FilePath -> a -> IO ()
     cleanupHandler path e = print e >>
         whenM (doesFileExist path) (removeFile path)

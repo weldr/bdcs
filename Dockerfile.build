@@ -1,5 +1,7 @@
 FROM juhp/fedora-haskell-ghc:8.0.2
-RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel ostree-devel sqlite-devel && dnf clean all
+RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel sqlite-devel \
+                   https://kojipkgs.fedoraproject.org//packages/ostree/2017.6/2.fc25/x86_64/ostree{,-devel,-libs}-2017.6-2.fc25.x86_64.rpm && \
+    dnf clean all
 
 ENV PATH ~/.cabal/bin:$PATH
 

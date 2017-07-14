@@ -20,13 +20,14 @@
 module Export.Directory(directorySink)
  where
 
+import           Control.Conditional(unlessM)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(runResourceT)
 import           Data.Conduit((.|), Consumer, await, runConduit)
 import           Data.Conduit.Binary(sinkFile)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import           System.Directory(createDirectoryIfMissing, setModificationTime)
+import           System.Directory(createDirectoryIfMissing, doesPathExist, setModificationTime)
 import           System.FilePath((</>), dropDrive, takeDirectory)
 import           System.Posix.Files(createSymbolicLink, setFileMode)
 import           System.Posix.Types(CMode(..))
@@ -58,8 +59,9 @@ directorySink outPath = await >>= \case
         createDirectoryIfMissing True $ takeDirectory fullPath
 
         -- Write the data or the symlink, depending
+        -- Skip creating the symbolic link if the target already exists
         case (symlink, contents) of
-            (Just symlinkTarget, _) -> createSymbolicLink (T.unpack symlinkTarget) fullPath
+            (Just symlinkTarget, _) -> unlessM (doesPathExist fullPath) (createSymbolicLink (T.unpack symlinkTarget) fullPath)
             (_, Just c)             -> do
                 runResourceT $ runConduit $ sourceInputStream c .| sinkFile fullPath
                 setMetadata f fullPath metadata
