@@ -198,8 +198,8 @@ usage = do
     putStrLn "\t* A directory (which may or may not already exist)"
     putStrLn "\t* The name of a .tar file to be created"
     putStrLn "thing can be:"
-    putStrLn "\t* The name of an RPM"
-    putStrLn "\t* A path to a file containing names of RPMs, 1 per line."
+    putStrLn "\t* The NEVRA of an RPM, e.g. filesystem-3.2-21.el7.x86_64"
+    putStrLn "\t* A path to a file containing NEVRA of RPMs, 1 per line."
     -- TODO group id?
     exitFailure
 
