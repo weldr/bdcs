@@ -18,6 +18,7 @@ addons:
     - e2fslibs-dev
     - libgpgme-dev
     - libfuse-dev
+    - libarchive-dev
     # used for testing
     - realpath
 
