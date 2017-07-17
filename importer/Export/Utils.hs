@@ -47,6 +47,11 @@ runHacks exportPath = do
     getDataFileName "sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
     callProcess "systemd-sysusers" ["--root", exportPath]
 
+    -- Install a tmpfiles.d config file
+    let tmpfilesDir = exportPath </> "usr" </> "lib" </> "tmpfiles.d"
+    createDirectoryIfMissing True tmpfilesDir
+    getDataFileName "tmpfiles-default.conf" >>= readFile >>= writeFile (tmpfilesDir </> "weldr.conf")
+
     -- Create a fstab stub
     writeFile (exportPath </> "etc" </> "fstab") "LABEL=composer / ext2 defaults 0 0"
 
