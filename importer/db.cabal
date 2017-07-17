@@ -8,7 +8,8 @@ license:             LGPL
 license-file:        LICENSE
 
 data-dir:            data
-data-files:          sysusers-default.conf
+data-files:          sysusers-default.conf,
+                     tmpfiles-default.conf
 
 flag scripts
   description:       Enable importing package scripts to the database
