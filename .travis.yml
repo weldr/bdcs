@@ -8,6 +8,7 @@ addons:
     - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu artful main universe'
     - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu artful-updates main universe'
     packages:
+    - apt # workaround for relocation error in libapt-private.so.0.0
     - util-linux # update to work around Debian #817857
     - liblzma-dev
     - zlib1g-dev
@@ -23,6 +24,9 @@ addons:
     - realpath
 
 before_install:
+  # workaround upgrade issues
+  - sudo rm -r /var/lib/dpkg/info/systemd-shim.*
+  - sudo apt-get install systemd
   # latest libostree-dev isn't available in Ubuntu yet so build it from source
   - git clone --recurse-submodules --branch v2017.8 --depth 1 https://github.com/ostreedev/ostree.git
   - cd ./ostree && env NOCONFIGURE=1 ./autogen.sh && ./configure --prefix=/usr && make && sudo make install && cd ../
