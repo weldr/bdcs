@@ -33,21 +33,22 @@ import           Text.ParserCombinators.Parsec.Number(number)
 
 -- Types for the tmpfiles.d config file
 -- This is not a complete list, some don't make sense for an empty filesystem and are unimplemented
-data TmpFileType = NewFile
-                 | TruncateFile
-                 | WriteFile
-                 | NewDirectory
+-- NOTE Order is important, it needs to maintain at least: Directory, Symlink, File, etc.
+data TmpFileType = NewDirectory
                  | ReplaceDirectory             -- This is conditional on --remove in systemd-tmpfiles
-                 | ModifyDirectory
                  | NewSymlink
                  | ReplaceSymlink
+                 | NewFile
+                 | TruncateFile
+                 | WriteFile
+                 | ModifyDirectory
                  | NewCharDev
                  | ReplaceCharDev
                  | NewBlockDev
                  | ReplaceBlockDev
                  | Copy
                  | Unsupported                  -- Catchall for unsupported types
-  deriving(Show)
+  deriving(Ord, Eq, Show)
 
 -- Translate the type characters into the actual types
 getTmpFileType :: String -> TmpFileType
@@ -70,7 +71,6 @@ allowedTypes :: String
 allowedTypes = "fFwdDevqQpLcbCxXrRzZtThHaA+!"
 
 -- Record for the tmpfiles.d config file entries
-
 data TmpFileEntry = TmpFileEntry {
     -- | The type of file to create
     tfeType :: TmpFileType,
@@ -80,8 +80,12 @@ data TmpFileEntry = TmpFileEntry {
     tfeGid  :: Maybe T.Text,
     tfeAge  :: Maybe T.Text,
     tfeArg  :: Maybe T.Text }
-  deriving(Show)
+  deriving(Eq, Show)
 
+-- Order the records by: Directory, Symlink, File, etc. and when equal, sort by the path.
+instance Ord TmpFileEntry where
+    a `compare` b = let cmp = tfeType a `compare` tfeType b
+                    in if cmp == EQ then tfePath a `compare` tfePath b else cmp
 
 eol :: Parsec String () Char
 eol = char '\n'
