@@ -73,7 +73,7 @@ class ImportedDBSanityTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.conn = sqlite3.connect(os.environ.get('MDDB', 'metadata.db'))
+        cls.conn = sqlite3.connect(os.environ.get('MDDB', './mddb/metadata.db'))
         cls.db = cls.conn.cursor()
 
     @classmethod

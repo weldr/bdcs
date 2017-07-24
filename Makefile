@@ -58,15 +58,24 @@ import-centos7:
 	make weld-f25
 	make importer
 	mkdir rpms/
-	sqlite3 centos-metadata.db < schema.sql
 	pip install -r tests/requirements.txt
+
+	if [ -n "$$EXISTING_MDDB" ]; then             \
+	    wget "$$EXISTING_MDDB";                   \
+	    gunzip -q `basename "$$EXISTING_MDDB"`;   \
+	    if [ ! -e ${d}/mddb ]; then               \
+	        mkdir ${d}/mddb;                      \
+	    fi;                                       \
+	    UNZIPPED=`basename "$$EXISTING_MDDB" | sed 's/.gz//'`; \
+	    mv $$UNZIPPED ${d}/mddb/$(MDDB);             \
+	fi
+
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64/ \
 	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
 	    export IMPORT_URL="$$REPO"; \
 	    export KEEP_STORE=1; \
 	    export STORE="centos-store.repo"; \
 	    export KEEP_MDDB=1; \
-	    export MDDB="centos-metadata.db"; \
 	    make mddb; \
 	    python ./tests/is_import_busted.py -v $$REPO; \
 	done
