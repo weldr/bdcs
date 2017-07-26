@@ -37,7 +37,7 @@ module Export.TmpFiles(
     setupFilesystem)
  where
 
-import           Control.Conditional(unlessM, whenM)
+import           Control.Conditional(ifM)
 import           Data.List(sort)
 import qualified Data.Text as T
 import           System.Directory(createDirectoryIfMissing, doesPathExist, removePathForcibly)
@@ -47,7 +47,7 @@ import           System.Posix.Types(CMode(..), CUid(..), CGid(..))
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char(CharParser)
 import           Text.ParserCombinators.Parsec.Number(number)
-
+import           Text.Printf(printf)
 
 -- Types for the tmpfiles.d config file
 -- This is not a complete list, some don't make sense for an empty filesystem and are unimplemented
@@ -195,10 +195,9 @@ applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = do
 -- | Create a new file with optional contents
 -- Also sets the ownership and permissions
 applyEntry outPath TmpFileEntry{tfeType=NewFile, ..} =
-    unlessM (doesPathExist file) $ do
-        writeFile file content
-        setFileMode file mode
-        setOwnerAndGroup file (owner tfeUid) (group tfeGid)
+    ifM (doesPathExist file)
+        (printf "NewFile: %s already exists, skipping it." file)
+        createFile
   where
     file = outPath </> dropDrive tfePath
     content = case tfeArg of
@@ -207,6 +206,11 @@ applyEntry outPath TmpFileEntry{tfeType=NewFile, ..} =
     mode = case tfeMode of
         Nothing -> CMode 0o644
         Just m  -> CMode $ fromIntegral m
+    createFile = do
+        writeFile file content
+        setFileMode file mode
+        setOwnerAndGroup file (owner tfeUid) (group tfeGid)
+
 
 -- | Create or Truncate a file with optional contents
 -- Also sets the ownership and permissions
@@ -225,21 +229,26 @@ applyEntry outPath TmpFileEntry{tfeType=TruncateFile, ..} = do
 
 -- | Modify an existing directory's ownership and permissions
 applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} =
-    whenM (doesPathExist dir) $ do
-    setFileMode dir mode
-    setOwnerAndGroup dir (owner tfeUid) (group tfeGid)
+    ifM (doesPathExist dir)
+        modify
+        (printf "ModifyDirectory: %s doesn't exist, skipping it." dir)
   where
     dir = outPath </> dropDrive tfePath
     mode = case tfeMode of
         Nothing -> CMode 0o755
         Just m  -> CMode $ fromIntegral m
+    modify = do
+        setFileMode dir mode
+        setOwnerAndGroup dir (owner tfeUid) (group tfeGid)
+
 
 -- | Create a new symlink
 -- Does NOT create parents of the source file, they must already exist
 -- If no target arg is present it will link to the source filename under /usr/share/factory/
 applyEntry outPath TmpFileEntry{tfeType=NewSymlink, ..} =
-    unlessM (doesPathExist source) $
-        createSymbolicLink target source
+    ifM (doesPathExist source)
+        (printf "NewSymlink: %s exists, skipping." source)
+        (createSymbolicLink target source)
   where
     source = outPath </> dropDrive tfePath
     target = case tfeArg of
@@ -263,7 +272,8 @@ applyEntry _ TmpFileEntry{tfeType=Unsupported, ..} = undefined
 -- | Read the tmpfiles.d snippet and apply it to the output directory
 setupFilesystem :: FilePath -> FilePath -> IO ()
 setupFilesystem outPath tmpFileConf = do
+    createDirectoryIfMissing True outPath
     tmpfiles <- parseConfString <$> readFile tmpFileConf
     case tmpfiles of
         Right entries -> mapM_ (applyEntry outPath) $ sort entries
-        Left  _       -> return ()
+        Left  err     -> print err
