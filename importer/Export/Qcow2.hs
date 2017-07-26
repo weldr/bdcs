@@ -32,7 +32,7 @@ import System.Process(callProcess)
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
-import           Export.Utils(runHacks)
+import           Export.Utils(runHacks, runTmpfiles)
 
 import Paths_db(getDataFileName)
 
@@ -45,6 +45,9 @@ qcow2Sink outPath =
     bracketP (createTempDirectory (takeDirectory outPath) "export")
         removePathForcibly
         (\tmpDir -> do
+            -- Apply tmpfiles.d to the directory first
+            liftIO $ runTmpfiles tmpDir
+
             -- Run the sink to create a directory export
             directorySink tmpDir
 

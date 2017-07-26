@@ -38,7 +38,7 @@ import           BDCS.Version
 import qualified Export.Directory as Directory
 import qualified Export.Qcow2 as Qcow2
 import qualified Export.Tar as Tar
-import           Export.Utils(runHacks)
+import           Export.Utils(runHacks, runTmpfiles)
 import           Utils.Either(whenLeft)
 import           Utils.Monad(concatMapM)
 
@@ -101,6 +101,9 @@ main = do
  where
     directoryOutput :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
+        -- Apply tmpfiles.d to the directory first
+        liftIO $ runTmpfiles path
+
         Directory.directorySink path
         liftIO $ runHacks path
 
