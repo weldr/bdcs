@@ -14,39 +14,50 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleContexts  #-}
+{-# LANGUAGE RecordWildCards   #-}
 
 -- | Parse a tmpfiles.d config file into TmpFileEntry records.
 --
--- This parser is somewhat limited, it only supports types that are needed
+-- This parser is limited, it only supports types that are needed
 -- by the bdcs export tool (eg. creating files and directories)
+--
+-- Currently supported types are:
+--
+-- f    Create a new file and optionally write the arg to it. Will not overwrite.
+-- F    Remove existing file and make a new one, optionally writing arg to it.
+-- d    Create a new directory, only if it doesn't exist.
+-- e    Modify an existing directory's ownership and permissions
+-- L    Create a new symlink. Do nothing if it already exists.
+-- L+   Remove file, directory tree, or symlink before creating it. WARNING this will remove a whole directory tree.
 --
 module Export.TmpFiles(
     TmpFileEntry(..),
     TmpFileType(..),
-    parseConfString)
+    parseConfString,
+    setupFilesystem)
  where
 
+import           Control.Conditional(unlessM, whenM)
+import           Data.List(sort)
 import qualified Data.Text as T
+import           System.Directory(createDirectoryIfMissing, doesPathExist, removePathForcibly)
+import           System.FilePath((</>), dropDrive, takeFileName)
+import           System.Posix.Files(createSymbolicLink, setFileMode, setOwnerAndGroup)
+import           System.Posix.Types(CMode(..), CUid(..), CGid(..))
 import           Text.Parsec
 import           Text.ParserCombinators.Parsec.Char(CharParser)
 import           Text.ParserCombinators.Parsec.Number(number)
+
 
 -- Types for the tmpfiles.d config file
 -- This is not a complete list, some don't make sense for an empty filesystem and are unimplemented
 -- NOTE Order is important, it needs to maintain at least: Directory, Symlink, File, etc.
 data TmpFileType = NewDirectory
-                 | ReplaceDirectory             -- This is conditional on --remove in systemd-tmpfiles
                  | NewSymlink
                  | ReplaceSymlink
                  | NewFile
                  | TruncateFile
-                 | WriteFile
                  | ModifyDirectory
-                 | NewCharDev
-                 | ReplaceCharDev
-                 | NewBlockDev
-                 | ReplaceBlockDev
-                 | Copy
                  | Unsupported                  -- Catchall for unsupported types
   deriving(Ord, Eq, Show)
 
@@ -54,17 +65,10 @@ data TmpFileType = NewDirectory
 getTmpFileType :: String -> TmpFileType
 getTmpFileType "f" = NewFile
 getTmpFileType "F" = TruncateFile
-getTmpFileType "w" = WriteFile
 getTmpFileType "d" = NewDirectory
-getTmpFileType "D" = ReplaceDirectory
 getTmpFileType "e" = ModifyDirectory
 getTmpFileType "L" = NewSymlink
 getTmpFileType "L+"= ReplaceSymlink
-getTmpFileType "c" = NewCharDev
-getTmpFileType "c+"= ReplaceCharDev
-getTmpFileType "b" = NewBlockDev
-getTmpFileType "b+"= ReplaceBlockDev
-getTmpFileType "C" = Copy
 getTmpFileType _   = Unsupported
 
 allowedTypes :: String
@@ -121,10 +125,12 @@ parseMode :: Parsec String () (Maybe Integer)
 parseMode = parseMaybeDash octal
 
 -- | Parse a uid/gid (only supports strings)
+-- Which can also be set to '-' to mean the default for the type
 parseId :: Parsec String () (Maybe T.Text)
 parseId = parseMaybeDash getTextField
 
 -- | Age may be the last entry, or it may not.
+-- It can also be set to '-' to mean the default for the type
 parseAge :: Parsec String () (Maybe T.Text)
 parseAge = parseMaybeDash getAgeField
   where
@@ -149,9 +155,115 @@ parseConfLine = do
     age <- parseAge
     skipSpaces
     arg <- optionMaybe $ try parseArg
-    eol
+    _ <- eol
 
     return TmpFileEntry{tfeType=t, tfePath=p, tfeMode=m, tfeUid=uid, tfeGid=gid, tfeAge=age, tfeArg=arg}
 
 parseConfString :: String -> Either ParseError [TmpFileEntry]
 parseConfString = parse (many1 parseConfLine) "(tmpFiles.d)"
+
+-- TODO This is going to need a map from strings to ids
+-- Use root for now
+-- | Convert an owner name (eg. root) to a CUid value
+owner :: Maybe T.Text -> CUid
+owner uid = case uid of
+    Nothing -> CUid 0
+    Just _  -> CUid 0
+
+-- TODO This is going to need a map from strings to ids
+-- Use root for now
+-- | Convert a group name (eg. root) to a CUid value
+group :: Maybe T.Text -> CGid
+group gid = case gid of
+    Nothing -> CGid 0
+    Just _  -> CGid 0
+
+
+-- | Create a new directory if there isn't already one present
+-- Also sets the ownership and permissions
+applyEntry :: FilePath -> TmpFileEntry -> IO ()
+applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = do
+    createDirectoryIfMissing True dir
+    setFileMode dir mode
+    setOwnerAndGroup dir (owner tfeUid) (group tfeGid)
+  where
+    dir = outPath </> dropDrive tfePath
+    mode = case tfeMode of
+        Nothing -> CMode 0o755
+        Just m  -> CMode $ fromIntegral m
+
+-- | Create a new file with optional contents
+-- Also sets the ownership and permissions
+applyEntry outPath TmpFileEntry{tfeType=NewFile, ..} =
+    unlessM (doesPathExist file) $ do
+        writeFile file content
+        setFileMode file mode
+        setOwnerAndGroup file (owner tfeUid) (group tfeGid)
+  where
+    file = outPath </> dropDrive tfePath
+    content = case tfeArg of
+        Nothing -> ""
+        Just c  -> T.unpack c
+    mode = case tfeMode of
+        Nothing -> CMode 0o644
+        Just m  -> CMode $ fromIntegral m
+
+-- | Create or Truncate a file with optional contents
+-- Also sets the ownership and permissions
+applyEntry outPath TmpFileEntry{tfeType=TruncateFile, ..} = do
+    writeFile file content
+    setFileMode file mode
+    setOwnerAndGroup file (owner tfeUid) (group tfeGid)
+  where
+    file = outPath </> dropDrive tfePath
+    content = case tfeArg of
+        Nothing -> ""
+        Just c  -> T.unpack c
+    mode = case tfeMode of
+        Nothing -> CMode 0o644
+        Just m  -> CMode $ fromIntegral m
+
+-- | Modify an existing directory's ownership and permissions
+applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} =
+    whenM (doesPathExist dir) $ do
+    setFileMode dir mode
+    setOwnerAndGroup dir (owner tfeUid) (group tfeGid)
+  where
+    dir = outPath </> dropDrive tfePath
+    mode = case tfeMode of
+        Nothing -> CMode 0o755
+        Just m  -> CMode $ fromIntegral m
+
+-- | Create a new symlink
+-- Does NOT create parents of the source file, they must already exist
+-- If no target arg is present it will link to the source filename under /usr/share/factory/
+applyEntry outPath TmpFileEntry{tfeType=NewSymlink, ..} =
+    unlessM (doesPathExist source) $
+        createSymbolicLink target source
+  where
+    source = outPath </> dropDrive tfePath
+    target = case tfeArg of
+        Nothing  -> "/usr/share/factory" </> takeFileName tfePath
+        Just arg -> T.unpack arg
+
+-- | Replace a symlink, if it exists or create a new one
+-- If no target arg is present it will link to the source filename under /usr/share/factory/
+applyEntry outPath TmpFileEntry{tfeType=ReplaceSymlink, ..} = do
+    removePathForcibly source
+    createSymbolicLink target source
+  where
+    source = outPath </> dropDrive tfePath
+    target = case tfeArg of
+        Nothing  -> "/usr/share/factory" </> takeFileName tfePath
+        Just arg -> T.unpack arg
+
+applyEntry _ TmpFileEntry{tfeType=Unsupported, ..} = undefined
+
+
+-- | Read the tmpfiles.d snippet and apply it to the output directory
+setupFilesystem :: FilePath -> FilePath -> IO ()
+setupFilesystem outPath tmpFileConf = do
+    tmpfiles <- parseConfString <$> readFile tmpFileConf
+    case tmpfiles of
+        Right entries -> mapM_ (applyEntry outPath) $ sort entries
+        Left  _       -> return ()
