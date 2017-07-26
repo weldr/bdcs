@@ -6,6 +6,7 @@ cache:
   directories:
     - ~/.ghc
     - ~/.cabal
+    - ./ostree
 
 addons:
   apt:
@@ -33,10 +34,22 @@ before_install:
   - sudo rm -r /var/lib/dpkg/info/systemd-shim.*
   - sudo apt-get install systemd
   # latest libostree-dev isn't available in Ubuntu yet so build it from source
-  - git clone --recurse-submodules --branch v2017.8 https://github.com/ostreedev/ostree.git && cd ./ostree
-    # temporary fix, https://github.com/ostreedev/ostree/pull/1007
-  - git cherry-pick 47a54bf876023b0cb457bc8a4f4264f9b2ed5438
-  - env NOCONFIGURE=1 ./autogen.sh && ./configure --prefix=/usr && make && sudo make install && cd ../
+  - |
+        # NOTE: When you update libostree version clear the cache from
+        # https://travis-ci.org/weldr/bdcs-api-rs/caches
+        if [ ! -f ./ostree/Makefile ]; then
+            git clone --recurse-submodules --branch v2017.8 https://github.com/ostreedev/ostree.git
+            cd ./ostree
+            # temporary fix, https://github.com/ostreedev/ostree/pull/1007
+            git cherry-pick 47a54bf876023b0cb457bc8a4f4264f9b2ed5438
+            env NOCONFIGURE=1
+            ./autogen.sh
+            ./configure --prefix=/usr
+            make
+        else
+            cd ./ostree
+        fi
+        sudo make install && cd ../
 
   - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
