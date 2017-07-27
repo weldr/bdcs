@@ -13,16 +13,17 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.Service(matches)
  where
 
-import Database.Persist.TH
+import qualified Data.Text as T
+import           System.FilePath.Posix(takeExtension)
 
-data Label = DocsLabel
-           | LibraryLabel
-           | ServiceLabel
-    deriving(Eq, Read, Show)
+import BDCS.DB(Files(..))
 
-derivePersistField "Label"
+matches :: Files -> Bool
+matches Files{..} =
+    takeExtension (T.unpack filesPath) == ".service"
