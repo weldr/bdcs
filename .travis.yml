@@ -63,6 +63,7 @@ script:
     cabal build && cabal test --show-details=always && cabal install
 
   # test binaries
+  - sudo ./tests/test_tmpfiles.sh
   - ./tests/test_import.sh
   - ./tests/test_export.sh
 

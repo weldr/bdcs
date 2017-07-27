@@ -29,6 +29,7 @@ usage = do
     putStrLn "       dest should be a destination directory."
     exitFailure
 
+{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
 main = do
     argv <- getArgs
