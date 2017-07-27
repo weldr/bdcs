@@ -23,14 +23,16 @@ import Database.Esqueleto(Key, SqlPersistT)
 import           BDCS.DB(Files(..), FileKeyValues(..))
 import qualified BDCS.Label.Docs as Docs
 import qualified BDCS.Label.Library as Library
-import           BDCS.Label.Utils(addLabelKey)
+import qualified BDCS.Label.Service as Service
 import           BDCS.Label.Types(Label(..))
+import           BDCS.Label.Utils(addLabelKey)
 
 import Utils.Monad(concatForM)
 
 checks :: [(Files -> Bool, Label)]
 checks = [(Docs.matches,    DocsLabel),
-          (Library.matches, LibraryLabel)]
+          (Library.matches, LibraryLabel),
+          (Service.matches, ServiceLabel)]
 
 apply :: MonadIO m => [(Files, Key Files)] -> SqlPersistT m [Key FileKeyValues]
 apply lst =
