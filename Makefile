@@ -60,21 +60,29 @@ import-centos7:
 	mkdir rpms/
 	pip install -r tests/requirements.txt
 
-	if [ -n "$$EXISTING_MDDB" ]; then             \
-	    wget "$$EXISTING_MDDB";                   \
-	    gunzip -q `basename "$$EXISTING_MDDB"`;   \
-	    if [ ! -e ${d}/mddb ]; then               \
-	        mkdir ${d}/mddb;                      \
-	    fi;                                       \
+	if [ ! -e ${d}/mddb ]; then \
+	    mkdir ${d}/mddb;        \
+	fi;                         \
+
+	if [ -n "$$EXISTING_MDDB" ]; then                          \
+	    wget --progress=dot:giga "$$EXISTING_MDDB";            \
+	    gunzip -q `basename "$$EXISTING_MDDB"`;                \
 	    UNZIPPED=`basename "$$EXISTING_MDDB" | sed 's/.gz//'`; \
-	    mv $$UNZIPPED ${d}/mddb/$(MDDB);             \
+	    mv $$UNZIPPED ${d}/mddb/$(MDDB);                       \
 	fi
+
+	if [ -n "$$EXISTING_STORE" ]; then                                          \
+	    STORE=`BASENAME "$$EXISTING_STORE"`;                                    \
+	    ostree --repo=${d}/mddb/$$STORE init --mode=archive;                    \
+	    ostree --repo=${d}/mddb/$$STORE remote add existing "$$EXISTING_STORE"; \
+	    ostree --repo=${d}/mddb/$$STORE pull --mirror existing;                 \
+	fi                                                                          \
 
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64/ \
 	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
 	    export IMPORT_URL="$$REPO"; \
 	    export KEEP_STORE=1; \
-	    export STORE="centos-store.repo"; \
+	    export STORE="$$STORE"; \
 	    export KEEP_MDDB=1; \
 	    make mddb; \
 	    python ./tests/is_import_busted.py -v $$REPO; \
