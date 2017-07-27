@@ -140,6 +140,18 @@ executable export
 
   ghc-options:         -Wall
 
+executable bdcs-tmpfiles
+  main-is:             bdcs-tmpfiles.hs
+  hs-source-dirs:      tools
+
+  build-depends:       db,
+                       base >= 4.9 && < 5.0,
+                       directory
+
+  default-language:    Haskell2010
+
+  ghc-options:         -Wall
+
 Test-Suite test-db
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
