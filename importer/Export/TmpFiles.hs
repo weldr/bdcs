@@ -179,6 +179,21 @@ group gid = case gid of
     Just _  -> CGid 0
 
 
+-- | Write a new file and set its ownership and permissions
+writeNewFile :: FilePath -> TmpFileEntry -> IO ()
+writeNewFile outPath TmpFileEntry{..} = do
+    writeFile file content
+    setFileMode file mode
+    setOwnerAndGroup file (owner tfeUid) (group tfeGid)
+  where
+    file = outPath </> dropDrive tfePath
+    content = case tfeArg of
+        Nothing -> ""
+        Just c  -> T.unpack c
+    mode = case tfeMode of
+        Nothing -> CMode 0o644
+        Just m  -> CMode $ fromIntegral m
+
 -- | Create a new directory if there isn't already one present
 -- Also sets the ownership and permissions
 applyEntry :: FilePath -> TmpFileEntry -> IO ()
@@ -194,38 +209,16 @@ applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = do
 
 -- | Create a new file with optional contents
 -- Also sets the ownership and permissions
-applyEntry outPath TmpFileEntry{tfeType=NewFile, ..} =
+applyEntry outPath entry@TmpFileEntry{tfeType=NewFile, ..} =
     ifM (doesPathExist file)
         (printf "NewFile: %s already exists, skipping it." file)
-        createFile
+        (writeNewFile outPath entry)
   where
     file = outPath </> dropDrive tfePath
-    content = case tfeArg of
-        Nothing -> ""
-        Just c  -> T.unpack c
-    mode = case tfeMode of
-        Nothing -> CMode 0o644
-        Just m  -> CMode $ fromIntegral m
-    createFile = do
-        writeFile file content
-        setFileMode file mode
-        setOwnerAndGroup file (owner tfeUid) (group tfeGid)
-
 
 -- | Create or Truncate a file with optional contents
 -- Also sets the ownership and permissions
-applyEntry outPath TmpFileEntry{tfeType=TruncateFile, ..} = do
-    writeFile file content
-    setFileMode file mode
-    setOwnerAndGroup file (owner tfeUid) (group tfeGid)
-  where
-    file = outPath </> dropDrive tfePath
-    content = case tfeArg of
-        Nothing -> ""
-        Just c  -> T.unpack c
-    mode = case tfeMode of
-        Nothing -> CMode 0o644
-        Just m  -> CMode $ fromIntegral m
+applyEntry outPath entry@TmpFileEntry{tfeType=TruncateFile, ..} = writeNewFile outPath entry
 
 -- | Modify an existing directory's ownership and permissions
 applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} =
