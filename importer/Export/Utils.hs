@@ -18,10 +18,13 @@ module Export.Utils(runHacks,
  where
 
 import Control.Conditional(whenM)
+import Control.Exception(tryJust)
+import Control.Monad(guard)
 import Data.List(intercalate)
 import Data.List.Split(splitOn)
 import System.Directory(createDirectoryIfMissing, doesFileExist, renameFile)
 import System.FilePath((</>))
+import System.IO.Error(isDoesNotExistError)
 import System.Process(callProcess)
 
 import Export.TmpFiles(setupFilesystem)
@@ -49,6 +52,11 @@ runHacks exportPath = do
     createDirectoryIfMissing True sysusersDir
     getDataFileName "sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
     callProcess "systemd-sysusers" ["--root", exportPath]
+
+    -- Run depmod on any kernel modules that might be present
+    let modDir = exportPath </> "usr" </> "lib" </> "modules"
+    modVers <- tryJust (guard . isDoesNotExistError) (listDirectory modDir)
+    mapM_ (\ver -> callProcess "depmod" ["-b", exportPath, "-a", ver]) $ either (const []) id modVers
 
     -- Create a fstab stub
     writeFile (exportPath </> "etc" </> "fstab") "LABEL=composer / ext2 defaults 0 0"
