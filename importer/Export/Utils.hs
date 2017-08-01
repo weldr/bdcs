@@ -22,7 +22,7 @@ import Control.Exception(tryJust)
 import Control.Monad(guard)
 import Data.List(intercalate)
 import Data.List.Split(splitOn)
-import System.Directory(createDirectoryIfMissing, doesFileExist, renameFile)
+import System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
 import System.FilePath((</>))
 import System.IO.Error(isDoesNotExistError)
 import System.Process(callProcess)
@@ -60,6 +60,10 @@ runHacks exportPath = do
 
     -- Create a fstab stub
     writeFile (exportPath </> "etc" </> "fstab") "LABEL=composer / ext2 defaults 0 0"
+
+    -- Clean up /run
+    -- Some packages create directories in /var/run, which a symlink to /run, which is a tmpfs.
+    (map ((exportPath </> "run") </>) <$> listDirectory (exportPath </> "run")) >>= mapM_ removePathForcibly
 
     -- EXTRA HACKY: turn off mod_ssl
     let sslConf = exportPath </> "etc" </> "httpd" </> "conf.d" </> "ssl.conf"
