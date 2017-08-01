@@ -30,7 +30,8 @@ import           Codec.RPM.Parse(parseRPMC)
 import           Codec.RPM.Tags
 import           Codec.RPM.Types
 import           Control.Conditional(ifM)
-import           Control.Monad(void)
+import           Control.Exception(evaluate, tryJust)
+import           Control.Monad(guard, void)
 import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
@@ -38,6 +39,7 @@ import           Control.Monad.State(execStateT)
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
+import           Data.Foldable(toList)
 import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
 import           GI.Gio(noCancellable)
@@ -47,7 +49,7 @@ import           Network.URI(URI(..))
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
 import BDCS.CS(commit, commitContents, store, withTransaction)
 import BDCS.DB
-import BDCS.Exceptions(DBException(..), throwIfNothing)
+import BDCS.Exceptions(DBException(..), isMissingRPMTagException, throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
 import BDCS.Label.FileLabels(apply)
 import BDCS.Packages(insertPackageName)
@@ -121,7 +123,13 @@ unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
     projectId <- insertProject $ mkProject tagHeaders
     sourceId  <- insertSource $ mkSource tagHeaders projectId
     buildId   <- insertBuild $ mkBuild tagHeaders sourceId
-    void $ insertBuildSignatures [mkRSASignature sigHeaders buildId, mkSHASignature sigHeaders buildId]
+
+    -- Ignore missing tag errors from mkRSASignature, it just means the RPM is unsigned
+    -- toList <$> tryJust will convert the result to [BuildSignatures], either containing one record on
+    -- success or an empty list on error.
+    rsaSignature <- liftIO $ toList <$> tryJust (guard . isMissingRPMTagException) (evaluate $ mkRSASignature sigHeaders buildId)
+    void $ insertBuildSignatures (mkSHASignature sigHeaders buildId:rsaSignature)
+
     pkgNameId <- insertPackageName $ T.pack $ findStringTag "Name" tagHeaders `throwIfNothing` MissingRPMTag "Name"
 
     files     <- mkFiles tagHeaders checksums

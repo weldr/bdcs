@@ -14,6 +14,8 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 module BDCS.Exceptions(DBException(..),
+                       isDBExceptionException,
+                       isMissingRPMTagException,
                        throwIfNothing,
                        throwIfNothingOtherwise)
  where
@@ -43,3 +45,11 @@ throwIfNothing _        exn = throw exn
 throwIfNothingOtherwise :: Exception e => Maybe a -> e -> (a -> b) -> b
 throwIfNothingOtherwise (Just v) _   fn = fn v
 throwIfNothingOtherwise _        exn _  = throw exn
+
+isDBExceptionException :: DBException -> Bool
+isDBExceptionException (DBException _) = True
+isDBExceptionException _               = False
+
+isMissingRPMTagException :: DBException -> Bool
+isMissingRPMTagException (MissingRPMTag _) = True
+isMissingRPMTagException _                 = False
