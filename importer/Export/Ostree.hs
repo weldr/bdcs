@@ -108,6 +108,13 @@ ostreeSink outPath = do
                 removePathForcibly $ tmpDir </> "usr" </> "local"
                 createSymbolicLink "../var/usrlocal" $ tmpDir </> "usr" </> "local"
 
+                -- rpm-ostree moves /var/lib/rpm to /usr/share/rpm. We don't have a rpmdb to begin
+                -- with, so create an empty one at /usr/share/rpm.
+                -- rpmdb treats every path as absolute
+                rpmdbDir <- makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
+                createDirectoryIfMissing True rpmdbDir
+                callProcess "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
+
                 -- import the directory as a new commit
                 void $ CS.withTransaction dst_repo $ \r -> do
                     f <- CS.storeDirectory r tmpDir
