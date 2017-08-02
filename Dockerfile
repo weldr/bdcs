@@ -1,4 +1,4 @@
-FROM weld/fedora:25
+FROM welder/fedora:latest
 
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
