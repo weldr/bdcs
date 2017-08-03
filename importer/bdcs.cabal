@@ -1,4 +1,4 @@
-name:                db
+name:                bdcs
 version:             0.1.0.0
 author:              Chris Lumens
 maintainer:          clumens@redhat.com
@@ -105,7 +105,7 @@ library
 
   pkgconfig-depends:   ostree-1 >= 2017.8
 
-  other-modules:       Paths_db
+  other-modules:       Paths_bdcs
   default-language:    Haskell2010
 
   if flag(scripts)
@@ -118,7 +118,7 @@ executable import
   main-is:             import.hs
   hs-source-dirs:      tools
 
-  build-depends:       db,
+  build-depends:       bdcs,
                        base >= 4.7 && < 5.0,
                        cond,
                        directory,
@@ -133,7 +133,7 @@ executable export
   main-is:             export.hs
   hs-source-dirs:      tools
 
-  build-depends:       db,
+  build-depends:       bdcs,
                        base >= 4.9 && < 5.0,
                        cond,
                        conduit >= 1.2.8,
@@ -150,7 +150,7 @@ executable bdcs-tmpfiles
   main-is:             bdcs-tmpfiles.hs
   hs-source-dirs:      tools
 
-  build-depends:       db,
+  build-depends:       bdcs,
                        base >= 4.9 && < 5.0,
                        directory
 
@@ -158,7 +158,7 @@ executable bdcs-tmpfiles
 
   ghc-options:         -Wall
 
-Test-Suite test-db
+Test-Suite test-bdcs
   type:                exitcode-stdio-1.0
   hs-source-dirs:      tests
   main-is:             Spec.hs
@@ -170,6 +170,6 @@ Test-Suite test-db
                        persistent,
                        persistent-sqlite,
                        resourcet,
-                       db
+                       bdcs 
 
   default-language:    Haskell2010

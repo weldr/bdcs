@@ -34,7 +34,7 @@ import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
 import           Export.Utils(runHacks, runTmpfiles)
 
-import Paths_db(getDataFileName)
+import Paths_bdcs(getDataFileName)
 
 qcow2Sink :: (MonadResource m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =

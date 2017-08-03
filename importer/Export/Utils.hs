@@ -29,7 +29,7 @@ import System.Process(callProcess)
 
 import Export.TmpFiles(setupFilesystem)
 
-import Paths_db(getDataFileName)
+import Paths_bdcs(getDataFileName)
 
 -- | Run filesystem hacks needed to make a directory tree bootable
 runHacks :: FilePath -> IO ()

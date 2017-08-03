@@ -21,7 +21,7 @@ import Data.Version (showVersion)
 import Development.GitRev
 import Text.Printf(printf)
 
-import Paths_db (version)
+import Paths_bdcs (version)
 
 
 printVersion :: String -> IO ()

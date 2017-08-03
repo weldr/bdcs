@@ -46,7 +46,7 @@ import           Export.Directory(directorySink)
 import           Export.Utils(runHacks)
 import           Utils.Conduit(awaitWith)
 
-import           Paths_db(getDataFileName)
+import           Paths_bdcs(getDataFileName)
 
 -- Disable a hint in replaceDirs that just makes thing look confusing
 {-# ANN ostreeSink ("HLint: ignore Use ." :: String) #-}
