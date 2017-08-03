@@ -1,17 +1,29 @@
 name:                bdcs
-version:             0.1.0.0
+version:             0.1.0
+synopsis:            Tools for managing a content store of software packages
+description:         This module provides a library and various tools for managing a content store and
+                     metadata database.  These store the contents of software packages that make up a
+                     Linux distribution as well as a lot of metadata about those software packages.
+                     Tools are inclued to construct those stores from pre-built software and to pull
+                     files back out to turn into bootable images.
+homepage:            https://github.com/weldr/bdcs
+category:            Distribution
 author:              Chris Lumens
 maintainer:          clumens@redhat.com
-build-type:          Simple
-cabal-version:       >=1.10
 license:             LGPL
 license-file:        LICENSE
+cabal-version:       >= 1.10
+build-type:          Simple
 
 data-dir:            data
 data-files:          sysusers-default.conf,
                      tmpfiles-default.conf,
                      tmpfiles-ostree.conf,
                      nsswitch-altfiles.conf
+
+source-repository    head
+    type:            git
+    location:        https://github.com/weldr/bdcs
 
 flag scripts
   description:       Enable importing package scripts to the database
