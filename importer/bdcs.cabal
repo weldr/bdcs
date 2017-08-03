@@ -21,6 +21,14 @@ data-files:             sysusers-default.conf,
                         tmpfiles-ostree.conf,
                         nsswitch-altfiles.conf
 
+extra-source-files:     Makefile,
+                        cabal.config,
+                        tests/*.hs,
+                        tests/*.sh,
+                        tests/BDCS/*.hs,
+                        tests/BDCS/RPM/*.hs,
+                        tests/Export/*.hs
+
 source-repository       head
     type:               git
     location:           https://github.com/weldr/bdcs
