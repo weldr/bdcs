@@ -13,15 +13,22 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module BDCS.GroupsSpec(spec)
  where
 
+import BDCS.DB(Groups(..))
 import BDCS.Groups(nevraToGroupId)
-import BDCS.DB
+import BDCS.GroupKeyValue(insertGroupKeyValue)
+import BDCS.KeyType(KeyType(..))
 
-import Database.Persist.Sql(toSqlKey)
+import Control.Monad(void)
+import Control.Monad.IO.Class(MonadIO)
+import Control.Monad.Logger(NoLoggingT)
+import Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
+import Database.Persist.Sql(SqlPersistT, insertKey, toSqlKey)
 import Test.Hspec
 
 import Utils(withDb)
@@ -29,30 +36,53 @@ import Utils(withDb)
 spec :: Spec
 spec = describe "BDCS.Groups Tests" $ do
     it "nevraToGroupId, has epoch" $
-        -- gid <- withDb $ nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "x86_64")
+        -- gid <- withNevras $ nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "x86_64")
         -- gid `shouldBe` Just (toSqlKey 1)
-        withDb (nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Just (toSqlKey 1))
+        withNevras (nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Just (toSqlKey 1))
 
     it "nevraToGroupId, no epoch" $
-        withDb (nevraToGroupId ("noEpoch", Nothing, "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Just (toSqlKey 2))
+        withNevras (nevraToGroupId ("noEpoch", Nothing, "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Just (toSqlKey 2))
 
     it "nevraToGroupId, has epoch, not specified" $
-        withDb (nevraToGroupId ("hasEpoch", Nothing, "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("hasEpoch", Nothing, "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, no epoch, is specified" $
-        withDb (nevraToGroupId ("noEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("noEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, has wrong epoch" $
-        withDb (nevraToGroupId ("hasEpoch", Just "8", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("hasEpoch", Just "8", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, wrong name" $
-        withDb (nevraToGroupId ("missingEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("missingEpoch", Just "7", "1.0", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, wrong version" $
-        withDb (nevraToGroupId ("hasEpoch", Just "7", "1.1", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("hasEpoch", Just "7", "1.1", "1.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, wrong release" $
-        withDb (nevraToGroupId ("hasEpoch", Just "7", "1.0", "2.el7", "x86_64")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("hasEpoch", Just "7", "1.0", "2.el7", "x86_64")) >>= (`shouldBe` Nothing)
 
     it "nevraToGroupId, wrong arch" $
-        withDb (nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "i686")) >>= (`shouldBe` Nothing)
+        withNevras (nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "i686")) >>= (`shouldBe` Nothing)
+
+ where
+    addNevras :: MonadIO m => SqlPersistT m ()
+    addNevras = do
+        -- hasEpoch-7:1.0-1.el7.x86_64
+        let gid_1 = toSqlKey 1
+        insertKey gid_1 $ Groups "hasEpoch" "rpm"
+        void $ insertGroupKeyValue (TextKey "name")    "hasEpoch" Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "epoch")   "7"        Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "release") "1.el7"    Nothing gid_1
+        void $ insertGroupKeyValue (TextKey "arch")    "x86_64"   Nothing gid_1
+
+        -- noEpoch-1.0-1.el7.x86_64
+        let gid_2 = toSqlKey 2
+        insertKey gid_2 $ Groups "noEpoch" "rpm"
+        void $ insertGroupKeyValue (TextKey "name")    "noEpoch"  Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "release") "1.el7"    Nothing gid_2
+        void $ insertGroupKeyValue (TextKey "arch")    "x86_64"   Nothing gid_2
+
+    withNevras :: (MonadBaseControl IO m, MonadIO m) => SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
+    withNevras action = withDb (addNevras >> action)
