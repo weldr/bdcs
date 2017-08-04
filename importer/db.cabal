@@ -84,7 +84,7 @@ library
                        gi-gio,
                        gi-glib,
                        gi-ostree >= 1.0.3,
-                       gitrev,
+                       gitrev >= 1.3.1,
                        haskell-gi-base,
                        http-conduit,
                        mtl >= 2.2.1,
