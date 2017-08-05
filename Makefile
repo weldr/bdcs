@@ -74,7 +74,7 @@ import-centos7:
 	if [ -n "$$EXISTING_STORE" ]; then                                          \
 	    STORE=`basename "$$EXISTING_STORE"`;                                    \
 	    ostree --repo=${d}/mddb/$$STORE init --mode=archive;                    \
-	    ostree --repo=${d}/mddb/$$STORE remote add existing "$$EXISTING_STORE"; \
+	    ostree --repo=${d}/mddb/$$STORE remote add --no-gpg-verify existing "$$EXISTING_STORE"; \
 	    # note: pulls with --depth=0, only the last commit                      \
 	    ostree --repo=${d}/mddb/$$STORE pull --mirror existing;                 \
 	fi                                                                          \
