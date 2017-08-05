@@ -72,7 +72,7 @@ import-centos7:
 	fi
 
 	if [ -n "$$EXISTING_STORE" ]; then                                          \
-	    STORE=`BASENAME "$$EXISTING_STORE"`;                                    \
+	    STORE=`basename "$$EXISTING_STORE"`;                                    \
 	    ostree --repo=${d}/mddb/$$STORE init --mode=archive;                    \
 	    ostree --repo=${d}/mddb/$$STORE remote add existing "$$EXISTING_STORE"; \
 	    # note: pulls with --depth=0, only the last commit                      \
