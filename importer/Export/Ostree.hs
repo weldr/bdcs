@@ -23,11 +23,11 @@ module Export.Ostree(ostreeSink)
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
 import           Control.Conditional(condM, otherwiseM, whenM)
 import           Control.Monad(void, when)
-import           Control.Monad.Except(MonadError, throwError)
+import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
-import qualified Data.ByteString as BS (readFile, writeFile)
+import qualified Data.ByteString as BS (readFile)
 import qualified Data.Conduit.List as CL
 import           Data.List(isPrefixOf)
 import           System.Directory
@@ -163,20 +163,20 @@ ostreeSink outPath = do
             recurseAndEmit
 
         yieldLink :: MonadIO m => FilePath -> FilePath -> Producer m String
-        yieldLink basePath realPath = do
-            target <- liftIO $ readSymbolicLink realPath
-            yield $ printf "L %s - - - - %s" basePath target
+        yieldLink baseFilePath realFilePath = do
+            target <- liftIO $ readSymbolicLink realFilePath
+            yield $ printf "L %s - - - - %s" baseFilePath target
 
         yieldDir :: MonadIO m => FilePath -> FilePath -> Producer m String
-        yieldDir basePath realPath = do
-            stat <- liftIO $ getFileStatus realPath
+        yieldDir baseDirPath realDirPath = do
+            stat <- liftIO $ getFileStatus realDirPath
 
             -- coerce the stat fields into a type that implements PrintfArg
             let mode = fromIntegral $ fileMode stat :: Integer
             let userId = fromIntegral $ fileOwner stat :: Integer
             let groupId = fromIntegral $ fileGroup stat :: Integer
 
-            yield $ printf "d %s %#o %d %d - -" basePath mode userId groupId
+            yield $ printf "d %s %#o %d %d - -" baseDirPath mode userId groupId
 
     installKernelInitrd :: FilePath -> IO ()
     installKernelInitrd exportDir = do

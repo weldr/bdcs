@@ -171,9 +171,9 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
  where
     -- helper function that takes an assignment map and a formula
     solveCNF' :: Ord a => CNFFormula a -> AssignmentState a (Maybe [DepAssignment a])
-    solveCNF' formula =
+    solveCNF' f =
         -- simplify the formula. simplify will recurse as necessary
-        simplify formula >>= \case
+        simplify f >>= \case
             -- if things failed during simplify, the formula is unsatisfiable
             Nothing   -> return Nothing
             -- All clauses have been satisfied, we're done. Return the assignments
@@ -191,18 +191,19 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
             tryAssignments = Map.insert (atomToLiteral firstLiteral) val assignments
          in
             evalState (solveCNF' f) tryAssignments
+    guessAndCheck _ = return Nothing
 
     simplify :: Ord a => CNFFormula a -> AssignmentState a (Maybe (CNFFormula a))
-    simplify formula = do
+    simplify f = do
         -- pureLiteralEliminate only updates the assignments, the assigned literals are actually
         -- removed by unitPropagate.
-        pureLiteralEliminate Set.empty formula
+        pureLiteralEliminate Set.empty f
 
-        unitPropagate formula >>= \case
+        unitPropagate f >>= \case
             Nothing -> return Nothing
             result@(Just upFormula) ->
                 -- repeat until the formula doesn't change
-                if formula == upFormula then return result
+                if f == upFormula then return result
                 else simplify upFormula
 
     -- find pure literals and add them to the assignment map. This just updates assignments and does not make a decision as
@@ -231,8 +232,8 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
                 (CNFNot  a, Nothing, _) -> (unpure, Map.insert a False assignments)
 
                 -- In the map and matches our guess, keep it
-                (CNFAtom a, Just True,  _) -> (unpure, assignments)
-                (CNFNot  a, Just False, _) -> (unpure, assignments)
+                (CNFAtom _, Just True,  _) -> (unpure, assignments)
+                (CNFNot  _, Just False, _) -> (unpure, assignments)
 
                 -- otherwise we guessed wrong. Remove from the map and add to unpure
                 _ -> (Set.insert literalX unpure, Map.delete literalX assignments)
@@ -251,14 +252,14 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
         satisfiable assignments = let
             literalX = atomToLiteral x
             boolX = atomToBool x
-            lookup = Map.lookup literalX assignments
+            literalLookup = Map.lookup literalX assignments
          in
-            -- if lookup is Nothing, this is a new literal. add it to assignments
-            if | isNothing lookup     -> (True, Map.insert literalX boolX assignments)
+            -- if literalLookup is Nothing, this is a new literal. add it to assignments
+            if | isNothing literalLookup     -> (True, Map.insert literalX boolX assignments)
                -- old literal, matches
-               | Just boolX == lookup -> (True, assignments)
+               | Just boolX == literalLookup -> (True, assignments)
                -- old literal, does not match
-               | otherwise            -> (False, assignments)
+               | otherwise                   -> (False, assignments)
 
     -- for clauses with more than one thing:
     -- if the clause contains any literal that matches the map, the whole clause is true and we can remove it
@@ -273,6 +274,8 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
         if | clauseTrue          -> unitPropagate ys
            | null clauseFiltered -> return Nothing
            | otherwise           -> (unitPropagate <$> (clauseFiltered:)) ys
+
+    unitPropagate _ = return Nothing
 
     assignmentsToList :: Ord a => AssignmentState a [DepAssignment a]
     assignmentsToList = do

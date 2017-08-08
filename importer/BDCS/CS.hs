@@ -67,8 +67,8 @@ data FileContents = FileContents { metadata :: Metadata,
 
 -- Given a commit, return the parent of it or Nothing if no parent exists.
 parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
-parentCommit repo commit =
-    catch (Just <$> repoResolveRev repo commit False)
+parentCommit repo commitSum =
+    catch (Just <$> repoResolveRev repo commitSum False)
           (\(_ :: SomeException) -> return Nothing)
 
 -- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
@@ -88,8 +88,8 @@ commit repo repoFile subject body =
 -- Given an open ostree repo and a checksum to some commit, return a ChecksumMap.  This is useful for
 -- creating a mapping in the MDDB from some MDDB object to its content in the ostree store.
 commitContents :: IsRepo a => a -> T.Text -> StateT ChecksumMap IO ()
-commitContents repo commit = do
-    (root, _) <- repoReadCommit repo commit noCancellable
+commitContents repo commitSum = do
+    (root, _) <- repoReadCommit repo commitSum noCancellable
     file <- fileResolveRelativePath root "/"
     info <- fileQueryInfo file "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
     walk file info

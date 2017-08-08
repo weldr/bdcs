@@ -54,18 +54,21 @@ import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFile
 import BDCS.Label.FileLabels(apply)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
-import BDCS.Scripts(insertScript)
 import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
 import BDCS.RPM.Builds(mkBuild)
 import BDCS.RPM.Files(mkFiles)
 import BDCS.RPM.Groups(createGroup)
 import BDCS.RPM.Projects(mkProject)
-import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromURI)
 import Import.State(ImportState(..))
+
+#ifdef SCRIPTS
+import BDCS.Scripts(insertScript)
+import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
+#endif
 
 buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
 buildImported sigs =
@@ -137,7 +140,7 @@ unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
 
     -- Pair up files with their IDs in the Files table.  Then use this mapping to add all the
     -- various file-based labels to the KeyVal table.
-    apply (zip files filesIds)
+    void $ apply (zip files filesIds)
 
     void $ associateFilesWithBuild filesIds buildId
     void $ associateFilesWithPackage filesIds pkgNameId

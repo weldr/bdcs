@@ -34,7 +34,6 @@ import           System.Posix.Types(CMode(..))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
-import           BDCS.Version
 import           Utils.Conduit(sourceInputStream)
 
 directorySink :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()

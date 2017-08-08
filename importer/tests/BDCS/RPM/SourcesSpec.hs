@@ -21,7 +21,6 @@ import Codec.RPM.Tags(Tag(..))
 import Control.Exception(evaluate)
 import Test.Hspec
 
-import BDCS.DB(Projects(..))
 import BDCS.Exceptions(DBException(..))
 import BDCS.RPM.Sources(mkSource)
 
