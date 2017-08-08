@@ -13,10 +13,11 @@ weld-f25:
 	$(MAKE) -C welder-deployment weld-f25
 	-rm -rf ./welder-deployment
 
-importer:
-	docker build -t $(ORG_NAME)/build-img -f Dockerfile.build .
+importer: Dockerfile.build
+	docker build -t $(ORG_NAME)/build-img -f $< .
 	docker create --name build-cont $(ORG_NAME)/build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
+	docker cp build-cont:/root/.cabal/bin/export ./export
 	docker rm build-cont
 	docker build -t $(ORG_NAME)/import-img .
 
