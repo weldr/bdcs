@@ -88,9 +88,9 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
                                  (gkv_rel   `InnerJoin` kv_rel)  `InnerJoin`
                                  (gkv_arch  `InnerJoin` kv_arch) `LeftOuterJoin`
                                  (gkv_epoch `InnerJoin` kv_epoch)) -> do
-        on     $ kv_epoch ?. KeyValId ==. gkv_epoch ?. GroupKeyValuesKey_val_id &&.
-                 kv_epoch ?. KeyValKey_value ==. just (val $ TextKey "epoch")
-        on     $ gkv_epoch ?. GroupKeyValuesGroup_id ==. just (gkv_arch ^. GroupKeyValuesGroup_id)
+        on     $ kv_epoch ^. KeyValId ==. gkv_epoch ^. GroupKeyValuesKey_val_id &&.
+                 kv_epoch ^. KeyValKey_value ==. val (TextKey "epoch")
+        on     $ gkv_epoch ^. GroupKeyValuesGroup_id ==. gkv_arch ^. GroupKeyValuesGroup_id
         on     $ kv_arch ^. KeyValId ==. gkv_arch ^. GroupKeyValuesKey_val_id &&.
                  kv_arch ^. KeyValKey_value ==. val (TextKey "arch")
         on     $ gkv_arch ^. GroupKeyValuesGroup_id ==. gkv_rel ^. GroupKeyValuesGroup_id
@@ -106,12 +106,6 @@ nevraToGroupId (n, e, v, r, a) = firstResult $
                  kv_ver   ^. KeyValVal_value ==. just (val v) &&.
                  kv_rel   ^. KeyValVal_value ==. just (val r) &&.
                  kv_arch  ^. KeyValVal_value ==. just (val a) &&.
-                 cmpEpoch (kv_epoch ?. KeyValVal_value)
+                 kv_epoch ^. KeyValVal_value ==? e
         limit 1
         return $ gkv_name ^. GroupKeyValuesGroup_id
- where
-    -- If there is an epoch, do 'key_val.val_value == <epoch>'
-    -- If there is no epoch, do 'key_val.val_value is null'
-    cmpEpoch = case e of
-        Nothing -> isNothing
-        Just _  -> (==. just (val e))

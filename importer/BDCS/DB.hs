@@ -31,7 +31,8 @@ import           Data.ByteString(ByteString)
 import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
-import           Database.Esqueleto(Key, PersistEntity, SqlBackend, SqlPersistT, ToBackendKey, Value, insert,  unValue)
+import           Database.Esqueleto(Esqueleto, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
+                                    (==.), insert, isNothing, val, unValue)
 import           Database.Persist.TH
 
 import BDCS.KeyType
@@ -152,9 +153,27 @@ firstResult query = do
 -- by some other database query.  If the key is Nothing, return the default value.  Otherwise,
 -- run the function on the key and return that value.
 maybeKey :: MonadIO m => m b -> (t -> m b) -> m (Maybe t) -> m b
-maybeKey def fn val = val >>= \case
+maybeKey def fn value = value >>= \case
     Nothing -> def
     Just v  -> fn v
+
+-- Return a query fragment to match a Maybe value.
+-- If the value is Nothing, this is equivalent to (column is NULL)
+-- If the value is Just x, this is (value == column)
+-- Unlike the other Esqueleto operators, the right-hand value is not boxed in a Value,
+-- since we need to examine it in order to generate the correct SQL.
+--
+-- e.g., with a table like:
+--    create table example (
+--      id integer primary key,
+--      value text );
+-- you could use an esqueleto query like:
+--    select $ from $ \example -> do
+--    where_ $ maybeVal ==? (example ?. ExampleValue)
+infix 4 ==?
+(==?) :: (PersistField typ, Esqueleto query expr backend) => expr (Value (Maybe typ)) -> Maybe typ -> expr (Value Bool)
+(==?) column Nothing = isNothing column
+(==?) column value@(Just _) = column ==. val value
 
 -- Attempt to find a record in some table of the database.  If it exists, return its key.
 -- If it doesn't exist, perform some other action and return the key given by that action.

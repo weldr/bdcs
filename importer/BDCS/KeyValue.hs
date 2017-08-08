@@ -18,7 +18,6 @@ module BDCS.KeyValue(findKeyValue,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import qualified Data.Maybe as Maybe
 import qualified Data.Text as T
 import           Database.Esqueleto
 
@@ -29,8 +28,8 @@ findKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersi
 findKeyValue k v e = firstResult $
     select $ from $ \kv -> do
     where_ $ kv ^. KeyValKey_value ==. val k &&.
-             (kv ^. KeyValVal_value ==. val v ||. (val (Maybe.isNothing v) &&. isNothing (kv ^. KeyValVal_value))) &&.
-             (kv ^. KeyValExt_value ==. val e ||. (val (Maybe.isNothing v) &&. isNothing (kv ^.KeyValExt_value)))
+             kv ^. KeyValVal_value ==? v &&.
+             kv ^. KeyValExt_value ==? e
     limit 1
     return $ kv ^. KeyValId
 
