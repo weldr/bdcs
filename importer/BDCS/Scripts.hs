@@ -30,7 +30,7 @@ findScript ty body name _ver _ndx _flags = firstResult $
     select $ from $ \script -> do
     where_ $ script ^. ScriptsTy ==. val ty &&.
              script ^. ScriptsBody ==. val body &&.
-             (isNothing (val name) &&. isNothing (script ^. ScriptsTrigger_name) ||. script ^. ScriptsTrigger_name ==. val name)
+             script ^. ScriptsTrigger_name ==? name
     limit 1
     return $ script ^. ScriptsId
 
