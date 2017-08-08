@@ -16,7 +16,6 @@
 module BDCS.Label.FileLabels(apply)
  where
 
-import Control.Monad(forM_, when)
 import Control.Monad.IO.Class(MonadIO)
 import Database.Esqueleto(Key, SqlPersistT)
 

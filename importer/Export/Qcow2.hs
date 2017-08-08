@@ -18,14 +18,11 @@
 module Export.Qcow2(qcow2Sink)
  where
 
-import Control.Conditional(whenM)
 import Control.Monad.IO.Class(MonadIO, liftIO)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
-import Data.List(intercalate)
-import Data.List.Split(splitOn)
-import System.Directory(createDirectoryIfMissing, doesFileExist, removePathForcibly, renameFile)
-import System.FilePath((</>), takeDirectory)
+import System.Directory(removePathForcibly)
+import System.FilePath(takeDirectory)
 import System.IO.Temp(createTempDirectory)
 import System.Process(callProcess)
 
@@ -33,8 +30,6 @@ import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
 import           Export.Utils(runHacks, runTmpfiles)
-
-import Paths_bdcs(getDataFileName)
 
 qcow2Sink :: (MonadResource m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =

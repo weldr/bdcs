@@ -26,7 +26,7 @@ import           Database.Esqueleto
 import BDCS.DB
 
 findScript :: MonadIO m => T.Text -> T.Text -> Maybe T.Text -> Maybe T.Text -> Maybe Int -> Maybe Int -> SqlPersistT m (Maybe (Key Scripts))
-findScript ty body name ver ndx flags = firstResult $
+findScript ty body name _ver _ndx _flags = firstResult $
     select $ from $ \script -> do
     where_ $ script ^. ScriptsTy ==. val ty &&.
              script ^. ScriptsBody ==. val body &&.

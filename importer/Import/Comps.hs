@@ -82,7 +82,7 @@ extractGroups doc = let
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do
-    groups <- extractGroups <$> runConduitRes (readMetadataPipeline uri)
+    _groups <- extractGroups <$> runConduitRes (readMetadataPipeline uri)
     -- FIXME:  For now we don't actually do any loading.  There's a lot of questions
     -- about how this is going to fit into the database, but I want to make sure this
     -- code doesn't get lost.

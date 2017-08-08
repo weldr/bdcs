@@ -22,7 +22,7 @@ module Utils(fakeKey,
 
 import Control.Monad(void)
 import Control.Monad.IO.Class(MonadIO)
-import Control.Monad.Trans.Resource(MonadBaseControl, MonadResource, ResourceT)
+import Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
 import Control.Monad.Logger(NoLoggingT)
 import Database.Persist.Sql(Key, SqlBackend, SqlPersistT, ToBackendKey, insertKey, runMigrationSilent, toSqlKey)
 import Database.Persist.Sqlite(runSqlite)

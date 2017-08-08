@@ -20,7 +20,7 @@ import           Control.Monad.IO.Class(MonadIO)
 import qualified Data.Text as T
 import           Database.Esqueleto(Key, SqlPersistT, insert)
 
-import BDCS.DB(Files, FileKeyValues(..), KeyVal, maybeKey)
+import BDCS.DB(Files, FileKeyValues(..), maybeKey)
 import BDCS.KeyValue(findKeyValue, insertKeyValue)
 import BDCS.KeyType(KeyType(..))
 import BDCS.Label.Types(Label)
