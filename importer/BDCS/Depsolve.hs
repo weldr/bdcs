@@ -22,7 +22,7 @@ module BDCS.Depsolve(Formula(..),
                      CNFLiteral(..),
                      CNFAtom(..),
                      CNFFormula,
-                     formulaToCnf,
+                     formulaToCNF,
                      solveCNF
 -- export private symbols for testing
 #ifdef TEST
@@ -66,16 +66,16 @@ data CNFAtom a = CNFAtom (CNFLiteral a)
 
 type CNFFormula a = [[CNFAtom a]]
 
-formulaToCnf :: Formula a -> CNFFormula a
-formulaToCnf f =
+formulaToCNF :: Formula a -> CNFFormula a
+formulaToCNF f =
     -- wrap the call in a State Int starting at 0 to create a counter for substitution variables
-    evalState (formulaToCnf' f) 0
+    evalState (formulaToCNF' f) 0
  where
-    formulaToCnf' :: Formula a -> State Int (CNFFormula a)
+    formulaToCNF' :: Formula a -> State Int (CNFFormula a)
 
     -- easy ones: a becomes AND(OR(a)), NOT(a) becomes AND(OR(NOT(a)))
-    formulaToCnf' (Atom x) = return [[CNFAtom (CNFOriginal x)]]
-    formulaToCnf' (Not x)  = return [[CNFNot (CNFOriginal x)]]
+    formulaToCNF' (Atom x) = return [[CNFAtom (CNFOriginal x)]]
+    formulaToCNF' (Not x)  = return [[CNFNot (CNFOriginal x)]]
 
     -- -- for an expression of the form And [a1, a2, a3, ...], we need to convert
     -- each a1, a2, ... to CNF and concatenate the results.
@@ -93,7 +93,7 @@ formulaToCnf f =
     --     Or[a1_or2_1, a1_or2_2],
     --     Or[a2_or1_1, a2_or1_2],
     --     Or[a2_or2_1, a2_or2_2]]
-    formulaToCnf' (And andFormulas) = concatMapM formulaToCnf' andFormulas
+    formulaToCNF' (And andFormulas) = concatMapM formulaToCNF' andFormulas
 
     -- For Or, the equivalent formula is exponentially larger than the original, so instead
     -- create an equisatisfiable formula using new substitution variables, via Tseytin transformations.
@@ -127,21 +127,21 @@ formulaToCnf f =
     -- to CNF via distribution as above. We then have <cnf-of-head> AND <cnf-of-tail>, which is CNF.
 
     -- end of recursion: OR of nothing is nothing, OR of 1 thing is just that thing
-    formulaToCnf' (Or []) = return [[]]
-    formulaToCnf' (Or [x]) = formulaToCnf' x
+    formulaToCNF' (Or []) = return [[]]
+    formulaToCNF' (Or [x]) = formulaToCNF' x
 
-    formulaToCnf' (Or (x:xs)) = do
+    formulaToCNF' (Or (x:xs)) = do
         -- Get and increment the counter
         subVar <- state $ \i -> (CNFSubstitute i, i+1)
 
         -- recurse on the left hand expression
-        lhCNF <- formulaToCnf' x
+        lhCNF <- formulaToCNF' x
 
         -- distribute NOT(subVar) AND lhCNF by adding NOT(subVar) into each of the OR lists
         let lhSubCNF = map (CNFNot subVar:) lhCNF
 
         -- recurse on the right hand side
-        rhCNF <- formulaToCnf' (Or xs)
+        rhCNF <- formulaToCNF' (Or xs)
 
         -- distribute subVar across the right hand expression
         let rhSubCNF = map (CNFAtom subVar:) rhCNF
