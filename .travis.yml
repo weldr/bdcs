@@ -68,13 +68,14 @@ script:
   - ./tests/test_export.sh
 
   # collect coverage data from binaries
-  - mkdir ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
+  - mkdir ./dist/hpc/vanilla/tix/bdcs-tmpfiles/ ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
+  - mv bdcs-tmpfiles.tix ./dist/hpc/vanilla/tix/bdcs-tmpfiles/
   - mv import.tix ./dist/hpc/vanilla/tix/import/
   - mv export.tix ./dist/hpc/vanilla/tix/export/
 
 
 after_success:
-  - ~/.cabal/bin/hpc-coveralls --display-report test-db import export
+  - ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles
 
 notifications:
   email:
