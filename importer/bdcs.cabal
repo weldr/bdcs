@@ -281,9 +281,11 @@ Test-Suite test-bdcs
                         base >= 4.8 && < 5.0,
                         codec-rpm >= 0.1.1 && < 0.2,
                         monad-logger,
+                        mtl >= 2.2.1,
                         persistent,
                         persistent-sqlite,
                         resourcet,
+                        text,
                         bdcs
 
     default-language:   Haskell2010
