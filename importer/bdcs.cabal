@@ -288,4 +288,6 @@ Test-Suite test-bdcs
                         text,
                         bdcs
 
+    ghc-options:        -Wall
+
     default-language:   Haskell2010
