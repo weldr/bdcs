@@ -13,6 +13,7 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE TupleSections #-}
@@ -22,7 +23,13 @@ module BDCS.Depsolve(Formula(..),
                      CNFAtom(..),
                      CNFFormula,
                      formulaToCnf,
-                     solveCNF)
+                     solveCNF
+-- export private symbols for testing
+#ifdef TEST
+                   , pureLiteralEliminate
+                   , unitPropagate
+#endif
+                     )
  where
 
 import           Control.Applicative((<|>))
@@ -206,77 +213,6 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
                 if f == upFormula then return result
                 else simplify upFormula
 
-    -- find pure literals and add them to the assignment map. This just updates assignments and does not make a decision as
-    -- to satisfiability. It works by assuming every new literal it finds is pure and then correcting as needed. The Set
-    -- argument is the literals that have been found to be unpure (i.e, they appear as both A and ~A)
-    pureLiteralEliminate :: Ord a => Set (CNFLiteral a) -> CNFFormula a -> AssignmentState a ()
-
-    -- end of recursion
-    pureLiteralEliminate _ [] = return ()
-    -- end of a clause, move on to the next one
-    pureLiteralEliminate unpure ([]:ys) = pureLiteralEliminate unpure ys
-
-    pureLiteralEliminate unpure ((x:xs):ys) = do
-        unpure' <- state updateAssignments
-        pureLiteralEliminate unpure' (xs:ys)
-     where
-        updateAssignments assignments = let
-            literalX = atomToLiteral x
-         in
-            case (x, Map.lookup literalX assignments, Set.member literalX unpure) of
-                -- something we've already marked as unpure, skip it
-                (_, _, True) -> (unpure, assignments)
-
-                -- Not in the map, add it
-                (CNFAtom a, Nothing, _) -> (unpure, Map.insert a True assignments)
-                (CNFNot  a, Nothing, _) -> (unpure, Map.insert a False assignments)
-
-                -- In the map and matches our guess, keep it
-                (CNFAtom _, Just True,  _) -> (unpure, assignments)
-                (CNFNot  _, Just False, _) -> (unpure, assignments)
-
-                -- otherwise we guessed wrong. Remove from the map and add to unpure
-                _ -> (Set.insert literalX unpure, Map.delete literalX assignments)
-
-    unitPropagate :: Ord a => CNFFormula a -> AssignmentState a (Maybe (CNFFormula a))
-
-    -- We have a unit! If it's new, add it to assignments and eliminate the unit
-    -- If it's something in assignments, check that it matches
-    unitPropagate ([x]:ys) = do
-        isSatisfiable <- state satisfiable
-        if isSatisfiable then
-            unitPropagate ys
-        else
-            return Nothing
-     where
-        satisfiable assignments = let
-            literalX = atomToLiteral x
-            boolX = atomToBool x
-            literalLookup = Map.lookup literalX assignments
-         in
-            -- if literalLookup is Nothing, this is a new literal. add it to assignments
-            if | isNothing literalLookup     -> (True, Map.insert literalX boolX assignments)
-               -- old literal, matches
-               | Just boolX == literalLookup -> (True, assignments)
-               -- old literal, does not match
-               | otherwise                   -> (False, assignments)
-
-    -- for clauses with more than one thing:
-    -- if the clause contains any literal that matches the map, the whole clause is true and we can remove it
-    -- otherwise, remove any literals that do not match the map, as they cannot be true. If, after removing
-    -- untrue literals, the clause is empty, the expression is unsolvable.
-    unitPropagate (clause:ys) = do
-        assignments <- get
-
-        let clauseTrue = any (\atom -> Just (atomToBool atom) == Map.lookup (atomToLiteral atom) assignments) clause
-        let clauseFiltered = filter (\atom -> Just (not (atomToBool atom)) == Map.lookup (atomToLiteral atom) assignments) clause
-
-        if | clauseTrue          -> unitPropagate ys
-           | null clauseFiltered -> return Nothing
-           | otherwise           -> (unitPropagate <$> (clauseFiltered:)) ys
-
-    unitPropagate _ = return Nothing
-
     assignmentsToList :: Ord a => AssignmentState a [DepAssignment a]
     assignmentsToList = do
         -- start by getting everything out of the map as a list of (CNFLiteral, Bool)
@@ -286,16 +222,87 @@ solveCNF formula = evalState (solveCNF' formula) Map.empty
          -- map each (literal, bool) to Maybe (orig, bool), mapMaybe will filter out the Nothings
         return $ mapMaybe (\(literal, value) -> (,value) <$> literalToOriginal literal) literalList
 
-    -- unwrap an atom
-    atomToLiteral :: CNFAtom a -> CNFLiteral a
-    atomToLiteral (CNFAtom x) = x
-    atomToLiteral (CNFNot x)  = x
-
-    atomToBool :: CNFAtom a -> Bool
-    atomToBool (CNFAtom _) = True
-    atomToBool (CNFNot _)  = False
-
     -- unwrap original values, discard substitutes
     literalToOriginal :: CNFLiteral a -> Maybe a
     literalToOriginal (CNFOriginal x) = Just x
     literalToOriginal _ = Nothing
+
+-- find pure literals and add them to the assignment map. This just updates assignments and does not make a decision as
+-- to satisfiability. It works by assuming every new literal it finds is pure and then correcting as needed. The Set
+-- argument is the literals that have been found to be unpure (i.e, they appear as both A and ~A)
+pureLiteralEliminate :: Ord a => Set (CNFLiteral a) -> CNFFormula a -> AssignmentState a ()
+
+-- end of recursion
+pureLiteralEliminate _ [] = return ()
+-- end of a clause, move on to the next one
+pureLiteralEliminate unpure ([]:ys) = pureLiteralEliminate unpure ys
+
+pureLiteralEliminate unpure ((x:xs):ys) = do
+    unpure' <- state updateAssignments
+    pureLiteralEliminate unpure' (xs:ys)
+ where
+    updateAssignments assignments = let
+        literalX = atomToLiteral x
+     in
+        case (x, Map.lookup literalX assignments, Set.member literalX unpure) of
+            -- something we've already marked as unpure, skip it
+            (_, _, True) -> (unpure, assignments)
+
+            -- Not in the map, add it
+            (CNFAtom a, Nothing, _) -> (unpure, Map.insert a True assignments)
+            (CNFNot  a, Nothing, _) -> (unpure, Map.insert a False assignments)
+
+            -- In the map and matches our guess, keep it
+            (CNFAtom _, Just True,  _) -> (unpure, assignments)
+            (CNFNot  _, Just False, _) -> (unpure, assignments)
+
+            -- otherwise we guessed wrong. Remove from the map and add to unpure
+            _ -> (Set.insert literalX unpure, Map.delete literalX assignments)
+
+unitPropagate :: Ord a => CNFFormula a -> AssignmentState a (Maybe (CNFFormula a))
+
+-- We have a unit! If it's new, add it to assignments and eliminate the unit
+-- If it's something in assignments, check that it matches
+unitPropagate ([x]:ys) = do
+    isSatisfiable <- state satisfiable
+    if isSatisfiable then
+        unitPropagate ys
+    else
+        return Nothing
+ where
+    satisfiable assignments = let
+        literalX = atomToLiteral x
+        boolX = atomToBool x
+        literalLookup = Map.lookup literalX assignments
+     in
+        -- if literalLookup is Nothing, this is a new literal. add it to assignments
+        if | isNothing literalLookup     -> (True, Map.insert literalX boolX assignments)
+           -- old literal, matches
+           | Just boolX == literalLookup -> (True, assignments)
+           -- old literal, does not match
+           | otherwise                   -> (False, assignments)
+
+-- for clauses with more than one thing:
+-- if the clause contains any literal that matches the map, the whole clause is true and we can remove it
+-- otherwise, remove any literals that do not match the map, as they cannot be true. If, after removing
+-- untrue literals, the clause is empty, the expression is unsolvable.
+unitPropagate (clause:ys) = do
+    assignments <- get
+
+    let clauseTrue = any (\atom -> Just (atomToBool atom) == Map.lookup (atomToLiteral atom) assignments) clause
+    let clauseFiltered = filter (\atom -> Just (not (atomToBool atom)) == Map.lookup (atomToLiteral atom) assignments) clause
+
+    if | clauseTrue          -> unitPropagate ys
+       | null clauseFiltered -> return Nothing
+       | otherwise           -> (unitPropagate <$> (clauseFiltered:)) ys
+
+unitPropagate _ = return Nothing
+
+-- unwrap an atom
+atomToLiteral :: CNFAtom a -> CNFLiteral a
+atomToLiteral (CNFAtom x) = x
+atomToLiteral (CNFNot x)  = x
+
+atomToBool :: CNFAtom a -> Bool
+atomToBool (CNFAtom _) = True
+atomToBool (CNFNot _)  = False
