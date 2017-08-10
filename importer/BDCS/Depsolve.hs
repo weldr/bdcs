@@ -284,7 +284,9 @@ unitPropagate assignments ([x]:ys) = do
 -- untrue literals, the clause is empty, the expression is unsolvable.
 unitPropagate assignments (clause:ys) = do
     let clauseTrue = any (\atom -> Just (atomToBool atom) == Map.lookup (atomToLiteral atom) assignments) clause
-    let clauseFiltered = filter (\atom -> Just (not (atomToBool atom)) == Map.lookup (atomToLiteral atom) assignments) clause
+    let clauseFiltered = filter (\atom -> case Map.lookup (atomToLiteral atom) assignments of
+                                            Nothing -> True
+                                            Just x  -> x == atomToBool atom) clause
 
     if | clauseTrue          -> unitPropagate assignments ys
        | null clauseFiltered -> throwError "Unable to solve expression"
