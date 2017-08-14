@@ -111,6 +111,7 @@ library
                         network-uri,
                         parsec,
                         parsec-numbers,
+                        persistent,
                         persistent-sqlite,
                         persistent-template,
                         process,

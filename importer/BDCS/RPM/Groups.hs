@@ -20,13 +20,15 @@ module BDCS.RPM.Groups(createGroup)
  where
 
 import           Codec.RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
+import           Control.Conditional((<&&>), whenM)
 import           Control.Monad(forM_, void, when)
 import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.State(State, execState, get, modify)
 import           Data.Bits(testBit)
 import           Data.Maybe(fromJust, isJust)
 import qualified Data.Text as T
 import           Data.Word(Word32)
-import           Database.Esqueleto
+import           Database.Persist.Sql(SqlPersistT, insert)
 
 import           BDCS.DB
 import           BDCS.GroupKeyValue(insertGroupKeyValue)
@@ -37,13 +39,13 @@ import           BDCS.RPM.Requirements(mkGroupRequirement, mkRequirement)
 
 addPRCO :: MonadIO m => [Tag] -> Key Groups -> T.Text -> T.Text -> SqlPersistT m ()
 addPRCO tags groupId tagBase keyName =
-    withPRCO tagBase tags $ \expr -> let
+    withPRCO tagBase tags $ \(_, expr) -> let
         -- split out the name part of "name >= version"
         exprBase = T.takeWhile (/= ' ')  expr
       in
         insertGroupKeyValue (TextKey keyName) exprBase (Just expr) groupId
 
-prcoExpressions :: T.Text -> [Tag] -> [T.Text]
+prcoExpressions :: T.Text -> [Tag] -> [(Word32, T.Text)]
 prcoExpressions ty tags = let
     ty'   = T.toTitle ty
 
@@ -51,7 +53,7 @@ prcoExpressions ty tags = let
     flags =              findWord32ListTag (T.unpack ty' ++ "Flags") tags
     vers  = map T.pack $ findStringListTag (T.unpack ty' ++ "Version") tags
  in
-    map (\(n, f, v) -> T.stripEnd $ T.concat [n, " ", rpmFlagsToOperator f, " ", v])
+    zip flags $ map (\(n, f, v) -> T.stripEnd $ T.concat [n, " ", rpmFlagsToOperator f, " ", v])
         (zip3 names flags vers)
 
 rpmFlagsToOperator :: Word32 -> T.Text
@@ -63,7 +65,48 @@ rpmFlagsToOperator f =
        | f `testBit` 3                  -> "="
        | otherwise                      -> ""
 
-withPRCO :: Monad m => T.Text -> [Tag] -> (T.Text -> m a) -> m ()
+-- Return the list of contexts to which this requirement applies
+-- RPM interprets a combination of RPMSENSE_SCRIPT_* flags as meaning that the requirement is needed for
+-- each of those script types. If the requirement is *also* needed for Runtime, it will appear
+-- again in the requirements without any SCRIPT_* flags.
+--
+-- RPMSENSE_INTERP is annoying: it doesn't add any information (INTERP | SCRIPT_PRE is just another %pre requirement)
+-- *unless* it appears on its own, which instead means that it applies to all script types present.
+--
+-- Ignoring RPMSENSE_CONFIG, since config(whatever) requirements have matching config(whatever) provides without
+-- bringing flags into it.
+--
+-- Also ignoring RPMSENSE_TRIGGER*, since they don't appear to ever be used
+rpmFlagsToContexts :: [Tag] -> Word32 -> [RT.ReqContext]
+rpmFlagsToContexts tags flags =
+    execState rpmFlagsToContextsState []
+ where
+    rpmFlagsToContextsState :: State [RT.ReqContext] ()
+    rpmFlagsToContextsState = do
+        when (flags `testBit`  9) (modify (RT.ScriptPre:))
+        when (flags `testBit` 10) (modify (RT.ScriptPost:))
+        when (flags `testBit` 11) (modify (RT.ScriptPreUn:))
+        when (flags `testBit` 12) (modify (RT.ScriptPostUn:))
+        when (flags `testBit`  7) (modify (RT.ScriptPreTrans:))
+        when (flags `testBit`  5) (modify (RT.ScriptPostTrans:))
+        when (flags `testBit` 13) (modify (RT.ScriptVerify:))
+
+        -- Check for a bare RPMSENSE_INTERP
+        whenM ((null <$> get) <&&> (return $ flags `testBit` 8)) $ do
+            when ((isJust . findTag "PreIn")  tags) (modify (RT.ScriptPre:))
+            when ((isJust . findTag "PostIn") tags) (modify (RT.ScriptPost:))
+            when ((isJust . findTag "PreUn")  tags) (modify (RT.ScriptPreUn:))
+            when ((isJust . findTag "PostUn") tags) (modify (RT.ScriptPost:))
+            when ((isJust . findTag "PreTrans") tags)  (modify (RT.ScriptPreTrans:))
+            when ((isJust . findTag "PostTrans") tags) (modify (RT.ScriptPostTrans:))
+            when ((isJust . findTag "VerifyScript") tags) (modify (RT.ScriptVerify:))
+
+        when (flags `testBit` 24) (modify (RT.Feature:))
+
+        -- If nothing else set, return Runtime
+        whenM (null <$> get) (modify (RT.Runtime:))
+
+withPRCO :: Monad m => T.Text -> [Tag] -> ((Word32, T.Text) -> m a) -> m ()
 withPRCO ty tags fn =
     mapM_ fn (prcoExpressions ty tags)
 
@@ -100,12 +143,13 @@ createGroup fileIds rpm = do
     -- Create the Requires attributes
     forM_ [("Require", RT.Must), ("Recommend", RT.Should), ("Suggest", RT.May),
            ("Supplement", RT.ShouldIfInstalled), ("Enhance", RT.MayIfInstalled)] $ \tup ->
-        withPRCO (fst tup) rpm $ \expr -> do
-            reqId <- insertRequirement $ mkRequirement (snd tup) expr
+        withPRCO (fst tup) rpm $ \(flags, expr) ->
+            forM_ (rpmFlagsToContexts rpm flags) $ \context -> do
+                reqId <- insertRequirement $ mkRequirement context (snd tup) expr
 
-            -- Don't insert a requirement for a group more than once.  RPMs can have the same
-            -- requirement listed multiple times, for whatever reason, but we want to reduce
-            -- duplication.
-            void $ insertGroupRequirement $ mkGroupRequirement groupId reqId
+                -- Don't insert a requirement for a group more than once.  RPMs can have the same
+                -- requirement listed multiple times, for whatever reason, but we want to reduce
+                -- duplication.
+                insertGroupRequirement $ mkGroupRequirement groupId reqId
 
     return groupId

@@ -24,7 +24,17 @@ import Database.Persist.TH
 data ReqLanguage = RPM
  deriving(Eq, Read, Show)
 
-data ReqContext = Build | Runtime | Test
+data ReqContext = Build
+                | Runtime
+                | Test
+                | ScriptPre         -- before a package install
+                | ScriptPost        -- after a package install
+                | ScriptPreUn       -- before a package uninstall
+                | ScriptPostUn      -- after a package uninstall
+                | ScriptPreTrans    -- before a package transaction
+                | ScriptPostTrans   -- after a package transaction
+                | ScriptVerify      -- package verification script
+                | Feature           -- feature requirement, e.g. rpmlib features
  deriving(Eq, Read, Show)
 
 data ReqStrength = Must | Should | May | ShouldIfInstalled | MayIfInstalled
