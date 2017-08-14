@@ -29,6 +29,6 @@ mkGroupRequirement :: Key Groups -> Key Requirements -> GroupRequirements
 mkGroupRequirement groupId reqId =
     GroupRequirements groupId reqId
 
-mkRequirement :: RT.ReqStrength -> T.Text -> Requirements
-mkRequirement strength expr =
-    Requirements RT.RPM RT.Runtime strength expr
+mkRequirement :: RT.ReqContext -> RT.ReqStrength -> T.Text -> Requirements
+mkRequirement context strength expr =
+    Requirements RT.RPM context strength expr
