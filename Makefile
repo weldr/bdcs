@@ -18,12 +18,15 @@ build: Dockerfile.build
 	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
 	docker cp build-cont:/root/.cabal/bin/export ./export
-	docker cp build-cont:/root/.cabal/bin/bdcs-tmpfiles ./bdcs-tmpfiles
-	docker cp build-cont:/importer/dist/ ./dist/
 	docker rm build-cont
 
 importer: build
 	docker build -t $(ORG_NAME)/bdcs-import-img .
+
+integration-test: build Dockerfile.integration-test
+	docker build -t $(ORG_NAME)/bdcs-integration-test -f Dockerfile.integration-test .
+	docker run --rm --name integration-test $(ORG_NAME)/bdcs-integration-test
+
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
 #       Unless KEEP_STORE=1 and KEEP_MDDB=1 are set.

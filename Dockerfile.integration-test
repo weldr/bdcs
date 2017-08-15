@@ -1,0 +1,6 @@
+FROM welder/bdcs-build-img:latest
+MAINTAINER Alexander Todorov <atodorov@redhat.com>
+
+COPY schema.sql /
+COPY entrypoint-integration-test.sh /usr/local/bin/entrypoint-integration-test.sh
+ENTRYPOINT ["/usr/local/bin/entrypoint-integration-test.sh"]
