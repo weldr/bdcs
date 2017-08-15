@@ -60,6 +60,7 @@ usage = do
     putStrLn "dest can be:"
     putStrLn "\t* A directory (which may or may not already exist)"
     putStrLn "\t* The name of a .tar file to be created"
+    putStrLn "\t* The name of a .qcow2 image to be created"
     putStrLn "\t* A directory ending in .repo, which will create a new ostree repo"
     putStrLn "thing can be:"
     putStrLn "\t* The NEVRA of an RPM, e.g. filesystem-3.2-21.el7.x86_64"
