@@ -8,7 +8,6 @@ ENV PATH ~/.cabal/bin:$PATH
 RUN cabal update
 RUN cabal install happy
 RUN cabal install hlint
-RUN cabal install hpc-coveralls
 
 RUN mkdir /importer
 
