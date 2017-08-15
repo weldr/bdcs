@@ -13,12 +13,16 @@ weld-f25:
 	$(MAKE) -C welder-deployment weld-f25
 	-rm -rf ./welder-deployment
 
-importer: Dockerfile.build
+build: Dockerfile.build
 	docker build -t $(ORG_NAME)/bdcs-build-img -f $< .
 	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
 	docker cp build-cont:/root/.cabal/bin/export ./export
+	docker cp build-cont:/root/.cabal/bin/bdcs-tmpfiles ./bdcs-tmpfiles
+	docker cp build-cont:/importer/dist/ ./dist/
 	docker rm build-cont
+
+importer: build
 	docker build -t $(ORG_NAME)/bdcs-import-img .
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
