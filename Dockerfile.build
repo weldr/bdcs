@@ -1,14 +1,27 @@
 FROM juhp/fedora-haskell-ghc:8.0.2
-RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel sqlite-devel \
+RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel sqlite-devel libcurl-devel \
                    https://kojipkgs.fedoraproject.org/packages/ostree/2017.8/2.fc25/x86_64/ostree{,-devel,-libs}-2017.8-2.fc25.x86_64.rpm && \
     dnf clean all
 
 ENV PATH ~/.cabal/bin:$PATH
 
 RUN cabal update
+RUN cabal install happy
+RUN cabal install hlint
+RUN cabal install hpc-coveralls
 
-COPY importer /root/bdcs/importer/
+RUN mkdir /importer
 
-RUN cabal update && cabal install happy && \
-    cd /root/bdcs/importer && cabal install && cabal clean && \
-    cd /root/.cabal && rm -rf lib logs packages
+# install the build dependencies first so we can cache this layer
+COPY importer/*.cabal /importer
+RUN cd /importer/ && cabal update && cabal install --dependencies-only --enable-tests --force-reinstall
+
+# copy the rest of the code and build the application
+COPY importer/ /importer/
+
+WORKDIR /importer/
+RUN hlint .
+RUN cabal configure --enable-tests --enable-coverage
+RUN cabal build
+RUN cabal test --show-details=always
+RUN cabal install
