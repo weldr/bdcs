@@ -14,7 +14,7 @@ weld-f25:
 	-rm -rf ./welder-deployment
 
 build: Dockerfile.build
-	docker build -t $(ORG_NAME)/bdcs-build-img -f $< .
+	docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .
 	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
 	docker cp build-cont:/root/.cabal/bin/export ./export
@@ -25,7 +25,7 @@ importer: build
 
 integration-test: build Dockerfile.integration-test
 	docker build -t $(ORG_NAME)/bdcs-integration-test -f Dockerfile.integration-test .
-	docker run --rm --name integration-test $(ORG_NAME)/bdcs-integration-test
+	docker run --name tests $(ORG_NAME)/bdcs-integration-test
 
 
 # NOTE: The mddb and content store under ./mddb/ will be removed

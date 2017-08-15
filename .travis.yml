@@ -1,83 +1,48 @@
-dist: trusty
 sudo: required
+dist: trusty
 language: c
+services:
+  - docker
 
 cache:
   directories:
     - ~/.ghc
     - ~/.cabal
-    - ./ostree
-
-addons:
-  apt:
-    sources:
-    - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu artful main universe'
-    - sourceline: 'deb http://us-central1.gce.archive.ubuntu.com/ubuntu artful-updates main universe'
-    packages:
-    - apt # workaround for relocation error in libapt-private.so.0.0
-    - util-linux # update to work around Debian #817857
-    - liblzma-dev
-    - zlib1g-dev
-    - libglib2.0-dev
-    - libgirepository1.0-dev
-#    - libostree-dev
-    # libostree dependencies
-    - e2fslibs-dev
-    - libgpgme-dev
-    - libfuse-dev
-    - libarchive-dev
-    # used for testing
-    - realpath
 
 before_install:
-  # workaround upgrade issues
-  - sudo rm -r /var/lib/dpkg/info/systemd-shim.*
-  - sudo apt-get install systemd
-  # latest libostree-dev isn't available in Ubuntu yet so build it from source
-  - |
-        # NOTE: When you update libostree version clear the cache from
-        # https://travis-ci.org/weldr/bdcs-api-rs/caches
-        if [ ! -f ./ostree/Makefile ]; then
-            git clone --recurse-submodules --branch v2017.8 https://github.com/ostreedev/ostree.git
-            cd ./ostree
-            # temporary fix, https://github.com/ostreedev/ostree/pull/1007
-            git cherry-pick 47a54bf876023b0cb457bc8a4f4264f9b2ed5438
-            env NOCONFIGURE=1
-            ./autogen.sh
-            ./configure --prefix=/usr
-            make
-        else
-            cd ./ostree
-        fi
-        sudo make install && cd ../
-
+  - sudo docker pull welder/bdcs-build-img:latest
   - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - sudo ./install-haskell-platform.sh
-  - travis_retry cabal update && cabal install hlint hpc-coveralls
+  - travis_retry cabal update && cabal install hpc-coveralls
+
 
 script:
-  - cd importer/ && ~/.cabal/bin/hlint . && cd ../
-  - cd importer/ && cabal install --dependencies-only --enable-tests --force-reinstall &&
-    cabal configure --enable-tests --enable-coverage &&
-    cabal build && cabal test --show-details=always && cabal install
-
-  # test binaries
-  - sudo ./tests/test_tmpfiles.sh
-  - ./tests/test_import.sh
-  - ./tests/test_export.sh
-
-  # collect coverage data from binaries
-  - mkdir ./dist/hpc/vanilla/tix/bdcs-tmpfiles/ ./dist/hpc/vanilla/tix/import/ ./dist/hpc/vanilla/tix/export/
-  - mv bdcs-tmpfiles.tix ./dist/hpc/vanilla/tix/bdcs-tmpfiles/
-  - mv import.tix ./dist/hpc/vanilla/tix/import/
-  - mv export.tix ./dist/hpc/vanilla/tix/export/
+  - sudo make integration-test
 
 
 after_success:
-  - ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles
+  - |
+        # copy the coverage data out of the container
+        sudo docker cp tests:/importer/dist ./importer/dist
+        sudo docker rm tests
+
+        # report to coveralls here because we need access to git
+        sudo chown travis:travis -R ./importer/dist
+        cd importer/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles
+
+        if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
+            sudo docker tag welder/bdcs-build-img:latest welder/bdcs-build-img:$TRAVIS_BUILD_NUMBER
+
+            docker login -u atodorov -p $DOCKER_PASSWORD
+            docker push welder/bdcs-api-rs
+        fi
 
 notifications:
   email:
     on_failure: change
-    on_success: change
+    on_success: never
+
+env:
+    global:
+        secure: "ppLH0NQB9Q4o4yqteWyfkSKCmoDm1puTz3hMiGjtLf7AZrp9M6F3dv3VWIv+ph7vDxuaL/UA5SSgGwLGi/ZeFt/YNda+nk5oyVR7clGxb8SYOK+S/jBiAKH5SHw7QHpMoJnTlNZE1UmJXzHj96XTWv/XCxBEyx1wjvyjeGVaQS8kM5VFCBp3/jPNonssReotCWVd/I+9tyeCb39cxi8P2mjqsSO0njNIn9gtyqLjEafSypw5qrI1fxBfkS35Ir5aXhmP60o/qy+EaUAdnGjA5+PNB4N5M8/RN09nGX0jNia3mx2ZAwPmU7L/vnzRId61pC2fSyO5A619tG4P+53cJDjtgMf8+y72AZY6yyDGhubEBhMbeegCvrdhNmBEjtH/48zOh0qHRSY4zJQzw5oWZGk6AbZUBvUu5n1DKRDBNLw2RRjTTjNk/uMfZlGsYt96zBrkttK5VIRUCgOqw6zeTZDgJPXNogU5t+2TBUnEOlDFxFYxP4gN804oLfcMu+zAg0e2KeS0nODNkfuJp7r4fuFCRIFhLh2L5GSMT7tAAHLX75iuxdLwmUCfokiVFkIOlC+7FZHXmDenuYM8djQpRZx3WZae2Ff+EE5JfORRuGC4VHp5n1sD7M2uvAjMN4oBZMx52gGHwcETaU3+AB2aGyBQ0ltoL5cZC9V1pN3/Dzo="
