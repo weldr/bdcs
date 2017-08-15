@@ -7,3 +7,7 @@ rpms/
 Dockerfile
 Dockerfile.build
 welder-deployment/
+*.repo/
+*.db
+**.tix
+**/dist

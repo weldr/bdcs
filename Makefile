@@ -4,7 +4,7 @@ else
 d = ${CURDIR}
 endif
 
-ORG_NAME=weld
+ORG_NAME=welder
 STORE ?= cs.repo
 MDDB ?= metadata.db
 
@@ -14,12 +14,12 @@ weld-f25:
 	-rm -rf ./welder-deployment
 
 importer: Dockerfile.build
-	docker build -t $(ORG_NAME)/build-img -f $< .
-	docker create --name build-cont $(ORG_NAME)/build-img
+	docker build -t $(ORG_NAME)/bdcs-build-img -f $< .
+	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
 	docker cp build-cont:/root/.cabal/bin/export ./export
 	docker rm build-cont
-	docker build -t $(ORG_NAME)/import-img .
+	docker build -t $(ORG_NAME)/bdcs-import-img .
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
 #       Unless KEEP_STORE=1 and KEEP_MDDB=1 are set.
@@ -35,7 +35,7 @@ mddb:
 	    -e "STORE=$(STORE)"             \
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
-	    $(ORG_NAME)/import-img
+	    $(ORG_NAME)/bdcs-import-img
 	docker rm mddb-container
 
 api-mddb:
@@ -50,7 +50,7 @@ api-mddb:
 	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-20.el7_2.x86_64.rpm \
 	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-21.el7_3.x86_64.rpm
 	docker volume create -d local --name api-test-mddb-volume
-	docker run -v api-test-mddb-volume:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" --rm $(ORG_NAME)/import-img
+	docker run -v api-test-mddb-volume:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" --rm $(ORG_NAME)/bdcs-import-img
 
 
 .PHONY: importer mddb api-mddb
