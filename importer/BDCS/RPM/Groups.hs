@@ -92,7 +92,7 @@ rpmFlagsToContexts tags flags =
         when (flags `testBit` 13) (modify (RT.ScriptVerify:))
 
         -- Check for a bare RPMSENSE_INTERP
-        whenM ((null <$> get) <&&> (return $ flags `testBit` 8)) $ do
+        whenM ((null <$> get) <&&> return (flags `testBit` 8)) $ do
             when ((isJust . findTag "PreIn")  tags) (modify (RT.ScriptPre:))
             when ((isJust . findTag "PostIn") tags) (modify (RT.ScriptPost:))
             when ((isJust . findTag "PreUn")  tags) (modify (RT.ScriptPreUn:))
