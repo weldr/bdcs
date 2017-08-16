@@ -161,7 +161,8 @@ executable inspect
                         conduit >= 1.2.8,
                         directory,
                         persistent-sqlite,
-                        text
+                        text,
+                        time
 
     default-language:   Haskell2010
 
