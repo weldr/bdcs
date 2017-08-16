@@ -20,6 +20,9 @@
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
                    getGroupIdC,
+                   groups,
+                   groupsC,
+                   groupIdToNevra,
                    nameToGroupId,
                    nevraToGroupId)
  where
@@ -27,12 +30,16 @@ module BDCS.Groups(findGroupRequirements,
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Resource(MonadBaseControl)
-import           Data.Conduit(Conduit, yield)
+import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
+import           Data.Bifunctor(bimap)
+import           Data.Conduit((.|), Conduit, Source , yield)
+import qualified Data.Conduit.List as CL
+import           Data.Maybe(isNothing, fromJust, fromMaybe)
 import qualified Data.Text as T
-import           Database.Esqueleto
+import           Database.Esqueleto hiding (isNothing)
 
 import           BDCS.DB
+import           BDCS.GroupKeyValue(getValueForGroup)
 import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Utils(splitFilename)
@@ -62,17 +69,43 @@ getGroupIdC = awaitWith $ \thing ->
         Just gid -> yield gid >> getGroupIdC
         Nothing  -> throwError $ "No such group " ++ T.unpack thing
 
+groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
+groups = do
+    results <- select  $ from $ \group -> do
+               orderBy [asc (group ^. GroupsName)]
+               return  (group ^. GroupsId, group ^. GroupsName)
+    return $ map (bimap unValue unValue) results
+
+groupsC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) (Key Groups, T.Text)
+groupsC = do
+    let source = selectSource $ from $ \group -> do
+                 orderBy      [asc (group ^. GroupsName)]
+                 return       (group ^. GroupsId, group ^. GroupsName)
+    source .| CL.map (bimap unValue unValue)
+
+groupIdToNevra :: MonadIO m => Key Groups -> SqlPersistT m (Maybe T.Text)
+groupIdToNevra groupId = do
+    n <- getValueForGroup groupId (TextKey "name")
+    e <- getValueForGroup groupId (TextKey "epoch")
+    v <- getValueForGroup groupId (TextKey "version")
+    r <- getValueForGroup groupId (TextKey "release")
+    a <- getValueForGroup groupId (TextKey "arch")
+
+    if isNothing n || isNothing v || isNothing r || isNothing a
+    then return Nothing
+    else return $ Just $ T.concat [fromMaybe "" e, fromJust n, "-", fromJust v, "-", fromJust r, ".", fromJust a]
+
 -- Given a group name, return a group id
 nameToGroupId :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Groups))
 nameToGroupId name = firstResult $
-    select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` groups) -> do
+    select $ distinct $ from $ \(keyval `InnerJoin` group_keyval `InnerJoin` grps) -> do
     on     $ keyval ^. KeyValId ==. group_keyval ^. GroupKeyValuesKey_val_id &&.
-             group_keyval ^. GroupKeyValuesGroup_id ==. groups ^. GroupsId
+             group_keyval ^. GroupKeyValuesGroup_id ==. grps ^. GroupsId
     where_ $ keyval ^. KeyValKey_value ==. val (TextKey "name") &&.
              keyval ^. KeyValVal_value ==. just (val name) &&.
-             groups ^. GroupsGroup_type ==. val "rpm"
+             grps ^. GroupsGroup_type ==. val "rpm"
     limit 1
-    return $ groups ^. GroupsId
+    return $ grps ^. GroupsId
 
 nevraToGroupId :: MonadIO m => (T.Text, Maybe T.Text, T.Text, T.Text, T.Text) -> SqlPersistT m (Maybe (Key Groups))
 nevraToGroupId (n, e, v, r, a) = firstResult $
