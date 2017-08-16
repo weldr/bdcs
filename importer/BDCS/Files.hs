@@ -26,7 +26,6 @@ import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Conduit((.|), Conduit, Source, toProducer)
 import qualified Data.Conduit.List as CL
-import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
@@ -45,19 +44,19 @@ associateFilesWithPackage fs package =
     mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
          (zip fs $ repeat package)
 
-files :: MonadIO m => SqlPersistT m [T.Text]
+files :: MonadIO m => SqlPersistT m [Files]
 files = do
     results <- select  $ from $ \file -> do
                orderBy [asc (file ^. FilesPath)]
-               return  $ file ^. FilesPath
-    return $ map unValue results
+               return  file
+    return $ map entityVal results
 
-filesC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) T.Text
+filesC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) Files
 filesC = do
     let source = selectSource $ from $ \file -> do
                  orderBy      [asc (file ^. FilesPath)]
-                 return       $ file ^. FilesPath
-    source .| CL.map unValue
+                 return       file
+    source .| CL.map entityVal
 
 groupIdToFiles :: MonadResource m => Key Groups -> Source (SqlPersistT m) Files
 groupIdToFiles groupid = do
