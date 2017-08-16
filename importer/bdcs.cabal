@@ -151,6 +151,22 @@ executable import
 
     ghc-options:        -Wall
 
+executable inspect
+    main-is:            inspect.hs
+    hs-source-dirs:     tools
+
+    build-depends:      bdcs,
+                        base >= 4.7 && < 5.0,
+                        cond,
+                        conduit >= 1.2.8,
+                        directory,
+                        persistent-sqlite,
+                        text
+
+    default-language:   Haskell2010
+
+    ghc-options:        -Wall
+
 executable export
     main-is:            export.hs
     hs-source-dirs:     tools
