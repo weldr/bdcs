@@ -16,6 +16,8 @@
 module BDCS.Files(insertFiles,
                   associateFilesWithBuild,
                   associateFilesWithPackage,
+                  files,
+                  filesC,
                   groupIdToFiles,
                   groupIdToFilesC)
  where
@@ -24,6 +26,7 @@ import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Conduit((.|), Conduit, Source, toProducer)
 import qualified Data.Conduit.List as CL
+import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
@@ -33,21 +36,35 @@ insertFiles :: MonadIO m => [Files] -> SqlPersistT m [Key Files]
 insertFiles = mapM insert
 
 associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
-associateFilesWithBuild files build =
+associateFilesWithBuild fs build =
     mapM (\(fID, bID) -> insert $ BuildFiles bID fID)
-         (zip files $ repeat build)
+         (zip fs $ repeat build)
 
 associateFilesWithPackage :: MonadIO m => [Key Files] -> Key KeyVal -> SqlPersistT m [Key FileKeyValues]
-associateFilesWithPackage files package =
+associateFilesWithPackage fs package =
     mapM (\(fID, pID) -> insert $ FileKeyValues fID pID)
-         (zip files $ repeat package)
+         (zip fs $ repeat package)
+
+files :: MonadIO m => SqlPersistT m [T.Text]
+files = do
+    results <- select  $ from $ \file -> do
+               orderBy [asc (file ^. FilesPath)]
+               return  $ file ^. FilesPath
+    return $ map unValue results
+
+filesC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) T.Text
+filesC = do
+    let source = selectSource $ from $ \file -> do
+                 orderBy      [asc (file ^. FilesPath)]
+                 return       $ file ^. FilesPath
+    source .| CL.map unValue
 
 groupIdToFiles :: MonadResource m => Key Groups -> Source (SqlPersistT m) Files
 groupIdToFiles groupid = do
-    let source = selectSource $ from $ \(files `InnerJoin` group_files) -> do
-                       on     $ files ^. FilesId ==. group_files ^. GroupFilesFile_id
+    let source = selectSource $ from $ \(fs `InnerJoin` group_files) -> do
+                       on     $ fs ^. FilesId ==. group_files ^. GroupFilesFile_id
                        where_ $ group_files ^. GroupFilesGroup_id ==. val groupid
-                       return files
+                       return fs
     source .| CL.map entityVal
 
 groupIdToFilesC :: MonadResource m => Conduit (Key Groups) (SqlPersistT m) Files
