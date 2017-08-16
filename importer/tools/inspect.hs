@@ -13,6 +13,8 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -26,6 +28,7 @@ import qualified Data.Text.IO as TIO
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
 import           Data.Time.Format(defaultTimeLocale, formatTime)
 import           Database.Persist.Sqlite(runSqlite)
+import           GI.OSTree(IsRepo)
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
@@ -36,19 +39,32 @@ import           BDCS.Files(filesC)
 import           BDCS.Groups(groupsC, groupIdToNevra)
 import           BDCS.Version
 
+liftedPutStrLn = liftIO . TIO.putStrLn
+
 runGroupsCommand :: T.Text -> [String] -> IO ()
 runGroupsCommand db _ =
-    runSqlite db $ runConduit $ groupsC .| CL.mapM_ (liftIO . TIO.putStrLn . snd)
+    runSqlite db $ runConduit $ groupsC .| CL.mapM_ (liftedPutStrLn . snd)
 
-runLsCommand :: T.Text -> [String] -> IO ()
-runLsCommand db args = do
-    currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
-    runSqlite db $ runConduit $ filesC .| CL.mapM_ (liftIO . TIO.putStrLn . printer currentYear)
+runLsCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
+runLsCommand db repo args =
+    if "-l" `elem` args
+    then do
+        currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
+        runSqlite db $ runConduit $ filesC .| CL.mapM getMetadata
+                                           .| CL.catMaybes
+                                           .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
+    else
+        runSqlite db $ runConduit $ filesC .| CL.mapM_ (liftedPutStrLn . filesPath)
  where
-    printer currentYear Files{..} =
-        if "-l" `elem` args
-        then T.concat [filesFile_user, " ", filesFile_group, " ", T.pack $ showTime filesMtime, " ", filesPath]
-        else filesPath
+    getMetadata f@Files{..} = case filesCs_object of
+        Nothing    -> return Nothing
+        Just cksum -> CS.load repo cksum >>= \case
+            CS.DirMeta obj    -> return $ Just (f, obj)
+            CS.FileObject obj -> return $ Just (f, CS.metadata obj)
+
+    verbosePrinter :: String -> (Files, CS.Metadata) -> T.Text
+    verbosePrinter currentYear (Files{..}, metadata) =
+        T.concat [filesFile_user, " ", filesFile_group, " ", T.pack $ showTime filesMtime, " ", filesPath]
      where
         -- Figure out how to format the file's time.  If the time is in the current year, display
         -- month, day, and hours/minutes.  If the time is in any other year, display that year
@@ -67,7 +83,7 @@ runNevrasCommand :: T.Text -> [String] -> IO ()
 runNevrasCommand db _ =
     runSqlite db $ runConduit $ groupsC .| CL.map fst
                                         .| CL.mapMaybeM groupIdToNevra
-                                        .| CL.mapM_ (liftIO . TIO.putStrLn)
+                                        .| CL.mapM_ liftedPutStrLn
 
 usage :: IO ()
 usage = do
@@ -99,6 +115,6 @@ main = do
 
     case subcmd of
         "groups"    -> runGroupsCommand (T.pack db) args
-        "ls"        -> runLsCommand (T.pack db) args
+        "ls"        -> runLsCommand (T.pack db) repo args
         "nevras"    -> runNevrasCommand (T.pack db) args
         _           -> usage

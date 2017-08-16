@@ -160,6 +160,8 @@ executable inspect
                         cond,
                         conduit >= 1.2.8,
                         directory,
+                        gi-ostree,
+                        mtl >= 2.2.1,
                         persistent-sqlite,
                         text,
                         time
