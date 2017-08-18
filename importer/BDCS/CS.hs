@@ -35,7 +35,7 @@ import           Data.Conduit.Binary(sinkLbs)
 import           Data.GI.Base.ManagedPtr(unsafeCastTo)
 import           Data.Maybe(isNothing)
 import qualified Data.Text as T
-import           Data.Word(Word32)
+import           Data.Word(Word32, Word64)
 import           GI.Gio
 import           GI.OSTree
 import           System.Directory(doesDirectoryExist)
@@ -58,6 +58,7 @@ data Object = DirMeta Metadata
 data Metadata = Metadata { uid :: Word32,
                            gid :: Word32,
                            mode :: Word32,
+                           size :: Word64,
                            xattrs :: [(BS.ByteString, BS.ByteString)] }
 
 -- metadata + contents for a file
@@ -244,6 +245,7 @@ load repo checksum =
                 Just (uid, gid, mode, xattrs) -> return Metadata {uid=fromBE32 uid,
                                                                   gid=fromBE32 gid,
                                                                   mode=fromBE32 mode,
+                                                                  size=0,
                                                                   xattrs=xattrs}
                 Nothing -> throwError $ "Error reading dirmeta object from content store: " ++ show checksum
 
@@ -263,6 +265,7 @@ load repo checksum =
         uid <- fileInfoGetAttributeUint32 info' "unix::uid"
         gid <- fileInfoGetAttributeUint32 info' "unix::gid"
         mode <- fileInfoGetAttributeUint32 info' "unix::mode"
+        size <- fileInfoGetAttributeUint64 info' "standard::size"
 
         symlink <- ifM (fileInfoGetIsSymlink info')
                        (fmap Just (fileInfoGetSymlinkTarget info'))
@@ -270,7 +273,7 @@ load repo checksum =
 
         -- the xattrs is a GVariant of type a(ayay), i.e., [(ByteString, ByteString)]
         liftIO (variantToXattrs xattrsVariant) >>= \case
-            Just xattrs -> return FileContents {metadata=Metadata{uid, gid, mode, xattrs}, symlink, contents}
+            Just xattrs -> return FileContents {metadata=Metadata{uid, gid, mode, size, xattrs}, symlink, contents}
             Nothing -> throwError $ "Error reading xattrs object for " ++ show checksum
 
     variantToDirMeta :: GVariant -> IO (Maybe (Word32, Word32, Word32, [(BS.ByteString, BS.ByteString)]))
