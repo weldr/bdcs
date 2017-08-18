@@ -14,13 +14,14 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import           Control.Conditional(unlessM)
 import           Control.Monad(when)
-import           Control.Monad.IO.Class(liftIO)
+import           Control.Monad.Except(runExceptT)
+import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
@@ -32,13 +33,17 @@ import           GI.OSTree(IsRepo)
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
+import           Text.Printf(printf)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Files(filesC)
 import           BDCS.Groups(groupsC, groupIdToNevra)
 import           BDCS.Version
+import           Utils.Either(whenLeft)
+import           Utils.Mode(modeAsText)
 
+liftedPutStrLn :: MonadIO m => T.Text -> m ()
 liftedPutStrLn = liftIO . TIO.putStrLn
 
 runGroupsCommand :: T.Text -> [String] -> IO ()
@@ -50,22 +55,41 @@ runLsCommand db repo args =
     if "-l" `elem` args
     then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
-        runSqlite db $ runConduit $ filesC .| CL.mapM getMetadata
-                                           .| CL.catMaybes
-                                           .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
+        result <- runExceptT $ runSqlite db $ runConduit $
+                  filesC .| CL.mapM getMetadata
+                         .| CL.catMaybes
+                         .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
+        whenLeft result print
     else
         runSqlite db $ runConduit $ filesC .| CL.mapM_ (liftedPutStrLn . filesPath)
  where
     getMetadata f@Files{..} = case filesCs_object of
         Nothing    -> return Nothing
-        Just cksum -> CS.load repo cksum >>= \case
-            CS.DirMeta obj    -> return $ Just (f, obj)
-            CS.FileObject obj -> return $ Just (f, CS.metadata obj)
+        Just cksum -> CS.load repo cksum >>= \obj -> return $ Just (f, obj)
 
-    verbosePrinter :: String -> (Files, CS.Metadata) -> T.Text
-    verbosePrinter currentYear (Files{..}, metadata) =
-        T.concat [filesFile_user, " ", filesFile_group, " ", T.pack $ showTime filesMtime, " ", filesPath]
+    verbosePrinter :: String -> (Files, CS.Object) -> T.Text
+    verbosePrinter currentYear (Files{..}, obj) = T.pack $
+        printf "%c%s %8s %8s %10Ld %s %s%s"
+               ty
+               (T.unpack $ modeAsText $ CS.mode md)
+               (T.unpack filesFile_user) (T.unpack filesFile_group)
+               (CS.size md)
+               (showTime filesMtime)
+               filesPath target
      where
+        md = case obj of
+            CS.DirMeta metadata -> metadata
+            CS.FileObject CS.FileContents{metadata} -> metadata
+
+        ty = case obj of
+            CS.DirMeta _ -> 'd'
+            CS.FileObject CS.FileContents{symlink=Just _} -> 'l'
+            _ -> '-'
+
+        target = case obj of
+            CS.FileObject CS.FileContents{symlink=Just x} -> " -> " ++ T.unpack x
+            _ -> ""
+
         -- Figure out how to format the file's time.  If the time is in the current year, display
         -- month, day, and hours/minutes.  If the time is in any other year, display that year
         -- instead of hours and minutes.  This is not quite how ls does it - it appears to use
