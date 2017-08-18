@@ -85,6 +85,7 @@ library
                         Import.URI,
                         Utils.Conduit,
                         Utils.Either,
+                        Utils.Mode,
                         Utils.Monad
 
     build-depends:      base >=4.9 && <5.0,
