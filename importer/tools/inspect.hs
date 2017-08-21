@@ -45,6 +45,11 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
+data GroupsOptions = GroupsOptions { grpMatches :: String }
+
+defaultGroupsOptions :: GroupsOptions
+defaultGroupsOptions = GroupsOptions { grpMatches = ".*" }
+
 data LsOptions = LsOptions { lsMatches :: String,
                              lsVerbose :: Bool }
 
@@ -52,12 +57,36 @@ defaultLsOptions :: LsOptions
 defaultLsOptions = LsOptions { lsMatches = ".*",
                                lsVerbose = False }
 
+data NevrasOptions = NevrasOptions { nevraMatches :: String }
+
+defaultNevrasOptions :: NevrasOptions
+defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }
+
 liftedPutStrLn :: MonadIO m => T.Text -> m ()
 liftedPutStrLn = liftIO . TIO.putStrLn
 
 runGroupsCommand :: T.Text -> [String] -> IO ()
-runGroupsCommand db _ =
-    runSqlite db $ runConduit $ groupsC .| CL.mapM_ (liftedPutStrLn . snd)
+runGroupsCommand db args = do
+    (opts, _) <- compilerOpts args
+    runSqlite db $ runConduit $
+        groupsC .| CL.map snd
+                .| CL.filter (\g -> T.unpack g =~ grpMatches opts)
+                .| CL.mapM_ liftedPutStrLn
+ where
+    options :: [OptDescr (GroupsOptions -> GroupsOptions)]
+    options = [
+        Option ['m'] ["matches"]
+               (ReqArg (\d opts -> opts { grpMatches = d }) "REGEX")
+               "return only results that match REGEX"
+     ]
+
+    compilerOpts :: [String] -> IO (GroupsOptions, [String])
+    compilerOpts argv =
+        case getOpt Permute options argv of
+            (o, n, [])   -> return (foldl (flip id) defaultGroupsOptions o, n)
+            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
+     where
+        header = "Usage: groups [OPTIONS]"
 
 runLsCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
 runLsCommand db repo args = do
@@ -134,10 +163,28 @@ runLsCommand db repo args = do
             formatTime defaultTimeLocale fmt utcMtime
 
 runNevrasCommand :: T.Text -> [String] -> IO ()
-runNevrasCommand db _ =
-    runSqlite db $ runConduit $ groupsC .| CL.map fst
-                                        .| CL.mapMaybeM groupIdToNevra
-                                        .| CL.mapM_ liftedPutStrLn
+runNevrasCommand db args = do
+    (opts, _) <- compilerOpts args
+    runSqlite db $ runConduit $
+        groupsC .| CL.map fst
+                .| CL.mapMaybeM groupIdToNevra
+                .| CL.filter (\g -> T.unpack g =~ nevraMatches opts)
+                .| CL.mapM_ liftedPutStrLn
+ where
+    options :: [OptDescr (NevrasOptions -> NevrasOptions)]
+    options = [
+        Option ['m'] ["matches"]
+               (ReqArg (\d opts -> opts { nevraMatches = d }) "REGEX")
+               "return only results that match REGEX"
+     ]
+
+    compilerOpts :: [String] -> IO (NevrasOptions, [String])
+    compilerOpts argv =
+        case getOpt Permute options argv of
+            (o, n, [])   -> return (foldl (flip id) defaultNevrasOptions o, n)
+            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
+     where
+        header = "Usage: nevras [OPTIONS]"
 
 usage :: IO ()
 usage = do
