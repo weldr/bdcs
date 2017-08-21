@@ -19,6 +19,7 @@
 
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
+                   getGroupId,
                    getGroupIdC,
                    groups,
                    groupsC,
@@ -29,10 +30,9 @@ module BDCS.Groups(findGroupRequirements,
 
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
-import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
+import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Bifunctor(bimap)
-import           Data.Conduit((.|), Conduit, Source , yield)
+import           Data.Conduit((.|), Conduit, Source)
 import qualified Data.Conduit.List as CL
 import           Data.Maybe(isNothing, fromJust, fromMaybe)
 import qualified Data.Text as T
@@ -43,7 +43,6 @@ import           BDCS.GroupKeyValue(getValueForGroup)
 import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Utils(splitFilename)
-import           Utils.Conduit(awaitWith)
 
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
 findGroupRequirements groupId reqId = firstResult $
@@ -63,11 +62,14 @@ findRequires reqLang reqCtx reqStrength reqExpr = firstResult $
     limit 1
     return $ r ^. RequirementsId
 
-getGroupIdC :: (MonadError String m, MonadBaseControl IO m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
-getGroupIdC = awaitWith $ \thing ->
-    lift (nevraToGroupId $ splitFilename thing) >>= \case
-        Just gid -> yield gid >> getGroupIdC
+getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
+getGroupId thing =
+    nevraToGroupId (splitFilename thing) >>= \case
+        Just gid -> return gid
         Nothing  -> throwError $ "No such group " ++ T.unpack thing
+
+getGroupIdC :: (MonadError String m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
+getGroupIdC = CL.mapM getGroupId
 
 groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
 groups = do
