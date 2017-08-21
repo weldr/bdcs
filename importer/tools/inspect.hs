@@ -35,6 +35,7 @@ import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           Text.Printf(printf)
+import           Text.Regex.PCRE((=~))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
@@ -44,10 +45,12 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
-data LsOptions = LsOptions { lsVerbose :: Bool }
+data LsOptions = LsOptions { lsMatches :: String,
+                             lsVerbose :: Bool }
 
 defaultLsOptions :: LsOptions
-defaultLsOptions = LsOptions { lsVerbose = False }
+defaultLsOptions = LsOptions { lsMatches = ".*",
+                               lsVerbose = False }
 
 liftedPutStrLn :: MonadIO m => T.Text -> m ()
 liftedPutStrLn = liftIO . TIO.putStrLn
@@ -62,18 +65,24 @@ runLsCommand db repo args = do
     if lsVerbose opts then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
         result <- runExceptT $ runSqlite db $ runConduit $
-                  filesC .| CL.mapM getMetadata
+                  filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
+                         .| CL.mapM getMetadata
                          .| CL.catMaybes
                          .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
         whenLeft result print
     else
-        runSqlite db $ runConduit $ filesC .| CL.mapM_ (liftedPutStrLn . filesPath)
+        runSqlite db $ runConduit $
+        filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
+               .| CL.mapM_ (liftedPutStrLn . filesPath)
  where
     options :: [OptDescr (LsOptions -> LsOptions)]
     options = [
         Option ['l'] []
                (NoArg (\opts -> opts { lsVerbose = True }))
-               "use a long listing format"
+               "use a long listing format",
+        Option ['m'] ["matches"]
+               (ReqArg (\d opts -> opts { lsMatches = d }) "REGEX")
+               "return only results that match REGEX"
      ]
 
     compilerOpts :: [String] -> IO (LsOptions, [String])
@@ -82,7 +91,7 @@ runLsCommand db repo args = do
             (o, n, [])   -> return (foldl (flip id) defaultLsOptions o, n)
             (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
      where
-        header = "Usage: ls [-l]"
+        header = "Usage: ls [OPTIONS]"
 
     getMetadata f@Files{..} = case filesCs_object of
         Nothing    -> return Nothing
