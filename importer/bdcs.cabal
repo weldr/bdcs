@@ -164,6 +164,7 @@ executable inspect
                         gi-ostree,
                         mtl >= 2.2.1,
                         persistent-sqlite,
+                        regex-pcre,
                         text,
                         time
 
