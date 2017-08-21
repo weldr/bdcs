@@ -30,6 +30,7 @@ import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
 import           Data.Time.Format(defaultTimeLocale, formatTime)
 import           Database.Persist.Sqlite(runSqlite)
 import           GI.OSTree(IsRepo)
+import           System.Console.GetOpt
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
@@ -43,6 +44,11 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
+data LsOptions = LsOptions { lsVerbose :: Bool }
+
+defaultLsOptions :: LsOptions
+defaultLsOptions = LsOptions { lsVerbose = False }
+
 liftedPutStrLn :: MonadIO m => T.Text -> m ()
 liftedPutStrLn = liftIO . TIO.putStrLn
 
@@ -51,9 +57,9 @@ runGroupsCommand db _ =
     runSqlite db $ runConduit $ groupsC .| CL.mapM_ (liftedPutStrLn . snd)
 
 runLsCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
-runLsCommand db repo args =
-    if "-l" `elem` args
-    then do
+runLsCommand db repo args = do
+    (opts, _) <- compilerOpts args
+    if lsVerbose opts then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
         result <- runExceptT $ runSqlite db $ runConduit $
                   filesC .| CL.mapM getMetadata
@@ -63,6 +69,21 @@ runLsCommand db repo args =
     else
         runSqlite db $ runConduit $ filesC .| CL.mapM_ (liftedPutStrLn . filesPath)
  where
+    options :: [OptDescr (LsOptions -> LsOptions)]
+    options = [
+        Option ['l'] []
+               (NoArg (\opts -> opts { lsVerbose = True }))
+               "use a long listing format"
+     ]
+
+    compilerOpts :: [String] -> IO (LsOptions, [String])
+    compilerOpts argv =
+        case getOpt Permute options argv of
+            (o, n, [])   -> return (foldl (flip id) defaultLsOptions o, n)
+            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
+     where
+        header = "Usage: ls [-l]"
+
     getMetadata f@Files{..} = case filesCs_object of
         Nothing    -> return Nothing
         Just cksum -> CS.load repo cksum >>= \obj -> return $ Just (f, obj)
