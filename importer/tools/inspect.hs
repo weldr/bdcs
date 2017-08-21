@@ -96,7 +96,6 @@ runLsCommand db repo args = do
         result <- runExceptT $ runSqlite db $ runConduit $
                   filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
                          .| CL.mapM getMetadata
-                         .| CL.catMaybes
                          .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
         whenLeft result print
     else
@@ -123,30 +122,31 @@ runLsCommand db repo args = do
         header = "Usage: ls [OPTIONS]"
 
     getMetadata f@Files{..} = case filesCs_object of
-        Nothing    -> return Nothing
-        Just cksum -> CS.load repo cksum >>= \obj -> return $ Just (f, obj)
+        Nothing    -> return (f, Nothing)
+        Just cksum -> CS.load repo cksum >>= \obj -> return (f, Just obj)
 
-    verbosePrinter :: String -> (Files, CS.Object) -> T.Text
+    verbosePrinter :: String -> (Files, Maybe CS.Object) -> T.Text
     verbosePrinter currentYear (Files{..}, obj) = T.pack $
         printf "%c%s %8s %8s %10Ld %s %s%s"
                ty
-               (T.unpack $ modeAsText $ CS.mode md)
+               (maybe "--ghost--" (T.unpack . modeAsText . CS.mode) md)
                (T.unpack filesFile_user) (T.unpack filesFile_group)
-               (CS.size md)
+               (maybe 0 CS.size md)
                (showTime filesMtime)
                filesPath target
      where
         md = case obj of
-            CS.DirMeta metadata -> metadata
-            CS.FileObject CS.FileContents{metadata} -> metadata
+            Just (CS.DirMeta metadata) -> Just metadata
+            Just (CS.FileObject CS.FileContents{metadata}) -> Just metadata
+            Nothing -> Nothing
 
         ty = case obj of
-            CS.DirMeta _ -> 'd'
-            CS.FileObject CS.FileContents{symlink=Just _} -> 'l'
+            Just (CS.DirMeta _) -> 'd'
+            Just (CS.FileObject CS.FileContents{symlink=Just _}) -> 'l'
             _ -> '-'
 
         target = case obj of
-            CS.FileObject CS.FileContents{symlink=Just x} -> " -> " ++ T.unpack x
+            Just (CS.FileObject CS.FileContents{symlink=Just x}) -> " -> " ++ T.unpack x
             _ -> ""
 
         -- Figure out how to format the file's time.  If the time is in the current year, display
