@@ -45,7 +45,11 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
+class OptClass a
+
 data GroupsOptions = GroupsOptions { grpMatches :: String }
+
+instance OptClass GroupsOptions
 
 defaultGroupsOptions :: GroupsOptions
 defaultGroupsOptions = GroupsOptions { grpMatches = ".*" }
@@ -53,21 +57,33 @@ defaultGroupsOptions = GroupsOptions { grpMatches = ".*" }
 data LsOptions = LsOptions { lsMatches :: String,
                              lsVerbose :: Bool }
 
+instance OptClass LsOptions
+
 defaultLsOptions :: LsOptions
 defaultLsOptions = LsOptions { lsMatches = ".*",
                                lsVerbose = False }
 
 data NevrasOptions = NevrasOptions { nevraMatches :: String }
 
+instance OptClass NevrasOptions
+
 defaultNevrasOptions :: NevrasOptions
 defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }
+
+compilerOpts :: OptClass a => [OptDescr (a -> a)] -> a -> [String] -> String -> IO (a, [String])
+compilerOpts options defaults argv cmdName =
+    case getOpt Permute options argv of
+        (o, n, [])   -> return (foldl (flip id) defaults o, n)
+        (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
+ where
+     header = "Usage: " ++ cmdName ++ " [OPTIONS]"
 
 liftedPutStrLn :: MonadIO m => T.Text -> m ()
 liftedPutStrLn = liftIO . TIO.putStrLn
 
 runGroupsCommand :: T.Text -> [String] -> IO ()
 runGroupsCommand db args = do
-    (opts, _) <- compilerOpts args
+    (opts, _) <- compilerOpts options defaultGroupsOptions args "groups"
     runSqlite db $ runConduit $
         groupsC .| CL.map snd
                 .| CL.filter (\g -> T.unpack g =~ grpMatches opts)
@@ -80,17 +96,9 @@ runGroupsCommand db args = do
                "return only results that match REGEX"
      ]
 
-    compilerOpts :: [String] -> IO (GroupsOptions, [String])
-    compilerOpts argv =
-        case getOpt Permute options argv of
-            (o, n, [])   -> return (foldl (flip id) defaultGroupsOptions o, n)
-            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
-     where
-        header = "Usage: groups [OPTIONS]"
-
 runLsCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
 runLsCommand db repo args = do
-    (opts, _) <- compilerOpts args
+    (opts, _) <- compilerOpts options defaultLsOptions args "ls"
     if lsVerbose opts then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
         result <- runExceptT $ runSqlite db $ runConduit $
@@ -112,14 +120,6 @@ runLsCommand db repo args = do
                (ReqArg (\d opts -> opts { lsMatches = d }) "REGEX")
                "return only results that match REGEX"
      ]
-
-    compilerOpts :: [String] -> IO (LsOptions, [String])
-    compilerOpts argv =
-        case getOpt Permute options argv of
-            (o, n, [])   -> return (foldl (flip id) defaultLsOptions o, n)
-            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
-     where
-        header = "Usage: ls [OPTIONS]"
 
     getMetadata f@Files{..} = case filesCs_object of
         Nothing    -> return (f, Nothing)
@@ -164,7 +164,7 @@ runLsCommand db repo args = do
 
 runNevrasCommand :: T.Text -> [String] -> IO ()
 runNevrasCommand db args = do
-    (opts, _) <- compilerOpts args
+    (opts, _) <- compilerOpts options defaultNevrasOptions args "nevras"
     runSqlite db $ runConduit $
         groupsC .| CL.map fst
                 .| CL.mapMaybeM groupIdToNevra
@@ -177,14 +177,6 @@ runNevrasCommand db args = do
                (ReqArg (\d opts -> opts { nevraMatches = d }) "REGEX")
                "return only results that match REGEX"
      ]
-
-    compilerOpts :: [String] -> IO (NevrasOptions, [String])
-    compilerOpts argv =
-        case getOpt Permute options argv of
-            (o, n, [])   -> return (foldl (flip id) defaultNevrasOptions o, n)
-            (_, _, errs) -> ioError (userError (concat errs ++ usageInfo header options))
-     where
-        header = "Usage: nevras [OPTIONS]"
 
 usage :: IO ()
 usage = do
