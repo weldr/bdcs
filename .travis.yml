@@ -10,6 +10,7 @@ cache:
     - ~/.cabal
 
 before_install:
+  - pip install s3cmd
   - sudo docker pull welder/bdcs-build-img:latest
   - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
@@ -36,6 +37,9 @@ after_success:
 
             docker login -u atodorov -p $DOCKER_PASSWORD
             docker push welder/bdcs-api-rs
+
+            s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./import s3://weldr/import
+            s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./export s3://weldr/export
         fi
 
 notifications:
