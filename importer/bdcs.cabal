@@ -90,6 +90,7 @@ library
                         Import.URI,
                         Utils.Conduit,
                         Utils.Either,
+                        Utils.Error,
                         Utils.Mode,
                         Utils.Monad
 
