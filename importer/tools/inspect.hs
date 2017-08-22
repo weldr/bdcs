@@ -45,6 +45,11 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
+-- These warnings are coming from options records that only have one field.
+-- As options are added, these warnings will go away.  Until then, ignore
+-- them.
+{-# ANN module "HLint: ignore Use newtype instead of data" #-}
+
 class OptClass a
 
 data GroupsOptions = GroupsOptions { grpMatches :: String }
