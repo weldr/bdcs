@@ -20,7 +20,7 @@
 
 import           Control.Conditional(unlessM)
 import           Control.Monad(when)
-import           Control.Monad.Except(runExceptT)
+import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
@@ -48,7 +48,7 @@ import           Utils.Mode(modeAsText)
 -- These warnings are coming from options records that only have one field.
 -- As options are added, these warnings will go away.  Until then, ignore
 -- them.
-{-# ANN module "HLint: ignore Use newtype instead of data" #-}
+{-# ANN module ("HLint: ignore Use newtype instead of data" :: String) #-}
 
 class OptClass a
 
@@ -104,17 +104,17 @@ runGroupsCommand db args = do
 runLsCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
 runLsCommand db repo args = do
     (opts, _) <- compilerOpts options defaultLsOptions args "ls"
-    if lsVerbose opts then do
+    printer <- if lsVerbose opts then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
-        result <- runExceptT $ runSqlite db $ runConduit $
-                  filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
-                         .| CL.mapM getMetadata
-                         .| CL.mapM_ (liftedPutStrLn . verbosePrinter currentYear)
-        whenLeft result print
-    else
-        runSqlite db $ runConduit $
-        filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
-               .| CL.mapM_ (liftedPutStrLn . filesPath)
+        return $ liftedPutStrLn . verbosePrinter currentYear
+     else
+        return $ liftedPutStrLn . filesPath . fst
+
+    result <- runExceptT $ runSqlite db $ runConduit $
+              filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
+                     .| CL.mapM   (\f -> if lsVerbose opts then getMetadata f else return (f, Nothing))
+                     .| CL.mapM_  printer
+    whenLeft result print
  where
     options :: [OptDescr (LsOptions -> LsOptions)]
     options = [
@@ -126,6 +126,7 @@ runLsCommand db repo args = do
                "return only results that match REGEX"
      ]
 
+    getMetadata :: (MonadIO m, MonadError String m) => Files -> m (Files, Maybe CS.Object)
     getMetadata f@Files{..} = case filesCs_object of
         Nothing    -> return (f, Nothing)
         Just cksum -> CS.load repo cksum >>= \obj -> return (f, Just obj)
