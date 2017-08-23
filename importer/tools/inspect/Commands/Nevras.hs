@@ -1,16 +1,18 @@
-module Commands.Nevras(runCommand)
- where
-
+import           Control.Conditional(unlessM)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
 import           Database.Persist.Sqlite(runSqlite)
 import           System.Console.GetOpt
+import           System.Directory(doesFileExist)
+import           System.Environment(getArgs)
+import           System.Exit(exitFailure)
 import           Text.Regex.PCRE((=~))
 
 import BDCS.Groups(groupsC, groupIdToNevra)
+import BDCS.Version
 
-import Utils.GetOpt(OptClass, compilerOpts)
+import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
 -- These warnings are coming from options records that only have one field.
@@ -40,3 +42,24 @@ runCommand db _ args = do
                (ReqArg (\d opts -> opts { nevraMatches = d }) "REGEX")
                "return only results that match REGEX"
      ]
+
+usage :: IO ()
+usage = do
+    printVersion "inspect-nevras"
+    putStrLn "Usage: inspect-nevras output.db repo [args ...]"
+    putStrLn "  List NEVRAs of RPM packages in the content store"
+    putStrLn "- output.db is the path to a metadata database"
+    putStrLn "- repo is the path to a content store repo"
+    exitFailure
+
+main :: IO ()
+main = do
+    argv <- getArgs
+    case commandLineArgs argv of
+        Nothing               -> usage
+        Just (db, repo, args) -> do
+            unlessM (doesFileExist db) $ do
+                putStrLn "database does not exist"
+                exitFailure
+
+            runCommand (T.pack db) repo args

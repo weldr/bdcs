@@ -1,16 +1,18 @@
-module Commands.Groups(runCommand)
- where
-
+import           Control.Conditional(unlessM)
 import qualified Data.Text as T
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Database.Persist.Sqlite(runSqlite)
 import           System.Console.GetOpt
+import           System.Directory(doesFileExist)
+import           System.Environment(getArgs)
+import           System.Exit(exitFailure)
 import           Text.Regex.PCRE((=~))
 
 import BDCS.Groups(groupsC)
+import BDCS.Version
 
-import Utils.GetOpt(OptClass, compilerOpts)
+import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
 -- These warnings are coming from options records that only have one field.
@@ -40,3 +42,23 @@ runCommand db _ args = do
                "return only results that match REGEX"
      ]
 
+usage :: IO ()
+usage = do
+    printVersion "inspect-groups"
+    putStrLn "Usage: inspect-groups output.db repo [args ...]"
+    putStrLn "  List groups (RPM packages, etc.) in the content store"
+    putStrLn "- output.db is the path to a metadata database"
+    putStrLn "- repo is the path to a content store repo"
+    exitFailure
+
+main :: IO ()
+main = do
+    argv <- getArgs
+    case commandLineArgs argv of
+        Nothing               -> usage
+        Just (db, repo, args) -> do
+            unlessM (doesFileExist db) $ do
+                putStrLn "database does not exist"
+                exitFailure
+
+            runCommand (T.pack db) repo args

@@ -2,9 +2,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Commands.Ls(runCommand)
- where
-
+import           Control.Conditional(unlessM)
 import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Conduit((.|), runConduit)
@@ -15,16 +13,20 @@ import           Data.Time.Format(defaultTimeLocale, formatTime)
 import           Database.Persist.Sqlite(runSqlite)
 import           GI.OSTree(IsRepo)
 import           System.Console.GetOpt
+import           System.Directory(doesDirectoryExist, doesFileExist)
+import           System.Environment(getArgs)
+import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
 import           BDCS.DB(Files(..))
 import qualified BDCS.CS as CS
 import           BDCS.Files(filesC)
+import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
-import Utils.GetOpt(OptClass, compilerOpts)
+import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
 -- These warnings are coming from options records that only have one field.
@@ -108,3 +110,28 @@ runCommand db repoPath args = do
             fmt       = "%b %e " ++ if currentYear == mtimeYear then "%R" else "%Y"
          in
             formatTime defaultTimeLocale fmt utcMtime
+
+usage :: IO ()
+usage = do
+    printVersion "inspect-ls"
+    putStrLn "Usage: inspect-ls output.db repo [args ...]"
+    putStrLn "  List files in the content store"
+    putStrLn "- output.db is the path to a metadata database"
+    putStrLn "- repo is the path to a content store repo"
+    exitFailure
+
+main :: IO ()
+main = do
+    argv <- getArgs
+    case commandLineArgs argv of
+        Nothing               -> usage
+        Just (db, repo, args) -> do
+            unlessM (doesFileExist db) $ do
+                putStrLn "database does not exist"
+                exitFailure
+
+            unlessM (doesDirectoryExist repo) $ do
+                putStrLn "content store does not exist"
+                exitFailure
+
+            runCommand (T.pack db) repo args

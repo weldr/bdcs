@@ -164,6 +164,42 @@ executable inspect
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
+                        process
+
+    default-language:   Haskell2010
+
+    ghc-options:        -Wall
+
+executable inspect-groups
+    main-is:            Groups.hs
+    hs-source-dirs:     tools/inspect/Commands,
+                        tools/inspect
+
+    other-modules:      Utils.GetOpt,
+                        Utils.IO
+
+    build-depends:      bdcs,
+                        base >= 4.7 && < 5.0,
+                        cond,
+                        conduit >= 1.2.8,
+                        directory,
+                        persistent-sqlite,
+                        regex-pcre,
+                        text
+
+    default-language:   Haskell2010
+    ghc-options:        -Wall
+
+executable inspect-ls
+    main-is:            Ls.hs
+    hs-source-dirs:     tools/inspect/Commands,
+                        tools/inspect
+
+    other-modules:      Utils.GetOpt,
+                        Utils.IO
+
+    build-depends:      bdcs,
+                        base >= 4.7 && < 5.0,
                         cond,
                         conduit >= 1.2.8,
                         directory,
@@ -175,7 +211,26 @@ executable inspect
                         time
 
     default-language:   Haskell2010
+    ghc-options:        -Wall
 
+executable inspect-nevras
+    main-is:            Nevras.hs
+    hs-source-dirs:     tools/inspect/Commands,
+                        tools/inspect
+
+    other-modules:      Utils.GetOpt,
+                        Utils.IO
+
+    build-depends:      bdcs,
+                        base >= 4.7 && < 5.0,
+                        cond,
+                        conduit >= 1.2.8,
+                        directory,
+                        persistent-sqlite,
+                        regex-pcre,
+                        text
+
+    default-language:   Haskell2010
     ghc-options:        -Wall
 
 executable export
@@ -219,6 +274,6 @@ Test-Suite test-bdcs
                         persistent,
                         persistent-sqlite,
                         resourcet,
-                        bdcs 
- 
+                        bdcs
+
     default-language:   Haskell2010
