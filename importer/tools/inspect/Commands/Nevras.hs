@@ -25,8 +25,8 @@ instance OptClass NevrasOptions
 defaultNevrasOptions :: NevrasOptions
 defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }
 
-runCommand :: T.Text -> [String] -> IO ()
-runCommand db args = do
+runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultNevrasOptions args "nevras"
     runSqlite db $ runConduit $
         groupsC .| CL.map fst

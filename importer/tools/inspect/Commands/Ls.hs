@@ -41,8 +41,9 @@ defaultLsOptions :: LsOptions
 defaultLsOptions = LsOptions { lsMatches = ".*",
                                lsVerbose = False }
 
-runCommand :: IsRepo a => T.Text -> a -> [String] -> IO ()
-runCommand db repo args = do
+runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand db repoPath args = do
+    repo <- CS.open repoPath
     (opts, _) <- compilerOpts options defaultLsOptions args "ls"
     printer <- if lsVerbose opts then do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
@@ -52,7 +53,7 @@ runCommand db repo args = do
 
     result <- runExceptT $ runSqlite db $ runConduit $
               filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
-                     .| CL.mapM   (\f -> if lsVerbose opts then getMetadata f else return (f, Nothing))
+                     .| CL.mapM   (\f -> if lsVerbose opts then getMetadata repo f else return (f, Nothing))
                      .| CL.mapM_  printer
     whenLeft result print
  where
@@ -66,8 +67,8 @@ runCommand db repo args = do
                "return only results that match REGEX"
      ]
 
-    getMetadata :: (MonadIO m, MonadError String m) => Files -> m (Files, Maybe CS.Object)
-    getMetadata f@Files{..} = case filesCs_object of
+    getMetadata :: (IsRepo a, MonadIO m, MonadError String m) => a -> Files -> m (Files, Maybe CS.Object)
+    getMetadata repo f@Files{..} = case filesCs_object of
         Nothing    -> return (f, Nothing)
         Just cksum -> CS.load repo cksum >>= \obj -> return (f, Just obj)
 
