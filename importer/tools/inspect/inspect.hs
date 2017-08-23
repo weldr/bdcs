@@ -21,9 +21,12 @@ import Control.Monad(forM_, when)
 import System.Directory(doesFileExist)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
+import System.FilePath((</>))
 import System.Process(callProcess)
 
 import BDCS.Version
+
+import Paths_bdcs(getLibexecDir)
 
 -- A mapping from a subcommand name to a brief description of what it does.
 knownSubcommands :: [(String, String)]
@@ -44,6 +47,11 @@ usage = do
         putStrLn $ "      " ++ cmd ++ " - " ++ help
     exitFailure
 
+getBasePath :: IO FilePath
+getBasePath = do
+    dir <- getLibexecDir
+    return $ dir </> "inspect-"
+
 {-# ANN main "HLint: ignore Use head" #-}
 main :: IO ()
 main = do
@@ -53,11 +61,7 @@ main = do
     let subcmd = argv !! 2
     let subcmdArgs = [head argv, argv !! 1] ++ drop 3 argv
 
-    -- FIXME:  We should be able to use Paths_bdcs.getLibexecDir here, if only I could figure
-    -- out how to set it to include "weldr/" by default somewhere.
-    -- FIXME:  Also, I don't know how to get the subcommands to be installed into libexec.
-    -- cabal-2.x looks like it has a way to do it with private executables, but we're not using that.
-    let basePath = "/usr/libexec/weldr/inspect-"
+    basePath <- getBasePath
 
     case subcmd `lookup` knownSubcommands of
         -- This is a subcommand we have built-in knowledge of.  Check to see if it exists

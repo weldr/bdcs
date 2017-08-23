@@ -171,6 +171,7 @@ executable inspect
                         base >= 4.7 && < 5.0,
                         cond,
                         directory,
+                        filepath,
                         process
 
     default-language:   Haskell2010
