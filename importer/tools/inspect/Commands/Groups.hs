@@ -25,8 +25,8 @@ instance OptClass GroupsOptions
 defaultGroupsOptions :: GroupsOptions
 defaultGroupsOptions = GroupsOptions { grpMatches = ".*" }
 
-runCommand :: T.Text -> [String] -> IO ()
-runCommand db args = do
+runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultGroupsOptions args "groups"
     runSqlite db $ runConduit $
         groupsC .| CL.map snd

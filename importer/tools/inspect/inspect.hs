@@ -20,8 +20,7 @@ import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
-import qualified BDCS.CS as CS
-import           BDCS.Version
+import BDCS.Version
 
 import qualified Commands.Groups as Groups
 import qualified Commands.Ls as Ls
@@ -47,7 +46,7 @@ main = do
     when (length argv < 3) usage
 
     let db     = argv !! 0
-    repo      <- CS.open (argv !! 1)
+    let repo   = argv !! 1
     let subcmd = argv !! 2
     let args   = drop 3 argv
 
@@ -56,7 +55,7 @@ main = do
         exitFailure
 
     case subcmd of
-        "groups"    -> Groups.runCommand (T.pack db) args
+        "groups"    -> Groups.runCommand (T.pack db) repo args
         "ls"        -> Ls.runCommand (T.pack db) repo args
-        "nevras"    -> Nevras.runCommand (T.pack db) args
+        "nevras"    -> Nevras.runCommand (T.pack db) repo args
         _           -> usage
