@@ -164,6 +164,8 @@ executable inspect
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
+                        cond,
+                        directory,
                         process
 
     default-language:   Haskell2010
