@@ -53,10 +53,26 @@ main = do
     let subcmd = argv !! 2
     let subcmdArgs = [head argv, argv !! 1] ++ drop 3 argv
 
+    -- FIXME:  We should be able to use Paths_bdcs.getLibexecDir here, if only I could figure
+    -- out how to set it to include "weldr/" by default somewhere.
+    -- FIXME:  Also, I don't know how to get the subcommands to be installed into libexec.
+    -- cabal-2.x looks like it has a way to do it with private executables, but we're not using that.
+    let basePath = "/usr/libexec/weldr/inspect-"
+
     case subcmd `lookup` knownSubcommands of
-        Just _  -> tryCallProcess ("inspect-" ++ subcmd) subcmdArgs
-        Nothing -> ifM (doesFileExist ("/usr/libexec/weldr/inspect-" ++ subcmd))
-                       (tryCallProcess ("/usr/libexec/weldr/inspect-" ++ subcmd) subcmdArgs)
+        -- This is a subcommand we have built-in knowledge of.  Check to see if it exists
+        -- in /usr/libexec/weldr first.  If so, run that.  If not, try to run it using $PATH.
+        -- The latter is so we don't have to run "cabal install" every time we want to test
+        -- something during development.
+        Just _  -> ifM (doesFileExist (basePath ++ subcmd))
+                       (tryCallProcess (basePath ++ subcmd) subcmdArgs)
+                       (tryCallProcess ("inspect-" ++ subcmd) subcmdArgs)
+
+        -- This is a subcommand we know nothing about.  Check to see if it exists in
+        -- /usr/libexec/weldr, since it could have been installed by a third party.  If so,
+        -- run that.  If not, display an error message and quit.
+        Nothing -> ifM (doesFileExist (basePath ++ subcmd))
+                       (tryCallProcess (basePath ++ subcmd) subcmdArgs)
                        usage
  where
      tryCallProcess cmd args = catch (callProcess cmd args)
