@@ -13,7 +13,7 @@ maintainer:             clumens@redhat.com
 license:                LGPL
 license-file:           LICENSE
 cabal-version:          >= 1.10
-build-type:             Simple
+build-type:             Custom
 
 data-dir:               data
 data-files:             sysusers-default.conf,
@@ -28,6 +28,11 @@ extra-source-files:     Makefile,
                         tests/BDCS/*.hs,
                         tests/BDCS/RPM/*.hs,
                         tests/Export/*.hs
+
+custom-setup
+    setup-depends:      base,
+                        Cabal,
+                        filepath
 
 source-repository       head
     type:               git
