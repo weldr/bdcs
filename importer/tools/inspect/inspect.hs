@@ -13,18 +13,12 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-import           Control.Conditional(unlessM)
-import           Control.Monad(when)
-import qualified Data.Text as T
-import           System.Directory(doesFileExist)
-import           System.Environment(getArgs)
-import           System.Exit(exitFailure)
+import Control.Monad(when)
+import System.Environment(getArgs)
+import System.Exit(exitFailure)
+import System.Process(callProcess)
 
 import BDCS.Version
-
-import qualified Commands.Groups as Groups
-import qualified Commands.Ls as Ls
-import qualified Commands.Nevras as Nevras
 
 usage :: IO ()
 usage = do
@@ -44,18 +38,11 @@ main = do
     argv <- getArgs
 
     when (length argv < 3) usage
-
-    let db     = argv !! 0
-    let repo   = argv !! 1
     let subcmd = argv !! 2
-    let args   = drop 3 argv
-
-    unlessM (doesFileExist db) $ do
-        putStrLn "Database does not exist"
-        exitFailure
+    let subcmdArgs = [head argv, argv !! 1] ++ drop 3 argv
 
     case subcmd of
-        "groups"    -> Groups.runCommand (T.pack db) repo args
-        "ls"        -> Ls.runCommand (T.pack db) repo args
-        "nevras"    -> Nevras.runCommand (T.pack db) repo args
+        "groups"    -> callProcess "inspect-groups" subcmdArgs
+        "ls"        -> callProcess "inspect-ls" subcmdArgs
+        "nevras"    -> callProcess "inspect-nevras" subcmdArgs
         _           -> usage
