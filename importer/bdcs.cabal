@@ -154,7 +154,13 @@ executable import
 
 executable inspect
     main-is:            inspect.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     tools/inspect
+
+    other-modules:      Commands.Groups,
+                        Commands.Ls,
+                        Commands.Nevras,
+                        Utils.GetOpt,
+                        Utils.IO
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
