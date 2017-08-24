@@ -29,11 +29,6 @@ import           Utils.Mode(modeAsText)
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
--- These warnings are coming from options records that only have one field.
--- As options are added, these warnings will go away.  Until then, ignore
--- them.
-{-# ANN module "HLint: ignore Use newtype instead of data" #-}
-
 data LsOptions = LsOptions { lsMatches :: String,
                              lsVerbose :: Bool }
 
