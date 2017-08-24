@@ -7,6 +7,7 @@ import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
+import           Data.List(intercalate)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
 import           Data.Time.Format(defaultTimeLocale, formatTime)
@@ -19,9 +20,10 @@ import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
-import           BDCS.DB(Files(..))
+import           BDCS.DB(Files(..), KeyVal(..))
 import qualified BDCS.CS as CS
-import           BDCS.Files(filesC)
+import           BDCS.Files(filesC, keyValsForFile)
+import           BDCS.KeyValue(formatKeyValue)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
@@ -29,14 +31,25 @@ import           Utils.Mode(modeAsText)
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
-data LsOptions = LsOptions { lsMatches :: String,
+data LsOptions = LsOptions { lsKeyVal :: Bool,
+                             lsMatches :: String,
                              lsVerbose :: Bool }
 
 instance OptClass LsOptions
 
 defaultLsOptions :: LsOptions
-defaultLsOptions = LsOptions { lsMatches = ".*",
+defaultLsOptions = LsOptions { lsKeyVal = False,
+                               lsMatches = ".*",
                                lsVerbose = False }
+
+data LsRow = LsRow { rowFiles :: Files,
+                     rowKeyVals :: Maybe [KeyVal],
+                     rowMetadata :: Maybe CS.Object }
+
+initRow :: Files -> LsRow
+initRow f = LsRow { rowFiles=f,
+                    rowMetadata=Nothing,
+                    rowKeyVals=Nothing }
 
 runCommand :: T.Text -> FilePath -> [String] -> IO ()
 runCommand db repoPath args = do
@@ -46,16 +59,32 @@ runCommand db repoPath args = do
         currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
         return $ liftedPutStrLn . verbosePrinter currentYear
      else
-        return $ liftedPutStrLn . filesPath . fst
+        return $ liftedPutStrLn . simplePrinter
 
     result <- runExceptT $ runSqlite db $ runConduit $
+              -- Grab all the Files, filtering out any whose path does not match what we want.
               filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
-                     .| CL.mapM   (\f -> if lsVerbose opts then getMetadata repo f else return (f, Nothing))
+              -- Convert them into LsRow records containing only the Files record.
+                     .| CL.map    initRow
+              -- If we were asked for verbose output, add that to the LsRow.
+                     .| CL.mapM   (\row -> if lsVerbose opts then do
+                                               md <- getMetadata repo (rowFiles row)
+                                               return $ row { rowMetadata=md }
+                                           else return row)
+              -- If we were asked for keyval output, add that to the LsRow.
+                     .| CL.mapM   (\row -> if lsKeyVal opts then do
+                                               kvs <- keyValsForFile (filesPath $ rowFiles row)
+                                               return $ row { rowKeyVals=Just kvs }
+                                           else return row)
+              -- Finally, pass it to the appropriate printer.
                      .| CL.mapM_  printer
     whenLeft result print
  where
     options :: [OptDescr (LsOptions -> LsOptions)]
     options = [
+        Option ['k'] ["keyval"]
+               (NoArg (\opts -> opts { lsKeyVal = True }))
+               "add key/val pairs to output",
         Option ['l'] []
                (NoArg (\opts -> opts { lsVerbose = True }))
                "use a long listing format",
@@ -64,33 +93,48 @@ runCommand db repoPath args = do
                "return only results that match REGEX"
      ]
 
-    getMetadata :: (IsRepo a, MonadIO m, MonadError String m) => a -> Files -> m (Files, Maybe CS.Object)
-    getMetadata repo f@Files{..} = case filesCs_object of
-        Nothing    -> return (f, Nothing)
-        Just cksum -> CS.load repo cksum >>= \obj -> return (f, Just obj)
+    getMetadata :: (IsRepo a, MonadIO m, MonadError String m) => a -> Files -> m (Maybe CS.Object)
+    getMetadata repo Files{..} = case filesCs_object of
+        Nothing    -> return Nothing
+        Just cksum -> Just <$> CS.load repo cksum
 
-    verbosePrinter :: String -> (Files, Maybe CS.Object) -> T.Text
-    verbosePrinter currentYear (Files{..}, obj) = T.pack $
-        printf "%c%s %8s %8s %10Ld %s %s%s"
+    simplePrinter :: LsRow -> T.Text
+    simplePrinter LsRow{..} = T.pack $
+        printf "%s%s"
+               (filesPath rowFiles)
+               keyvals
+     where
+        keyvals = case rowKeyVals of
+            Just lst -> printf " [%s]" (intercalate ", " (map (T.unpack . formatKeyValue) lst))
+            _ -> ""
+
+    verbosePrinter :: String -> LsRow -> T.Text
+    verbosePrinter currentYear LsRow{..} = T.pack $
+        printf "%c%s %8s %8s %10Ld %s %s%s%s"
                ty
                (maybe "--ghost--" (T.unpack . modeAsText . CS.mode) md)
-               (T.unpack filesFile_user) (T.unpack filesFile_group)
+               (T.unpack $ filesFile_user rowFiles) (T.unpack $ filesFile_group rowFiles)
                (maybe 0 CS.size md)
-               (showTime filesMtime)
-               filesPath target
+               (showTime $ filesMtime rowFiles)
+               (filesPath rowFiles) target
+               keyvals
      where
-        md = case obj of
+        md = case rowMetadata of
             Just (CS.DirMeta metadata) -> Just metadata
             Just (CS.FileObject CS.FileContents{metadata}) -> Just metadata
             Nothing -> Nothing
 
-        ty = case obj of
+        ty = case rowMetadata of
             Just (CS.DirMeta _) -> 'd'
             Just (CS.FileObject CS.FileContents{symlink=Just _}) -> 'l'
             _ -> '-'
 
-        target = case obj of
+        target = case rowMetadata of
             Just (CS.FileObject CS.FileContents{symlink=Just x}) -> " -> " ++ T.unpack x
+            _ -> ""
+
+        keyvals = case rowKeyVals of
+            Just lst -> printf " [%s]" (intercalate ", " (map (T.unpack . formatKeyValue) lst))
             _ -> ""
 
         -- Figure out how to format the file's time.  If the time is in the current year, display
