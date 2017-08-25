@@ -169,6 +169,25 @@ spec = describe "BDCS.Depclose Tests" $ do
     it "depclose bash" $
         withRealDeps (depclose arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution)
 
+    let glibc_req_2 = And [Atom (toSqlKey 1000),
+                           Or [nss_softokn_freebl_req],
+                           Or [glibc_common_req]]
+    let bash_req_2 = And [Atom (toSqlKey 1),
+                          Or [ncurses_req],
+                          Or [glibc_req, glibc_req_2]]
+    let bash_solution_2 = Right $ And [bash_req_2]
+    it "depclose bash, two glibcs" $
+        withGlibcUpgrade (depclose arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution_2)
+
+    -- tar requirements, minus requirements already pulled in by bash (glibc, libselinux)
+    let libattr_req = And [Atom (toSqlKey 16)]
+    let libacl_req = And [Atom (toSqlKey 15),
+                          Or [libattr_req]]
+    let tar_with_bash_req = And [Atom (toSqlKey 14),
+                                 Or [libacl_req]]
+    let tar_with_bash_solution = Right $ And [tar_with_bash_req, bash_req]
+    it "depclose bash and tar at the same time" $
+        withRealDeps (depclose arches ["bash-4.2.46-12.el7.x86_64", "tar-2:1.26-29.el7.x86_64"]) >>= (`shouldBe` tar_with_bash_solution)
  where
     arches :: [T.Text]
     arches = ["x86_64"]
@@ -272,8 +291,13 @@ spec = describe "BDCS.Depclose Tests" $ do
     --  11: nss-softokn-freebl
     --  12: ncurses-libs
     --  13: ncurses-base
+    --  14: tar
+    --  15: libacl
+    --  16: libattr
     addRealDeps :: MonadIO m => SqlPersistT m ()
     addRealDeps = do
+        -- only the provides that are actually used are included, to try to keep things a little less out of control
+
         let groupid_1 = toSqlKey 1
         insertNEVRA groupid_1 "bash" Nothing "4.2.46" "12.el7" "x86_64"
         addProvide groupid_1 "/bin/bash" Nothing
@@ -329,6 +353,7 @@ spec = describe "BDCS.Depclose Tests" $ do
         addProvide groupid_2 "libc.so.6(GLIBC_2.3.3)(64bit)" Nothing
         addProvide groupid_2 "libc.so.6(GLIBC_2.3.4)(64bit)" Nothing
         addProvide groupid_2 "libc.so.6(GLIBC_2.4)(64bit)" Nothing
+        addProvide groupid_2 "libc.so.6(GLIBC_2.6)(64bit)" Nothing
         addProvide groupid_2 "libc.so.6(GLIBC_2.7)(64bit)" Nothing
         addProvide groupid_2 "libc.so.6(GLIBC_2.8)(64bit)" Nothing
         addProvide groupid_2 "libdl.so.2()(64bit)" Nothing
@@ -632,6 +657,59 @@ spec = describe "BDCS.Depclose Tests" $ do
         void $ insertGroupKeyValue (TextKey "rpm-obsolete") "termcap" (Just "termcap < 1:5.5-2") groupid_13
         -- no requirements
 
+        let groupid_14 = toSqlKey 14
+        insertNEVRA groupid_14 "tar" (Just "2") "1.26" "29.el7" "x86_64"
+
+        -- glibc (id 2)
+        addReq groupid_14 "libc.so.6()(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.14)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.17)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.2.5)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.3)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.3.4)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.4)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.6)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.7)(64bit)"
+        addReq groupid_14 "libc.so.6(GLIBC_2.8)(64bit)"
+        addReq groupid_14 "rtld(GNU_HASH)"
+
+        -- libselinux (id 4)
+        addReq groupid_14 "libselinux.so.1()(64bit)"
+
+        -- libacl (id 15)
+        addReq groupid_14 "libacl.so.1()(64bit)"
+        addReq groupid_14 "libacl.so.1(ACL_1.0)(64bit)"
+
+        let groupid_15 = toSqlKey 15
+        insertNEVRA groupid_15 "libacl" Nothing "2.2.51" "12.el7" "x86_64"
+        addProvide groupid_15 "libacl.so.1()(64bit)" Nothing
+        addProvide groupid_15 "libacl.so.1(ACL_1.0)(64bit)" Nothing
+        void $ insertGroupKeyValue (TextKey "rpm-conflict") "filesystem" (Just "filesystem < 3") groupid_15
+
+        -- glibc (id 2)
+        addReq groupid_15 "libc.so.6()(64bit)"
+        addReq groupid_15 "libc.so.6(GLIBC_2.14)(64bit)"
+        addReq groupid_15 "libc.so.6(GLIBC_2.2.5)(64bit)"
+        addReq groupid_15 "libc.so.6(GLIBC_2.3.4)(64bit)"
+        addReq groupid_15 "libc.so.6(GLIBC_2.4)(64bit)"
+        addReq groupid_15 "rtld(GNU_HASH)"
+
+        -- libattr (id 16)
+        addReq groupid_15 "libattr.so.1()(64bit)"
+        addReq groupid_15 "libattr.so.1(ATTR_1.0)(64bit)"
+
+        let groupid_16 = toSqlKey 16
+        insertNEVRA groupid_16 "libattr" Nothing "2.4.46" "12.el7" "x86_64"
+        addProvide groupid_16 "libattr.so.1()(64bit)" Nothing
+        addProvide groupid_16 "libattr.so.1(ATTR_1.0)(64bit)" Nothing
+        void $ insertGroupKeyValue (TextKey "rpm-conflict") "filesystem" (Just "filesystem < 3") groupid_16
+
+        -- glibc (id 2)
+        addReq groupid_16 "libc.so.6()(64bit)"
+        addReq groupid_16 "libc.so.6(GLIBC_2.2.5)(64bit)"
+        addReq groupid_16 "libc.so.6(GLIBC_2.4)(64bit)"
+        addReq groupid_16 "rtld(GNU_HASH)"
+
     addFile :: MonadIO m => Key Groups -> T.Text -> SqlPersistT m ()
     addFile groupid path = do
         fid <- insert $ Files path "root" "root" 0 (Just "checksum")
@@ -671,3 +749,93 @@ spec = describe "BDCS.Depclose Tests" $ do
 
     withRealDeps :: (MonadBaseControl IO m, MonadIO m) => SqlPersistT (NoLoggingT (ResourceT (ExceptT e m))) a -> m (Either e a)
     withRealDeps action = (runExceptT . withDb) (addRealDeps >> action)
+
+    -- Like withRealDeps, but with an extra glibc
+    addGlibcUpgrade :: MonadIO m => SqlPersistT m ()
+    addGlibcUpgrade = do
+        addRealDeps
+
+        let groupid_1000 = toSqlKey 1000
+        insertNEVRA groupid_1000 "glibc-upgrade" Nothing "3.0" "1" "x86_64"
+        -- Add all of the same provides and requires as glibc-2.17-78.el7.x86_64
+        addProvide groupid_1000 "glibc" (Just "= 2.17-78.el7")
+        addProvide groupid_1000 "glibc(x86_64)" (Just "= 2.17-78.el7")
+        addProvide groupid_1000 "config(glibc)" (Just "= 2.17-78.el7")
+        addProvide groupid_1000 "ld-linux-x86-64.so.2()(64bit)" Nothing
+        addProvide groupid_1000 "ld-linux-x86-64.so.2(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "ld-linux-x86-64.so.2(GLIBC_2.3)(64bit)" Nothing
+        addProvide groupid_1000 "libCNS.so()(64bit)" Nothing
+        addProvide groupid_1000 "libGB.so()(64bit)" Nothing
+        addProvide groupid_1000 "libISOIR165.so()(64bit)" Nothing
+        addProvide groupid_1000 "libJIS.so()(64bit)" Nothing
+        addProvide groupid_1000 "libJISX0213.so()(64bit)" Nothing
+        addProvide groupid_1000 "libKSC.so()(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6()(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.10)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.11)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.12)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.13)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.14)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.15)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.17)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.3)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.3.2)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.3.3)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.3.4)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.4)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.7)(64bit)" Nothing
+        addProvide groupid_1000 "libc.so.6(GLIBC_2.8)(64bit)" Nothing
+        addProvide groupid_1000 "libdl.so.2()(64bit)" Nothing
+        addProvide groupid_1000 "libdl.so.2(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libm.so.6()(64bit)" Nothing
+        addProvide groupid_1000 "libm.so.6(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libnsl.so.1()(64bit)" Nothing
+        addProvide groupid_1000 "libnsl.so.1(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libnss_files.so.2()(64bit)" Nothing
+        addProvide groupid_1000 "libpthread.so.0()(64bit)" Nothing
+        addProvide groupid_1000 "libpthread.so.0(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libpthread.so.0(GLIBC_2.3.2)(64bit)" Nothing
+        addProvide groupid_1000 "libpthread.so.0(GLIBC_2.3.3)(64bit)" Nothing
+        addProvide groupid_1000 "libresolv.so.2()(64bit)" Nothing
+        addProvide groupid_1000 "libresolv.so.2(GLIBC_2.2.5)(64bit)" Nothing
+        addProvide groupid_1000 "libresolv.so.2(GLIBC_2.9)(64bit)" Nothing
+        addProvide groupid_1000 "rtld(GNU_HASH)" Nothing
+        void $ insertGroupKeyValue (TextKey "rpm-conflict") "kernel" (Just "kernel < 2.6.32") groupid_1000
+        void $ insertGroupKeyValue (TextKey "rpm-conflict") "binutils" (Just "binutils < 2.19.51.0.10") groupid_1000
+        void $ insertGroupKeyValue (TextKey "rpm-conflict") "prelink" (Just "prelink < 0.4.2") groupid_1000
+        void $ insertGroupKeyValue (TextKey "rpm-obsolete") "glibc-profile" (Just "glibc-profile < 2.4") groupid_1000
+        void $ insertGroupKeyValue (TextKey "rpm-obsolete") "nss_db" (Just "nss_db") groupid_1000
+        addReq groupid_1000 "config(glibc) = 2.17-78.el7"
+        addReq groupid_1000 "ld-linux-x86-64.so.2()(64bit)"
+        addReq groupid_1000 "ld-linux-x86-64.so.2(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "ld-linux-x86-64.so.2(GLIBC_2.3)(64bit)"
+        addReq groupid_1000 "libCNS.so()(64bit)"
+        addReq groupid_1000 "libGB.so()(64bit)"
+        addReq groupid_1000 "libISOIR165.so()(64bit)"
+        addReq groupid_1000 "libJIS.so()(64bit)"
+        addReq groupid_1000 "libJISX0213.so()(64bit)"
+        addReq groupid_1000 "libKSC.so()(64bit)"
+        addReq groupid_1000 "libc.so.6()(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.14)(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.3)(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.3.2)(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.3.3)(64bit)"
+        addReq groupid_1000 "libc.so.6(GLIBC_2.4)(64bit)"
+        addReq groupid_1000 "libdl.so.2()(64bit)"
+        addReq groupid_1000 "libdl.so.2(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "libnsl.so.1()(64bit)"
+        addReq groupid_1000 "libnsl.so.1(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "libnss_files.so.2()(64bit)"
+        addReq groupid_1000 "libpthread.so.0()(64bit)"
+        addReq groupid_1000 "libpthread.so.0(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "libresolv.so.2()(64bit)"
+        addReq groupid_1000 "libresolv.so.2(GLIBC_2.2.5)(64bit)"
+        addReq groupid_1000 "libresolv.so.2(GLIBC_2.9)(64bit)"
+        addReq groupid_1000 "glibc-common = 2.17-78.el7"
+        addReq groupid_1000 "libfreebl3.so()(64bit)"
+        addReq groupid_1000 "libfreebl3.so(NSSRAWHASH_3.12.3)(64bit)"
+
+    withGlibcUpgrade :: (MonadBaseControl IO m, MonadIO m) => SqlPersistT (NoLoggingT (ResourceT (ExceptT e m))) a -> m (Either e a)
+    withGlibcUpgrade action = (runExceptT . withDb) (addGlibcUpgrade >> action)
