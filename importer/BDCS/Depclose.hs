@@ -45,6 +45,10 @@ import qualified BDCS.ReqType as RT
 import           Utils.Error(errorToMaybe)
 import           Utils.Monad(concatMapM, foldMaybeM, mapMaybeM)
 
+data ParentItem = GroupId (Key Groups)
+                | Provides DepRequirement
+ deriving (Eq, Ord)
+
 -- The Set is used to store the groups that are parents of the current subexpression,
 -- used to detect dependency loops and stop recursion. For instance:
 --
@@ -53,7 +57,7 @@ import           Utils.Monad(concatMapM, foldMaybeM, mapMaybeM)
 --  C Requires A
 --
 -- When depclose gets to C Requires A it can stop, since that has already been resolved.
-type DepParents = Set.Set (Key Groups)
+type DepParents = Set.Set ParentItem
 
 -- type of the depclose results
 type DepFormula = Formula (Key Groups)
@@ -92,7 +96,7 @@ depclose arches nevras = do
     groupIdToFormula :: (MonadError String m, MonadIO m) => DepParents -> Key Groups -> SqlPersistT m (DepFormula, DepParents)
     groupIdToFormula parents groupId = do
         -- add this group id to the parents set
-        let parents' = Set.insert groupId parents
+        let parents' = Set.insert (GroupId groupId) parents
 
         -- grab the key/value based data
         conflicts <- getKeyValuesForGroup groupId (TextKey "rpm-conflict") >>= mapM kvToDep
@@ -108,6 +112,17 @@ depclose arches nevras = do
         obsoleteIds <- concatMapM nameReqIds obsoletes
         let obsConflictFormulas = map Not (conflictIds ++ obsoleteIds)
 
+        -- grab all of the providers strings and add them to the parents set
+        -- Saving this data allows us to avoid repeatedly depclosing over a requirement provided
+        -- by more than one group. For instance, if there's more than one version of glibc available
+        -- in the mddb, a requirement for "libc.so.6" might resolve to Or [glibc-1, glibc-2]. Since
+        -- there are two choices, we can't say that either group id is definitely part of the expression,
+        -- but "libc.so.6" is definitely solved as part of the expression and does not need to be repeated.
+        providesSet <- Set.union parents'
+                    <$> Set.fromList
+                    <$> map Provides
+                    <$> (getKeyValuesForGroup groupId (TextKey "rpm-provide") >>= mapM kvToDep)
+
         -- Now the recursive part. First, grab everything from the requirements table for this group:
         -- TODO maybe do something with strength, context, etc.
 
@@ -121,16 +136,18 @@ depclose arches nevras = do
         -- Resolve each list of group ids to a formula
         -- Fold the parents set returned by each requirement into the next requirement, so we don't repeat
         -- ourselves too much.
-        (requirementFormulas, requirementParents) <- foldMaybeM resolveOneReq ([], parents') requirementIds
+        (requirementFormulas, requirementParents) <- foldMaybeM resolveOneReq ([], providesSet) requirementIds
 
         -- add an atom for the groupId itself, And it all together
-        return (And (Atom groupId : obsConflictFormulas ++ requirementFormulas), Set.insert groupId requirementParents)
+        return (And (Atom groupId : obsConflictFormulas ++ requirementFormulas), requirementParents)
      where
         resolveOneReq :: (MonadError String m, MonadIO m) => ([DepFormula], DepParents) -> (DepRequirement, [Key Groups]) -> SqlPersistT m (Maybe ([DepFormula], DepParents))
         resolveOneReq (formulaAcc, parentAcc) (req, idlist) =
-            -- If any of the possible ids are in the parents set, the requirement is already satisfied in the parents
-            if any (`Set.member` parentAcc) idlist then return Nothing
-            else do
+               -- If any of the possible ids are in the parents set, the requirement is already satisfied in the parents
+            if | any (`Set.member` parentAcc) (map GroupId idlist) -> return Nothing
+               -- If this exact requirement is already in the parents set, the requirement is already solved, so skip this group
+               | Set.member (Provides req) parentAcc -> return Nothing
+               | otherwise -> do
                 -- map each possible ID to a forumula, discarding the ones that cannot be satisfied
                 (formulaList, parentList) <- unzip <$> mapMaybeM (errorToMaybe . groupIdToFormula parentAcc) idlist
 
