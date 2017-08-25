@@ -22,7 +22,7 @@ import           Text.Regex.PCRE((=~))
 
 import           BDCS.DB(Files(..), KeyVal(..))
 import qualified BDCS.CS as CS
-import           BDCS.Files(filesC, keyValsForFile)
+import           BDCS.Files(filesC, getKeyValuesForFile)
 import           BDCS.KeyValue(formatKeyValue)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
@@ -73,7 +73,7 @@ runCommand db repoPath args = do
                                            else return row)
               -- If we were asked for keyval output, add that to the LsRow.
                      .| CL.mapM   (\row -> if lsKeyVal opts then do
-                                               kvs <- keyValsForFile (filesPath $ rowFiles row)
+                                               kvs <- getKeyValuesForFile (filesPath $ rowFiles row)
                                                return $ row { rowKeyVals=Just kvs }
                                            else return row)
               -- Finally, pass it to the appropriate printer.
