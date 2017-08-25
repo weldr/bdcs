@@ -18,9 +18,9 @@ module BDCS.Files(insertFiles,
                   associateFilesWithPackage,
                   files,
                   filesC,
+                  getKeyValuesForFile,
                   groupIdToFiles,
                   groupIdToFilesC,
-                  keyValsForFile,
                   pathToGroupId)
  where
 
@@ -61,6 +61,15 @@ filesC = do
                  return       file
     source .| CL.map entityVal
 
+getKeyValuesForFile :: MonadIO m => T.Text -> SqlPersistT m [KeyVal]
+getKeyValuesForFile path = do
+    results <- select $ from $ \(file `InnerJoin` file_key_val `InnerJoin` key_val) -> do
+               on     $ file ^. FilesId ==. file_key_val ^. FileKeyValuesFile_id &&.
+                        key_val ^. KeyValId ==. file_key_val ^. FileKeyValuesKey_val_id
+               where_ $ file ^. FilesPath ==. val path
+               return key_val
+    return $ map entityVal results
+
 groupIdToFiles :: MonadResource m => Key Groups -> Source (SqlPersistT m) Files
 groupIdToFiles groupid = do
     let source = selectSource $ from $ \(fs `InnerJoin` group_files) -> do
@@ -71,15 +80,6 @@ groupIdToFiles groupid = do
 
 groupIdToFilesC :: MonadResource m => Conduit (Key Groups) (SqlPersistT m) Files
 groupIdToFilesC = awaitWith $ \groupid -> toProducer (groupIdToFiles groupid) >> groupIdToFilesC
-
-keyValsForFile :: MonadIO m => T.Text -> SqlPersistT m [KeyVal]
-keyValsForFile path = do
-    results <- select $ from $ \(file `InnerJoin` file_key_val `InnerJoin` key_val) -> do
-               on     $ file ^. FilesId ==. file_key_val ^. FileKeyValuesFile_id &&.
-                        key_val ^. KeyValId ==. file_key_val ^. FileKeyValuesKey_val_id
-               where_ $ file ^. FilesPath ==. val path
-               return key_val
-    return $ map entityVal results
 
 pathToGroupId :: MonadIO m => T.Text -> SqlPersistT m [Key Groups]
 pathToGroupId path = do
