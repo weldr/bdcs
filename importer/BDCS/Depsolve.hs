@@ -22,6 +22,7 @@ module BDCS.Depsolve(Formula(..),
                      CNFLiteral(..),
                      CNFAtom(..),
                      CNFFormula,
+                     DepAssignment,
                      formulaToCNF,
                      solveCNF
 -- export private symbols for testing
