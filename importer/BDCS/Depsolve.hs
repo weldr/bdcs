@@ -219,7 +219,7 @@ solveCNF formula = evalStateT (solveCNF' formula) Map.empty
     assignmentsToList = do
         -- start by getting everything out of the map as a list of (CNFLiteral, Bool)
         assignments <- get
-        let literalList = Map.foldlWithKey (\acc key val -> (key, val):acc) [] assignments
+        let literalList = Map.assocs assignments
 
          -- map each (literal, bool) to Maybe (orig, bool), mapMaybe will filter out the Nothings
         return $ mapMaybe (\(literal, value) -> (,value) <$> literalToOriginal literal) literalList
