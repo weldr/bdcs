@@ -95,7 +95,8 @@ library
                         Utils.Mode,
                         Utils.Monad
 
-    build-depends:      base >=4.9 && <5.0,
+    build-depends:      aeson,
+                        base >=4.9 && <5.0,
                         bytestring,
                         codec-rpm >= 0.1.3 && < 0.2,
                         cond,
