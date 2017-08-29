@@ -1,8 +1,13 @@
 {-# LANGUAGE RecordWildCards #-}
 
 import           Control.Conditional(unlessM)
+import           Data.Aeson((.=), ToJSON, object, toJSON)
+import           Data.Aeson.Encode.Pretty(encodePretty)
+import           Data.ByteString.Lazy(toStrict)
 import           Data.List(intercalate)
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
+import           Data.Text.Encoding(decodeUtf8)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Database.Persist.Sqlite(Key, runSqlite)
@@ -13,27 +18,51 @@ import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
-import BDCS.DB(Groups(..), KeyVal)
+import BDCS.DB(Groups(..), KeyVal(..))
 import BDCS.GroupKeyValue(getKeyValuesForGroup)
 import BDCS.Groups(groupsC)
+import BDCS.KeyType(asText)
 import BDCS.KeyValue(formatKeyValue)
 import BDCS.Version
 
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
-data GroupsOptions = GroupsOptions { grpKeyVals :: Bool,
+data GroupsOptions = GroupsOptions { grpJSONOutput :: Bool,
+                                     grpKeyVals :: Bool,
                                      grpMatches :: String }
 
 instance OptClass GroupsOptions
 
 defaultGroupsOptions :: GroupsOptions
-defaultGroupsOptions = GroupsOptions { grpKeyVals = False,
+defaultGroupsOptions = GroupsOptions { grpJSONOutput = False,
+                                       grpKeyVals = False,
                                        grpMatches = ".*" }
 
 data GroupsRow = GroupsRow { rowId :: Key Groups,
                              rowKeyVals :: Maybe [KeyVal],
                              rowName :: T.Text }
+
+instance ToJSON GroupsRow where
+    toJSON r = let namePair = T.pack "groupName" .= toJSON (rowName r)
+                   keyvals  = case rowKeyVals r of
+                                  Nothing  -> []
+                                  -- toJSON on a KeyVal does nothing with the key, so we need to create a list of
+                                  -- (key, json) tuples.
+                                  Just kvs -> let vals    = map (\kv -> (asText $ keyValKey_value kv, [toJSON kv]))
+                                                                kvs
+                                                  -- A single group can have many KeyVals with the same key (think about
+                                                  -- rpm-provides and requires especially).  We use an intermediate map
+                                                  -- to turn it into a list of (key, [json1, json2, ...]) tuples.
+                                                  mapping = Map.fromListWith (++) vals
+                                                  -- If there's only one KeyVal for a given key, strip the list out before
+                                                  -- converting to a json list object.  Otherwise, everything will end up
+                                                  -- in a list.
+                                                  pairs   = map (\(k, v) -> if length v == 1 then k .= head v else k .= v)
+                                                                (Map.toList mapping)
+                                               in [T.pack "keyvals" .= object pairs]
+               in
+                   object (namePair : keyvals)
 
 initRow :: (Key Groups, T.Text) -> GroupsRow
 initRow (key, name) = GroupsRow { rowId=key,
@@ -43,6 +72,8 @@ initRow (key, name) = GroupsRow { rowId=key,
 runCommand :: T.Text -> FilePath -> [String] -> IO ()
 runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultGroupsOptions args "groups"
+    let printer = if grpJSONOutput opts then jsonPrinter else textPrinter
+
     runSqlite db $ runConduit $
         -- Grab all the Groups, filtering out any whose name does not match what we want.
         groupsC .| CL.filter (\(_, n) -> T.unpack n =~ grpMatches opts)
@@ -58,6 +89,9 @@ runCommand db _ args = do
  where
     options :: [OptDescr (GroupsOptions -> GroupsOptions)]
     options = [
+        Option [] ["json"]
+               (NoArg (\opts -> opts { grpJSONOutput = True }))
+               "format output as JSON",
         Option ['k'] ["keyval"]
                (NoArg (\opts -> opts { grpKeyVals = True }))
                "add key/val pairs to output",
@@ -66,8 +100,14 @@ runCommand db _ args = do
                "return only results that match REGEX"
      ]
 
-    printer :: GroupsRow -> T.Text
-    printer GroupsRow{..} = T.pack $
+    -- Note: The docs say that toStrict is an expensive operation that should be used carefully.
+    -- I think it's okay here because we are only dealing with one row of output at a time, so
+    -- it should be pretty small amounts of data to convert.
+    jsonPrinter :: GroupsRow -> T.Text
+    jsonPrinter = decodeUtf8 . toStrict . encodePretty
+
+    textPrinter :: GroupsRow -> T.Text
+    textPrinter GroupsRow{..} = T.pack $
         printf "%s%s"
                rowName
                keyvals
