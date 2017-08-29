@@ -34,7 +34,7 @@ after_success:
 
         # report to coveralls here because we need access to git
         sudo chown travis:travis -R ./importer/dist
-        cd importer/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles
+        cd importer/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles depsolve
 
         if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
             sudo docker tag welder/bdcs-build-img:latest welder/bdcs-build-img:$TRAVIS_BUILD_NUMBER
