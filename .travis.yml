@@ -26,6 +26,10 @@ after_success:
   - |
         # copy the coverage data out of the container
         sudo docker cp tests:/importer/dist ./importer/dist
+        # copy compiled binaries out of the container so we can upload
+        # them to S3 later
+        sudo docker cp tests:/importer/dist/import/import .
+        sudo docker cp tests:/importer/dist/export/export .
         sudo docker rm tests
 
         # report to coveralls here because we need access to git
