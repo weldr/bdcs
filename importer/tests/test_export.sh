@@ -99,6 +99,22 @@ compare_ostree $CS_REPO master $OSTREE_DIR $EXPORT_DIR
 sudo rm -rf $EXPORT_DIR $OSTREE_DIR
 
 ############################################################
+## When exporting existing package into .tar image
+## Then untarred contents match the export from an ostree checkout
+
+sudo $EXPORT $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-6.el7.noarch
+if [[ $? != 0 ]]; then
+    echo "ERROR: Exit code should be zero"
+    exit 1
+fi
+
+mkdir tar_contents && pushd tar_contents/ && tar xvf ../exported.tar && popd
+compare_ostree $CS_REPO master $OSTREE_DIR tar_contents/
+
+sudo rm -rf tar_contents/ exported.tar $OSTREE_DIR
+
+
+############################################################
 ## When exporting two conflicting packages
 ## And they conflict on a symlink
 ## Then (since 5834760) the first symlink to be exported wins
