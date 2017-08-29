@@ -1,3 +1,5 @@
 .cabal
 .cabal-sandbox
 welder-deployment/
+*.tix
+*.pyc
