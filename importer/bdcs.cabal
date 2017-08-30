@@ -213,10 +213,14 @@ executable inspect-ls
     other-modules:      Utils.GetOpt,
                         Utils.IO
 
-    build-depends:      bdcs,
+    build-depends:      aeson,
+                        aeson-pretty,
                         base >= 4.7 && < 5.0,
+                        bdcs,
+                        bytestring,
                         cond,
                         conduit >= 1.2.8,
+                        containers,
                         directory,
                         gi-ostree,
                         mtl >= 2.2.1,
