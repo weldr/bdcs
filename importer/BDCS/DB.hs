@@ -43,7 +43,7 @@ import BDCS.ReqType
 {-# ANN module ("HLint: ignore Use module export list" :: String) #-}
 -- Both esqueleto and maybe export isNothing.  I don't want to have to use a qualified import, so
 -- we'll just compare things directly to Nothing.
-{-# ANN module ("HLint: ignore Use isNothing found" :: String) #-}
+{-# ANN module ("HLint: ignore Use isNothing" :: String) #-}
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects
