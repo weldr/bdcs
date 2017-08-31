@@ -25,13 +25,12 @@ import           Data.Conduit(Consumer, (.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
-import           Database.Persist.Sqlite(runSqlite)
 import           System.Directory(doesFileExist, removePathForcibly)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
 import qualified BDCS.CS as CS
-import           BDCS.DB(Files)
+import           BDCS.DB(Files, checkAndRunSqlite)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 import           BDCS.Version
@@ -104,7 +103,7 @@ main = do
                                       (".repo" `isSuffixOf` out_path,  (cleanupHandler out_path, Ostree.ostreeSink out_path)),
                                       (otherwise,                      (print, directoryOutput out_path))]
 
-    result <- runExceptT $ runSqlite db_path $ runConduit $ CL.sourceList things
+    result <- runExceptT $ checkAndRunSqlite db_path $ runConduit $ CL.sourceList things
         .| getGroupIdC
         .| groupIdToFilesC
         .| CS.filesToObjectsC repo

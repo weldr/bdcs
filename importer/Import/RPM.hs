@@ -32,7 +32,7 @@ import           Codec.RPM.Types
 import           Control.Conditional(ifM)
 import           Control.Exception(evaluate, tryJust)
 import           Control.Monad(guard, void)
-import           Control.Monad.Except(runExceptT)
+import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.State(execStateT)
@@ -42,7 +42,6 @@ import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
 import           Data.Foldable(toList)
-import           Database.Persist.Sqlite(runSqlite)
 import qualified Data.Text as T
 import           GI.Gio(noCancellable)
 import           GI.OSTree(IsRepo, repoRegenerateSummary)
@@ -85,11 +84,11 @@ buildImported sigs =
 -- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
 -- information into the mddb.  The return value is whether or not an import occurred.  This is not the
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
-consume :: (IsRepo a, MonadIO m, MonadBaseControl IO m) => a -> FilePath -> Consumer RPM m Bool
+consume :: (IsRepo a, MonadIO m, MonadBaseControl IO m, MonadError String m) => a -> FilePath -> Consumer RPM m Bool
 consume repo db = await >>= \case
-    Just rpm -> lift $ runSqlite (T.pack db) $ ifM (rpmExistsInMDDB rpm)
-                                                   (return False)
-                                                   (unsafeConsume repo rpm)
+    Just rpm -> lift $ checkAndRunSqlite (T.pack db) $ ifM (rpmExistsInMDDB rpm)
+                                                           (return False)
+                                                           (unsafeConsume repo rpm)
     Nothing  -> return False
 
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
@@ -168,6 +167,7 @@ loadFromURI uri = do
     result <- runExceptT $ runConduitRes (pipeline repo db uri)
     case result of
         Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
+        Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e
         _          -> return ()
  where
     pipeline r d f = getFromURI f .| parseRPMC .| consume r d

@@ -27,14 +27,22 @@
 
 module BDCS.DB where
 
+import           Control.Monad(unless)
+import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.Logger(NoLoggingT)
+import           Control.Monad.Reader(ReaderT)
+import           Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
 import qualified Data.Aeson as Aeson
 import           Data.ByteString(ByteString)
+import           Data.Int(Int64)
 import           Data.Maybe(fromJust, listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
 import           Database.Esqueleto(Esqueleto, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
                                     (==.), insert, isNothing, val, unValue)
+import           Database.Persist.Sql(rawSql, unSingle)
+import           Database.Persist.Sqlite(runSqlite)
 import           Database.Persist.TH
 
 import BDCS.KeyType
@@ -44,6 +52,20 @@ import BDCS.ReqType
 -- Both esqueleto and maybe export isNothing.  I don't want to have to use a qualified import, so
 -- we'll just compare things directly to Nothing.
 {-# ANN module ("HLint: ignore Use isNothing" :: String) #-}
+
+-- This must match the PRAGMA user_version value in schema.sql
+schemaVersion :: Int64
+schemaVersion = 1
+
+checkDbVersion :: (MonadError String m, MonadIO m) => ReaderT SqlBackend m ()
+checkDbVersion = do
+    userVersion <- unSingle <$> head <$> rawSql "pragma user_version" []
+    unless (userVersion == schemaVersion) $ throwError $
+        "Database version " ++ show userVersion ++ " does not match expected version " ++ show schemaVersion
+
+checkAndRunSqlite :: (MonadError String m, MonadBaseControl IO m, MonadIO m) =>
+    T.Text -> SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
+checkAndRunSqlite db action = runSqlite db (checkDbVersion >> action)
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects

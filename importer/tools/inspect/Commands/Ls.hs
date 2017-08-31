@@ -17,7 +17,6 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
 import           Data.Time.Format(defaultTimeLocale, formatTime)
-import           Database.Persist.Sqlite(runSqlite)
 import           GI.OSTree(IsRepo)
 import           System.Console.GetOpt
 import           System.Directory(doesDirectoryExist, doesFileExist)
@@ -26,7 +25,7 @@ import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
-import           BDCS.DB(Files(..), KeyVal(..))
+import           BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
 import qualified BDCS.CS as CS
 import           BDCS.Files(filesC, getKeyValuesForFile)
 import           BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
@@ -125,7 +124,7 @@ runCommand db repoPath args = do
                                          return $ liftedPutStrLn . verbosePrinter currentYear
                   | otherwise -> return $ liftedPutStrLn . simplePrinter
 
-    result <- runExceptT $ runSqlite db $ runConduit $
+    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
               -- Grab all the Files, filtering out any whose path does not match what we want.
               filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
               -- Convert them into LsRow records containing only the Files record.

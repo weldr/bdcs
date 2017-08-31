@@ -19,10 +19,10 @@ import           Control.Monad(when)
 import           Control.Monad.Except(runExceptT)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import           Database.Persist.Sqlite(runSqlite)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
+import BDCS.DB(checkAndRunSqlite)
 import BDCS.Depclose(depclose)
 import BDCS.Depsolve(formulaToCNF, solveCNF)
 import BDCS.Groups(groupIdToNevra)
@@ -41,7 +41,7 @@ main = do
 
     let db = T.pack $ head argv
     let things = map T.pack $ drop 1 argv
-    result <- runExceptT $ runSqlite db $ do
+    result <- runExceptT $ checkAndRunSqlite db $ do
         formula <- depclose ["x86_64"] things
         solution <- solveCNF (formulaToCNF formula)
 

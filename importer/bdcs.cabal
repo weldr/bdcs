@@ -116,6 +116,7 @@ library
                         gitrev >= 1.3.1,
                         haskell-gi-base,
                         http-conduit,
+                        monad-logger,
                         mtl >= 2.2.1,
                         network-uri,
                         parsec,
@@ -198,6 +199,7 @@ executable inspect-groups
                         conduit >= 1.2.8,
                         containers,
                         directory,
+                        mtl >= 2.2.1,
                         persistent-sqlite,
                         regex-pcre,
                         text
@@ -245,6 +247,7 @@ executable inspect-nevras
                         cond,
                         conduit >= 1.2.8,
                         directory,
+                        mtl >= 2.2.1,
                         persistent-sqlite,
                         regex-pcre,
                         text
