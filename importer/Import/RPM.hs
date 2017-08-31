@@ -36,6 +36,8 @@ import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.State(execStateT)
+import           Control.Monad.Trans(lift)
+import           Control.Monad.Trans.Resource(MonadBaseControl)
 import qualified Data.ByteString.Char8 as C8
 import           Data.Conduit((.|), Consumer, await, runConduitRes)
 import           Database.Esqueleto
@@ -83,43 +85,43 @@ buildImported sigs =
 -- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
 -- information into the mddb.  The return value is whether or not an import occurred.  This is not the
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
-consume :: (IsRepo a, MonadIO m) => a -> FilePath -> Consumer RPM m Bool
+consume :: (IsRepo a, MonadIO m, MonadBaseControl IO m) => a -> FilePath -> Consumer RPM m Bool
 consume repo db = await >>= \case
-    Just rpm -> liftIO $ ifM (rpmExistsInMDDB db rpm)
-                             (return False)
-                             (unsafeConsume repo db rpm)
+    Just rpm -> lift $ runSqlite (T.pack db) $ ifM (rpmExistsInMDDB rpm)
+                                                   (return False)
+                                                   (unsafeConsume repo rpm)
     Nothing  -> return False
 
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only,
 -- but that might change in the future.  If so, its type should also change to be a Consumer.
-unsafeConsume :: IsRepo a => a -> FilePath -> RPM -> IO Bool
-unsafeConsume repo db rpm@RPM{..} = do
+unsafeConsume :: (IsRepo a, MonadIO m) => a -> RPM -> SqlPersistT m Bool
+unsafeConsume repo rpm@RPM{..} = do
    let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
 
-   checksum <- withTransaction repo $ \r -> do
+   checksum <- liftIO $ withTransaction repo $ \r -> do
        f <- store r rpmArchive
        commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
 
    repoRegenerateSummary repo Nothing noCancellable
 
-   checksums <- execStateT (commitContents repo checksum) []
-   loadIntoMDDB db rpm checksums
+   checksums <- liftIO $ execStateT (commitContents repo checksum) []
+   loadIntoMDDB rpm checksums
 
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
 -- package already exists in the mddb.
-loadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO Bool
-loadIntoMDDB db rpm checksums =
-    ifM (rpmExistsInMDDB db rpm)
+loadIntoMDDB :: MonadIO m => RPM -> [(T.Text, T.Text)] -> SqlPersistT m Bool
+loadIntoMDDB rpm checksums =
+    ifM (rpmExistsInMDDB rpm)
         (return False)
-        (unsafeLoadIntoMDDB db rpm checksums)
+        (unsafeLoadIntoMDDB rpm checksums)
 
 -- Like loadIntoMDDB, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
 -- that might change in the future.
-unsafeLoadIntoMDDB :: FilePath -> RPM -> [(T.Text, T.Text)] -> IO Bool
-unsafeLoadIntoMDDB db RPM{..} checksums = runSqlite (T.pack db) $ do
+unsafeLoadIntoMDDB :: MonadIO m => RPM -> [(T.Text, T.Text)] -> SqlPersistT m Bool
+unsafeLoadIntoMDDB RPM{..} checksums = do
     let sigHeaders = headerTags $ head rpmSignatures
     let tagHeaders = headerTags $ head rpmHeaders
 
@@ -173,7 +175,7 @@ loadFromURI uri = do
 -- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
 -- from being added to the content store a second time.  Note that loadIntoMDDB also performs this
 -- check, but both of these functions are public and therefore both need to prevent duplicate imports.
-rpmExistsInMDDB :: FilePath -> RPM -> IO Bool
-rpmExistsInMDDB db RPM{..} = do
+rpmExistsInMDDB :: MonadIO m => RPM -> SqlPersistT m Bool
+rpmExistsInMDDB RPM{..} = do
     let sigHeaders = headerTags $ head rpmSignatures
-    liftIO $ runSqlite (T.pack db) $ buildImported sigHeaders
+    buildImported sigHeaders
