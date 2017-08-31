@@ -13,12 +13,15 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.Types(Label(..),
+                        asText)
  where
 
-import Database.Persist.TH
+import           Database.Persist.TH
+import qualified Data.Text as T
 
 data Label = DocsLabel
            | LibraryLabel
@@ -26,3 +29,8 @@ data Label = DocsLabel
     deriving(Eq, Read, Show)
 
 derivePersistField "Label"
+
+asText :: Label -> T.Text
+asText DocsLabel    = "Label:Docs"
+asText LibraryLabel = "Label:Library"
+asText ServiceLabel = "Label:Service"

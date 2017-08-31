@@ -95,7 +95,8 @@ library
                         Utils.Mode,
                         Utils.Monad
 
-    build-depends:      base >=4.9 && <5.0,
+    build-depends:      aeson,
+                        base >=4.9 && <5.0,
                         bytestring,
                         codec-rpm >= 0.1.3 && < 0.2,
                         cond,
@@ -188,10 +189,14 @@ executable inspect-groups
     other-modules:      Utils.GetOpt,
                         Utils.IO
 
-    build-depends:      bdcs,
+    build-depends:      aeson,
+                        aeson-pretty,
                         base >= 4.7 && < 5.0,
+                        bdcs,
+                        bytestring,
                         cond,
                         conduit >= 1.2.8,
+                        containers,
                         directory,
                         persistent-sqlite,
                         regex-pcre,
@@ -208,10 +213,14 @@ executable inspect-ls
     other-modules:      Utils.GetOpt,
                         Utils.IO
 
-    build-depends:      bdcs,
+    build-depends:      aeson,
+                        aeson-pretty,
                         base >= 4.7 && < 5.0,
+                        bdcs,
+                        bytestring,
                         cond,
                         conduit >= 1.2.8,
+                        containers,
                         directory,
                         gi-ostree,
                         mtl >= 2.2.1,
@@ -292,6 +301,7 @@ Test-Suite test-bdcs
     main-is:            Spec.hs
 
     build-depends:      hspec,
+                        aeson,
                         base >= 4.8 && < 5.0,
                         bytestring,
                         codec-rpm >= 0.1.3 && < 0.2,

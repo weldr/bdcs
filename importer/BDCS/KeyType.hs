@@ -15,17 +15,21 @@
 
 {-# LANGUAGE TemplateHaskell #-}
 
-module BDCS.KeyType where
+module BDCS.KeyType(KeyType(..),
+                    asText)
+ where
 
 import           Database.Persist.TH
 import qualified Data.Text as T
 
-import BDCS.Label.Types(Label)
+import qualified BDCS.Label.Types as Label
 
-{-# ANN module "HLint: ignore Use module export list" #-}
-
-data KeyType = LabelKey Label
+data KeyType = LabelKey Label.Label
              | TextKey T.Text
  deriving(Eq, Read, Show)
 
 derivePersistField "KeyType"
+
+asText :: KeyType -> T.Text
+asText (LabelKey l) = Label.asText l
+asText (TextKey t)  = t

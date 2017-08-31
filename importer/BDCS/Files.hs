@@ -18,6 +18,7 @@ module BDCS.Files(insertFiles,
                   associateFilesWithPackage,
                   files,
                   filesC,
+                  getKeyValuesForFile,
                   groupIdToFiles,
                   groupIdToFilesC,
                   pathToGroupId)
@@ -59,6 +60,15 @@ filesC = do
                  orderBy      [asc (file ^. FilesPath)]
                  return       file
     source .| CL.map entityVal
+
+getKeyValuesForFile :: MonadIO m => T.Text -> SqlPersistT m [KeyVal]
+getKeyValuesForFile path = do
+    results <- select $ from $ \(file `InnerJoin` file_key_val `InnerJoin` key_val) -> do
+               on     $ file ^. FilesId ==. file_key_val ^. FileKeyValuesFile_id &&.
+                        key_val ^. KeyValId ==. file_key_val ^. FileKeyValuesKey_val_id
+               where_ $ file ^. FilesPath ==. val path
+               return key_val
+    return $ map entityVal results
 
 groupIdToFiles :: MonadResource m => Key Groups -> Source (SqlPersistT m) Files
 groupIdToFiles groupid = do

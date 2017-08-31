@@ -13,7 +13,11 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+
 module BDCS.KeyValue(findKeyValue,
+                     formatKeyValue,
                      insertKeyValue)
  where
 
@@ -32,6 +36,15 @@ findKeyValue k v e = firstResult $
              kv ^. KeyValExt_value ==? e
     limit 1
     return $ kv ^. KeyValId
+
+formatKeyValue :: KeyVal -> T.Text
+formatKeyValue KeyVal{..} = let
+    rhs = case (keyValVal_value, keyValExt_value) of
+              (Just v, Nothing) -> T.concat [ " = ", v ]
+              (Just v, Just e)  -> T.concat [ " = (", v, ", ", e, ")" ]
+              _                 -> ""
+ in
+    T.concat [ T.pack $ show keyValKey_value, rhs ]
 
 insertKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v e =

@@ -99,8 +99,8 @@ depclose arches nevras = do
         let parents' = Set.insert (GroupId groupId) parents
 
         -- grab the key/value based data
-        conflicts <- getKeyValuesForGroup groupId (TextKey "rpm-conflict") >>= mapM kvToDep
-        obsoletes <- getKeyValuesForGroup groupId (TextKey "rpm-obsolete") >>= mapM kvToDep
+        conflicts <- getKeyValuesForGroup groupId (Just $ TextKey "rpm-conflict") >>= mapM kvToDep
+        obsoletes <- getKeyValuesForGroup groupId (Just $ TextKey "rpm-obsolete") >>= mapM kvToDep
 
         -- map the strings to group ids. Obsolete and Conflict both express a potential group id
         -- that should NOT be included in the final, depsolved result, so express that information here
@@ -121,7 +121,7 @@ depclose arches nevras = do
         providesSet <- Set.union parents'
                     <$> Set.fromList
                     <$> map Provides
-                    <$> (getKeyValuesForGroup groupId (TextKey "rpm-provide") >>= mapM kvToDep)
+                    <$> (getKeyValuesForGroup groupId (Just $ TextKey "rpm-provide") >>= mapM kvToDep)
 
         -- Now the recursive part. First, grab everything from the requirements table for this group:
         -- TODO maybe do something with strength, context, etc.
@@ -225,7 +225,7 @@ depclose arches nevras = do
     -- Check if the given group matches either the target arch or noarch
     matchesArch :: MonadIO m => Key Groups -> SqlPersistT m Bool
     matchesArch groupId = do
-        kvArches <- mapMaybe keyValVal_value <$> getKeyValuesForGroup groupId (TextKey "arch")
+        kvArches <- mapMaybe keyValVal_value <$> getKeyValuesForGroup groupId (Just $ TextKey "arch")
         return $ (not . null) (("noarch":arches) `intersect` kvArches)
 
     -- various ways of converting things to DepRequirement

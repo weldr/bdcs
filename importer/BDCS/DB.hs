@@ -19,6 +19,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -27,8 +28,9 @@
 module BDCS.DB where
 
 import           Control.Monad.IO.Class(MonadIO)
+import qualified Data.Aeson as Aeson
 import           Data.ByteString(ByteString)
-import           Data.Maybe(listToMaybe)
+import           Data.Maybe(fromJust, listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
 import           Database.Esqueleto(Esqueleto, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
@@ -39,6 +41,9 @@ import BDCS.KeyType
 import BDCS.ReqType
 
 {-# ANN module ("HLint: ignore Use module export list" :: String) #-}
+-- Both esqueleto and maybe export isNothing.  I don't want to have to use a qualified import, so
+-- we'll just compare things directly to Nothing.
+{-# ANN module ("HLint: ignore Use isNothing" :: String) #-}
 
 share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Projects
@@ -142,6 +147,15 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     script_id ScriptsId
     deriving Eq Show
  |]
+
+instance Aeson.ToJSON KeyVal where
+    toJSON kv = let
+        v = fmap Aeson.toJSON (keyValVal_value kv)
+        e = fmap Aeson.toJSON (keyValExt_value kv)
+     in
+        if | v == Nothing           -> Aeson.Bool True
+           | v == e || e == Nothing -> fromJust v
+           | otherwise              -> fromJust e
 
 -- Run a sql query, returning the first value as a Maybe.
 firstResult :: Monad m => m [Value a] -> m (Maybe a)
