@@ -1,6 +1,8 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
 
 import           Control.Conditional(unlessM)
+import           Control.Monad.Except(runExceptT)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
 import           Data.Aeson.Encode.Pretty(encodePretty)
 import           Data.ByteString.Lazy(toStrict)
@@ -9,7 +11,7 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
-import           Database.Persist.Sqlite(Key, runSqlite)
+import           Database.Persist.Sqlite(Key)
 import           System.Console.GetOpt
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
@@ -17,12 +19,13 @@ import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
-import BDCS.DB(Groups(..), KeyVal(..))
+import BDCS.DB(Groups(..), KeyVal(..), checkAndRunSqlite)
 import BDCS.GroupKeyValue(getKeyValuesForGroup)
 import BDCS.Groups(groupsC)
 import BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
 import BDCS.Version
 
+import Utils.Either(whenLeft)
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
@@ -57,7 +60,7 @@ runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultGroupsOptions args "groups"
     let printer = if grpJSONOutput opts then jsonPrinter else textPrinter
 
-    runSqlite db $ runConduit $
+    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
         -- Grab all the Groups, filtering out any whose name does not match what we want.
         groupsC .| CL.filter (\(_, n) -> T.unpack n =~ grpMatches opts)
         -- Convert them into GroupsRow records.
@@ -69,6 +72,8 @@ runCommand db _ args = do
                                       else return row)
         -- Finally, pass it to the printer.
                 .| CL.mapM_  (liftedPutStrLn . printer)
+
+    whenLeft result (\e -> print $ "error: " ++ e)
  where
     options :: [OptDescr (GroupsOptions -> GroupsOptions)]
     options = [

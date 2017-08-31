@@ -1,17 +1,19 @@
 import           Control.Conditional(unlessM)
+import           Control.Monad.Except(runExceptT)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import qualified Data.Text as T
-import           Database.Persist.Sqlite(runSqlite)
 import           System.Console.GetOpt
 import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           Text.Regex.PCRE((=~))
 
+import BDCS.DB(checkAndRunSqlite)
 import BDCS.Groups(groupsC, groupIdToNevra)
 import BDCS.Version
 
+import Utils.Either(whenLeft)
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
@@ -30,11 +32,12 @@ defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }
 runCommand :: T.Text -> FilePath -> [String] -> IO ()
 runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultNevrasOptions args "nevras"
-    runSqlite db $ runConduit $
+    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
         groupsC .| CL.map fst
                 .| CL.mapMaybeM groupIdToNevra
                 .| CL.filter (\g -> T.unpack g =~ nevraMatches opts)
                 .| CL.mapM_ liftedPutStrLn
+    whenLeft result (\e -> print $ "error: " ++ e)
  where
     options :: [OptDescr (NevrasOptions -> NevrasOptions)]
     options = [
