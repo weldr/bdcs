@@ -18,10 +18,15 @@
 
 module BDCS.KeyValue(findKeyValue,
                      formatKeyValue,
-                     insertKeyValue)
+                     insertKeyValue,
+                     keyValueListToJSON)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
+import           Data.Aeson((.=), object, toJSON)
+import           Data.Aeson.Types(KeyValue)
+import           Data.List(partition)
+import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Database.Esqueleto
 
@@ -49,3 +54,35 @@ formatKeyValue KeyVal{..} = let
 insertKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v e =
     insert (KeyVal k v e)
+
+keyValueListToJSON :: KeyValue t => [KeyVal] -> [t]
+keyValueListToJSON lst = let
+    isLabelKey (LabelKey _) = True
+    isLabelKey _            = False
+
+    -- We want to handle LabelKeys differently from all other KeyTypes, so first let's sort them out.
+    (labelKvs, otherKvs) = partition (isLabelKey . keyValKey_value) lst
+
+    -- Convert LabelKeys into tuples of ("labels", json).  All LabelKeys will have the same first value
+    -- in their tuple - the string "labels".  This assumes that LabelKeys do not store values or extended
+    -- values.  If they start doing that, this will have to change.
+    labelVals = map (\kv -> (T.pack "labels", [toJSON $ asText $ keyValKey_value kv])) labelKvs
+
+    -- Convert all other KeyTypes into tuples of (key, json).
+    otherVals = map (\kv -> (asText $ keyValKey_value kv, [toJSON kv])) otherKvs
+
+    -- A single list can have many KeyVals with the same key (think about rpm-provides and requires
+    -- especially).  We use an intermediate map to turn it into a list of (key, [json1, json2, ...]) tuples.
+    -- Both types get handled the same way here.
+    labelMap = Map.fromListWith (++) labelVals
+    otherMap = Map.fromListWith (++) otherVals
+
+    -- If there's only one KeyVal for a given key, strip the list out before converting it to a
+    -- json list object.  Otherwise, everything will end up in a list.
+    --
+    -- On the other hand, we don't do anything to LabelKeys.  This means labels will always end up
+    -- in a list named "labels".
+    pairs = map (\(k, v) -> if length v == 1 then k .= head v else k .= v) (Map.toList otherMap) ++
+            map (uncurry (.=)) (Map.toList labelMap)
+ in
+    [T.pack "keyvals" .= object pairs]

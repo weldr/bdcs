@@ -12,7 +12,6 @@ import           Data.ByteString.Lazy(toStrict)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Data.List(intercalate)
-import qualified Data.Map.Strict as Map
 import           Data.Maybe(catMaybes, fromMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
@@ -30,8 +29,7 @@ import           Text.Regex.PCRE((=~))
 import           BDCS.DB(Files(..), KeyVal(..))
 import qualified BDCS.CS as CS
 import           BDCS.Files(filesC, getKeyValuesForFile)
-import           BDCS.KeyType(asText)
-import           BDCS.KeyValue(formatKeyValue)
+import           BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
@@ -58,22 +56,7 @@ data LsRow = LsRow { rowFiles :: Files,
 
 instance ToJSON LsRow where
     toJSON r = let namePair = T.pack "path" .= toJSON (filesPath $ rowFiles r)
-                   keyvals  = case rowKeyVals r of
-                                  Nothing  -> []
-                                  -- toJSON on a KeyVal does nothing with the key, so we need to create a list of
-                                  -- (key, json) tuples.
-                                  Just kvs -> let vals    = map (\kv -> (asText $ keyValKey_value kv, [toJSON kv]))
-                                                                kvs
-                                                  -- A single group can have many KeyVals with the same key (think about
-                                                  -- rpm-provides and requires especially).  We use an intermediate map
-                                                  -- to turn it into a list of (key, [json1, json2, ...]) tuples.
-                                                  mapping = Map.fromListWith (++) vals
-                                                  -- If there's only one KeyVal for a given key, strip the list out before
-                                                  -- converting to a json list object.  Otherwise, everything will end up
-                                                  -- in a list.
-                                                  pairs   = map (\(k, v) -> if length v == 1 then k .= head v else k .= v)
-                                                                (Map.toList mapping)
-                                               in [T.pack "keyvals" .= object pairs]
+                   keyvals  = maybe [] keyValueListToJSON (rowKeyVals r)
                    optional = catMaybes [ -- You may be tempted to rewrite the beginnings of these as "fileTypeString (rowMetadata r)",
                                           -- but don't.  We first want to check that there is any rowMetadata and if not, return Nothing.
                                           -- Doing it the other way passes Nothing to fileTypeString, which is set up to return something
