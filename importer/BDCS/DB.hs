@@ -31,7 +31,6 @@ import           Control.Monad(unless)
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Logger(NoLoggingT)
-import           Control.Monad.Reader(ReaderT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
 import qualified Data.Aeson as Aeson
 import           Data.ByteString(ByteString)
@@ -57,11 +56,15 @@ import BDCS.ReqType
 schemaVersion :: Int64
 schemaVersion = 2
 
-checkDbVersion :: (MonadError String m, MonadIO m) => ReaderT SqlBackend m ()
+getDbVersion :: MonadIO m => SqlPersistT m Int64
+getDbVersion = unSingle <$> head <$> rawSql "pragma user_version" []
+
+checkDbVersion :: (MonadError String m, MonadIO m) => SqlPersistT m ()
 checkDbVersion = do
-    userVersion <- unSingle <$> head <$> rawSql "pragma user_version" []
+    userVersion <- getDbVersion
     unless (userVersion == schemaVersion) $ throwError $
-        "Database version " ++ show userVersion ++ " does not match expected version " ++ show schemaVersion
+        "Database version " ++ show userVersion ++ " does not match expected version " ++ show schemaVersion ++
+            ", use migratedb to upgrade the database"
 
 checkAndRunSqlite :: (MonadError String m, MonadBaseControl IO m, MonadIO m) =>
     T.Text -> SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
