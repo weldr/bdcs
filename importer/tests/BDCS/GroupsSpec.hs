@@ -69,7 +69,7 @@ spec = describe "BDCS.Groups Tests" $ do
     addNevras = do
         -- hasEpoch-7:1.0-1.el7.x86_64
         let gid_1 = toSqlKey 1
-        insertKey gid_1 $ Groups "hasEpoch" "rpm"
+        insertKey gid_1 $ Groups "hasEpoch" "rpm" Nothing
         void $ insertGroupKeyValue (TextKey "name")    "hasEpoch" Nothing gid_1
         void $ insertGroupKeyValue (TextKey "epoch")   "7"        Nothing gid_1
         void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_1
@@ -78,7 +78,7 @@ spec = describe "BDCS.Groups Tests" $ do
 
         -- noEpoch-1.0-1.el7.x86_64
         let gid_2 = toSqlKey 2
-        insertKey gid_2 $ Groups "noEpoch" "rpm"
+        insertKey gid_2 $ Groups "noEpoch" "rpm" Nothing
         void $ insertGroupKeyValue (TextKey "name")    "noEpoch"  Nothing gid_2
         void $ insertGroupKeyValue (TextKey "version") "1.0"      Nothing gid_2
         void $ insertGroupKeyValue (TextKey "release") "1.el7"    Nothing gid_2

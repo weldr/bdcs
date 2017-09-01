@@ -1,6 +1,6 @@
 -- Increment this number any time the schema is changed, and update schemaVersion
 -- in BDCS/DB.hs
-PRAGMA user_version = 1;
+PRAGMA user_version = 2;
 
 -- This describes the schema used by the metadata database (mddb).  We
 -- considered several options for how to implement the mddb, finally deciding
@@ -154,6 +154,17 @@ create table files (
 );
 create index files_path_idx on files(path);
 
+-- This table associates a single file with a single source. It allows for a
+-- file to be part of several sources at the same time, and for a single source
+-- to contain several files.
+create table source_files (
+    id integer primary key,
+    source_id integer references sources(id) not null,
+    file_id integer references files(id) not null
+);
+create index source_files_source_id_idx on source_files(source_id);
+create index source_files_file_id_idx on source_files(file_id);
+
 -- This table associates a single file with a single build.  It allows for a
 -- file to be a part of several builds at the same time, and for a single build
 -- to contain several files.
@@ -244,7 +255,8 @@ create index file_key_values_key_val_id_idx on file_key_values(key_val_id);
 create table groups (
     id integer primary key,
     name text not null,
-    group_type text not null
+    group_type text not null,
+    build_id integer references builds(id) null
 );
 create index groups_name_idx on groups(name);
 
