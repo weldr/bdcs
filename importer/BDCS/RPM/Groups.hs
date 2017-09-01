@@ -123,7 +123,7 @@ createGroup fileIds rpm = do
     let arch    = maybe "" T.pack (findStringTag "Arch" rpm)
 
     -- Create the groups row
-    groupId <- insert $ Groups name "rpm"
+    groupId <- insert $ Groups name "rpm" Nothing
 
     -- Create the group_files rows
     mapM_ (\fId -> insert $ GroupFiles groupId fId) fileIds

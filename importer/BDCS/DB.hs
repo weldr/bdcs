@@ -55,7 +55,7 @@ import BDCS.ReqType
 
 -- This must match the PRAGMA user_version value in schema.sql
 schemaVersion :: Int64
-schemaVersion = 1
+schemaVersion = 2
 
 checkDbVersion :: (MonadError String m, MonadIO m) => ReaderT SqlBackend m ()
 checkDbVersion = do
@@ -104,6 +104,10 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     mtime Int
     cs_object T.Text Maybe
     deriving Eq Show
+ SourceFiles
+    source_id SourcesId
+    file_id FilesId
+    deriving Eq Show
  BuildFiles
     build_id BuildsId
     file_id FilesId
@@ -132,6 +136,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
  Groups
     name T.Text
     group_type T.Text
+    build_id BuildsId Maybe
     deriving Eq Show
  GroupFiles
     group_id GroupsId

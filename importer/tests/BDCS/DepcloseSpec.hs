@@ -728,7 +728,7 @@ spec = describe "BDCS.Depclose Tests" $ do
 
     insertNEVRA :: MonadIO m => Key Groups -> T.Text -> Maybe T.Text -> T.Text -> T.Text -> T.Text -> SqlPersistT m ()
     insertNEVRA gid name epoch version release arch = do
-        insertKey gid $ Groups name "rpm"
+        insertKey gid $ Groups name "rpm" Nothing
         void $ insertGroupKeyValue (TextKey "name")    name    Nothing gid
         void $ insertGroupKeyValue (TextKey "version") version Nothing gid
         void $ insertGroupKeyValue (TextKey "release") release Nothing gid
