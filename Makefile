@@ -87,6 +87,7 @@ import-centos7:
 	    ostree --repo=${d}/mddb/$$STORE pull --mirror existing;                 \
 	fi                                                                          \
 
+	set -e
 	for REPO in http://mirror.centos.org/centos/7/os/x86_64/ \
 	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
 	    export IMPORT_URL="$$REPO"; \
