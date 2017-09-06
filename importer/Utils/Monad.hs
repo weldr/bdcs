@@ -1,7 +1,10 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Utils.Monad(concatForM,
                    concatMapM,
                    foldMaybeM,
-                   mapMaybeM)
+                   mapMaybeM,
+                   (>>?))
  where
 
 import Data.Maybe(catMaybes)
@@ -25,3 +28,10 @@ foldMaybeM action acc (x:xs) = do
         Nothing -> foldMaybeM action acc xs
         -- Keep this one
         Just r  -> foldMaybeM action r xs
+
+-- compose a monadic action and Maybe
+infixl 1 >>?
+(>>?) :: Monad m => m (Maybe a) -> (a -> m b) -> m (Maybe b)
+(>>?) input action = input >>= \case
+    Nothing -> return Nothing
+    Just x  -> Just <$> action x
