@@ -21,6 +21,7 @@ import Database.Esqueleto(Key, SqlPersistT)
 
 import           BDCS.DB(Files(..), FileKeyValues(..))
 import qualified BDCS.Label.Docs as Docs
+import qualified BDCS.Label.InfoPage as Info
 import qualified BDCS.Label.Library as Library
 import qualified BDCS.Label.ManPage as Man
 import qualified BDCS.Label.Service as Service
@@ -31,6 +32,7 @@ import Utils.Monad(concatForM)
 
 checks :: [(Files -> Bool, Label)]
 checks = [(Docs.matches,    DocsLabel),
+          (Info.matches,    InfoPageLabel),
           (Library.matches, LibraryLabel),
           (Man.matches,     ManPageLabel),
           (Service.matches, ServiceLabel)]

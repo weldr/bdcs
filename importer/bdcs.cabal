@@ -56,6 +56,7 @@ library
                         BDCS.KeyValue,
                         BDCS.Label.Docs,
                         BDCS.Label.FileLabels,
+                        BDCS.Label.InfoPage,
                         BDCS.Label.Library,
                         BDCS.Label.ManPage,
                         BDCS.Label.Service,
