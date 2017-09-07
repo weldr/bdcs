@@ -16,14 +16,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Library(matches)
+module BDCS.Label.Library(matches,
+                          mkLabel)
  where
 
 import qualified Data.Text as T
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 matches :: Files -> Bool
 matches Files{..} =
     ("/lib/" `T.isInfixOf` filesPath || "/lib64/" `T.isInfixOf` filesPath) &&
     (".so" `T.isSuffixOf` filesPath || ".so." `T.isInfixOf` filesPath || ".a" `T.isSuffixOf` filesPath)
+
+mkLabel :: Files -> Label
+mkLabel _ = LibraryLabel

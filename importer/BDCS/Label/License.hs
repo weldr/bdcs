@@ -15,7 +15,8 @@
 
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.License(matches)
+module BDCS.Label.License(matches,
+                          mkLabel)
  where
 
 import           Data.Char(toUpper)
@@ -24,6 +25,7 @@ import qualified Data.Text as T
 import           System.FilePath.Posix(takeFileName)
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 feq :: FilePath -> String -> Bool
 feq path s = let
@@ -42,3 +44,6 @@ matches Files{..} = let
  in
     "/usr/share/licenses/" `isPrefixOf` filesPath' ||
     feq fn "COPYING" || feq fn "COPYRIGHT" || feq fn "LICENSE"
+
+mkLabel :: Files -> Label
+mkLabel _ = LicenseLabel

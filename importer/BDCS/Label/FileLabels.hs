@@ -31,19 +31,19 @@ import           BDCS.Label.Utils(addLabelKey)
 
 import Utils.Monad(concatForM)
 
-checks :: [(Files -> Bool, Label)]
-checks = [(Docs.matches,    DocsLabel),
-          (Info.matches,    InfoPageLabel),
-          (License.matches, LicenseLabel),
-          (Library.matches, LibraryLabel),
-          (Man.matches,     ManPageLabel),
-          (Service.matches, ServiceLabel)]
+checks :: [(Files -> Bool, Files -> Label)]
+checks = [(Docs.matches,    Docs.mkLabel),
+          (Info.matches,    Info.mkLabel),
+          (License.matches, License.mkLabel),
+          (Library.matches, Library.mkLabel),
+          (Man.matches,     Man.mkLabel),
+          (Service.matches, Service.mkLabel)]
 
 apply :: MonadIO m => [(Files, Key Files)] -> SqlPersistT m [Key FileKeyValues]
 apply lst =
     -- Iterate over the various file-related labels we know about.
-    concatForM checks $ \(matches, ty) ->
+    concatForM checks $ \(matches, mk) ->
         -- Iterate over all the given files.  If a file meets the matching criteria for
         -- this label, add a key.  Collect all the resulting IDs.
-        mapM (\(_, ndx) -> addLabelKey ndx ty Nothing Nothing)
+        mapM (\(f, ndx) -> addLabelKey ndx (mk f) Nothing Nothing)
              (filter (\(f, _) -> matches f) lst)
