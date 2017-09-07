@@ -15,7 +15,8 @@
 
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.ManPage(matches)
+module BDCS.Label.ManPage(matches,
+                          mkLabel)
  where
 
 import           Data.List(isPrefixOf)
@@ -23,6 +24,7 @@ import qualified Data.Text as T
 import           Text.Regex.PCRE((=~))
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 matches :: Files -> Bool
 matches Files{..} = let
@@ -30,3 +32,6 @@ matches Files{..} = let
  in
     "/usr/share/man/" `isPrefixOf` filesPath' &&
     (filesPath' =~ "\\.[0-9]$" || filesPath' =~ "\\.[0-9]\\.gz$")
+
+mkLabel :: Files -> Label
+mkLabel _ = ManPageLabel

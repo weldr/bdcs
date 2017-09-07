@@ -16,14 +16,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Docs(matches)
+module BDCS.Label.Docs(matches,
+                       mkLabel)
  where
 
 import qualified Data.Text as T
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 matches :: Files -> Bool
 matches Files{..} =
     -- FIXME:  Are man pages and info pages also documentation?  They certainly could be.
     "/usr/share/doc/" `T.isPrefixOf` filesPath
+
+mkLabel :: Files -> Label
+mkLabel _ = DocsLabel

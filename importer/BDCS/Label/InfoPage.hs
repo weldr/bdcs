@@ -15,7 +15,8 @@
 
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.InfoPage(matches)
+module BDCS.Label.InfoPage(matches,
+                           mkLabel)
  where
 
 import           Data.List(isPrefixOf, isSuffixOf)
@@ -23,6 +24,7 @@ import qualified Data.Text as T
 import           Text.Regex.PCRE((=~))
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 matches :: Files -> Bool
 matches Files{..} = let
@@ -30,3 +32,6 @@ matches Files{..} = let
  in
     "/usr/share/info/" `isPrefixOf` filesPath' &&
     (".info.gz" `isSuffixOf` filesPath' || filesPath' =~ "\\.info-[0-9]+\\.gz")
+
+mkLabel :: Files -> Label
+mkLabel _ = InfoPageLabel

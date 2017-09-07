@@ -16,14 +16,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Service(matches)
+module BDCS.Label.Service(matches,
+                          mkLabel)
  where
 
 import qualified Data.Text as T
 import           System.FilePath.Posix(takeExtension)
 
 import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
 matches :: Files -> Bool
 matches Files{..} =
     takeExtension (T.unpack filesPath) == ".service"
+
+mkLabel :: Files -> Label
+mkLabel _ = ServiceLabel
