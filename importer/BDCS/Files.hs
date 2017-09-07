@@ -15,6 +15,7 @@
 
 module BDCS.Files(insertFiles,
                   associateFilesWithBuild,
+                  associateFilesWithSource,
                   associateFilesWithPackage,
                   files,
                   filesC,
@@ -22,7 +23,9 @@ module BDCS.Files(insertFiles,
                   getKeyValuesForFile,
                   groupIdToFiles,
                   groupIdToFilesC,
-                  pathToGroupId)
+                  pathToGroupId,
+                  sourceIdToFiles,
+                  sourceIdToFilesC)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
@@ -42,6 +45,11 @@ associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT
 associateFilesWithBuild fs build =
     mapM (\(fID, bID) -> insert $ BuildFiles bID fID)
          (zip fs $ repeat build)
+
+associateFilesWithSource :: MonadIO m => [Key Files] -> Key Sources -> SqlPersistT m [Key SourceFiles]
+associateFilesWithSource fs source =
+    mapM (\(fID, sID) -> insert $ SourceFiles sID fID)
+        (zip fs $ repeat source)
 
 associateFilesWithPackage :: MonadIO m => [Key Files] -> Key KeyVal -> SqlPersistT m [Key FileKeyValues]
 associateFilesWithPackage fs package =
@@ -88,6 +96,17 @@ groupIdToFiles groupid = do
 
 groupIdToFilesC :: MonadResource m => Conduit (Key Groups) (SqlPersistT m) Files
 groupIdToFilesC = awaitWith $ \groupid -> toProducer (groupIdToFiles groupid) >> groupIdToFilesC
+
+sourceIdToFiles :: MonadResource m => Key Sources -> Source (SqlPersistT m) Files
+sourceIdToFiles sourceid = do
+    let source = selectSource $ from $ \(fs `InnerJoin` source_files) -> do
+                       on     $ fs ^. FilesId ==. source_files ^. SourceFilesFile_id
+                       where_ $ source_files ^. SourceFilesSource_id ==. val sourceid
+                       return fs
+    source .| CL.map entityVal
+
+sourceIdToFilesC :: MonadResource m => Conduit (Key Sources) (SqlPersistT m) Files
+sourceIdToFilesC = awaitWith $ \sourceid -> toProducer (sourceIdToFiles sourceid) >> sourceIdToFilesC
 
 pathToGroupId :: MonadIO m => T.Text -> SqlPersistT m [Key Groups]
 pathToGroupId path = do

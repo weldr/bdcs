@@ -18,7 +18,8 @@
 module BDCS.Builds(associateBuildWithPackage,
                    findBuild,
                    getBuild,
-                   insertBuild)
+                   insertBuild,
+                   insertBuildKeyValue)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
@@ -26,6 +27,8 @@ import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
+import BDCS.KeyType
+import BDCS.KeyValue(findKeyValue, insertKeyValue)
 
 findBuild :: MonadIO m => Int -> T.Text -> T.Text -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
 findBuild epoch release arch sourceId = firstKeyResult $
@@ -48,6 +51,12 @@ getBuild key = firstEntityResult $
 insertBuild :: MonadIO m => Builds -> SqlPersistT m (Key Builds)
 insertBuild build@Builds{..} =
     findBuild buildsEpoch buildsRelease buildsArch buildsSource_id `orInsert` build
+
+insertBuildKeyValue :: MonadIO m => KeyType -> T.Text -> Maybe T.Text -> Key Builds -> SqlPersistT m (Key BuildKeyValues)
+insertBuildKeyValue k v e buildId =
+    maybeKey (insertKeyValue k (Just v) e >>= associateBuildWithPackage buildId)
+             (associateBuildWithPackage buildId)
+             (findKeyValue k (Just v) e)
 
 associateBuildWithPackage :: MonadIO m => Key Builds -> Key KeyVal -> SqlPersistT m (Key BuildKeyValues)
 associateBuildWithPackage buildId kvId =

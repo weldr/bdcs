@@ -17,7 +17,8 @@
 
 module BDCS.Sources(findSource,
                     getSource,
-                    insertSource)
+                    insertSource,
+                    insertSourceKeyValue)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
@@ -25,6 +26,8 @@ import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
+import BDCS.KeyType
+import BDCS.KeyValue(findKeyValue)
 
 findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
 findSource version projectId = firstKeyResult $
@@ -45,3 +48,8 @@ getSource key = firstEntityResult $
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)
 insertSource source@Sources{..} =
     findSource sourcesVersion sourcesProject_id `orInsert` source
+
+insertSourceKeyValue :: MonadIO m => KeyType -> T.Text -> Maybe T.Text -> Key Sources -> SqlPersistT m (Key SourceKeyValues)
+insertSourceKeyValue k v e sourceId = do
+    kvId <- findKeyValue k (Just v) e `orInsert` KeyVal k (Just v) e
+    insert $ SourceKeyValues sourceId kvId
