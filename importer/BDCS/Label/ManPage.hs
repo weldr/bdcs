@@ -13,18 +13,20 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.ManPage(matches)
  where
 
-import Database.Persist.TH
+import           Data.List(isPrefixOf)
+import qualified Data.Text as T
+import           Text.Regex.PCRE((=~))
 
-data Label = DocsLabel
-           | LibraryLabel
-           | ManPageLabel
-           | ServiceLabel
-    deriving(Eq, Read, Show)
+import BDCS.DB(Files(..))
 
-derivePersistField "Label"
+matches :: Files -> Bool
+matches Files{..} = let
+    filesPath' = T.unpack filesPath
+ in
+    "/usr/share/man/" `isPrefixOf` filesPath' &&
+    (filesPath' =~ "\\.[0-9]$" || filesPath' =~ "\\.[0-9]\\.gz$")
