@@ -23,6 +23,7 @@ import           BDCS.DB(Files(..), FileKeyValues(..))
 import qualified BDCS.Label.Docs as Docs
 import qualified BDCS.Label.InfoPage as Info
 import qualified BDCS.Label.Library as Library
+import qualified BDCS.Label.License as License
 import qualified BDCS.Label.ManPage as Man
 import qualified BDCS.Label.Service as Service
 import           BDCS.Label.Types(Label(..))
@@ -33,6 +34,7 @@ import Utils.Monad(concatForM)
 checks :: [(Files -> Bool, Label)]
 checks = [(Docs.matches,    DocsLabel),
           (Info.matches,    InfoPageLabel),
+          (License.matches, LicenseLabel),
           (Library.matches, LibraryLabel),
           (Man.matches,     ManPageLabel),
           (Service.matches, ServiceLabel)]

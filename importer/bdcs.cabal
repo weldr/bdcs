@@ -58,6 +58,7 @@ library
                         BDCS.Label.FileLabels,
                         BDCS.Label.InfoPage,
                         BDCS.Label.Library,
+                        BDCS.Label.License,
                         BDCS.Label.ManPage,
                         BDCS.Label.Service,
                         BDCS.Label.Types,
