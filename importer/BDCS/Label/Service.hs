@@ -30,5 +30,5 @@ matches :: Files -> Bool
 matches Files{..} =
     takeExtension (T.unpack filesPath) == ".service"
 
-mkLabel :: Files -> Label
-mkLabel _ = ServiceLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just ServiceLabel

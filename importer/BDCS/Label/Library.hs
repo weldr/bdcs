@@ -30,5 +30,5 @@ matches Files{..} =
     ("/lib/" `T.isInfixOf` filesPath || "/lib64/" `T.isInfixOf` filesPath) &&
     (".so" `T.isSuffixOf` filesPath || ".so." `T.isInfixOf` filesPath || ".a" `T.isSuffixOf` filesPath)
 
-mkLabel :: Files -> Label
-mkLabel _ = LibraryLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just LibraryLabel

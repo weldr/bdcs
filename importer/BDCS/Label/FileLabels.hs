@@ -18,6 +18,7 @@ module BDCS.Label.FileLabels(apply)
 
 import Control.Monad.IO.Class(MonadIO)
 import Database.Esqueleto(Key, SqlPersistT)
+import Data.Maybe(mapMaybe)
 
 import           BDCS.DB(Files(..), FileKeyValues(..))
 import qualified BDCS.Label.Docs as Docs
@@ -31,7 +32,7 @@ import           BDCS.Label.Utils(addLabelKey)
 
 import Utils.Monad(concatForM)
 
-checks :: [(Files -> Bool, Files -> Label)]
+checks :: [(Files -> Bool, Files -> Maybe Label)]
 checks = [(Docs.matches,    Docs.mkLabel),
           (Info.matches,    Info.mkLabel),
           (License.matches, License.mkLabel),
@@ -41,9 +42,19 @@ checks = [(Docs.matches,    Docs.mkLabel),
 
 apply :: MonadIO m => [(Files, Key Files)] -> SqlPersistT m [Key FileKeyValues]
 apply lst =
-    -- Iterate over the various file-related labels we know about.
-    concatForM checks $ \(matches, mk) ->
-        -- Iterate over all the given files.  If a file meets the matching criteria for
-        -- this label, add a key.  Collect all the resulting IDs.
-        mapM (\(f, ndx) -> addLabelKey ndx (mk f) Nothing Nothing)
-             (filter (\(f, _) -> matches f) lst)
+    -- Iterate over all the given files.
+    concatForM lst $ \(f, ndx) -> do
+        -- Gather up all the tuples from the checks list where the
+        -- file met the matching criteria.
+        let successfulChecks = filter (\(matches, _) -> matches f) checks
+
+        -- Try to run the maker function from each of those tuples.
+        -- It's possible for the maker function to return Nothing
+        -- (though I don't know how that could happen right now),
+        -- so we need to filter those out.
+        let labels = mapMaybe (\(_, maker) -> maker f) successfulChecks
+
+        -- Now add each of those labels to the database, collecting
+        -- the resulting IDs.
+        mapM (\lbl -> addLabelKey ndx lbl Nothing Nothing)
+             labels

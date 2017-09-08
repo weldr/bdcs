@@ -45,5 +45,5 @@ matches Files{..} = let
     "/usr/share/licenses/" `isPrefixOf` filesPath' ||
     feq fn "COPYING" || feq fn "COPYRIGHT" || feq fn "LICENSE"
 
-mkLabel :: Files -> Label
-mkLabel _ = LicenseLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just LicenseLabel

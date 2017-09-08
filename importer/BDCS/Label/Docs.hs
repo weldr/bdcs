@@ -30,5 +30,5 @@ matches Files{..} =
     -- FIXME:  Are man pages and info pages also documentation?  They certainly could be.
     "/usr/share/doc/" `T.isPrefixOf` filesPath
 
-mkLabel :: Files -> Label
-mkLabel _ = DocsLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just DocsLabel

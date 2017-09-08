@@ -33,5 +33,5 @@ matches Files{..} = let
     "/usr/share/info/" `isPrefixOf` filesPath' &&
     (".info.gz" `isSuffixOf` filesPath' || filesPath' =~ "\\.info-[0-9]+\\.gz")
 
-mkLabel :: Files -> Label
-mkLabel _ = InfoPageLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just InfoPageLabel
