@@ -20,6 +20,7 @@ module BDCS.KeyType(KeyType(..),
  where
 
 import           Database.Persist.TH
+import           Data.Aeson(ToJSON, toJSON)
 import qualified Data.Text as T
 
 import qualified BDCS.Label.Types as Label
@@ -29,6 +30,10 @@ data KeyType = LabelKey Label.Label
  deriving(Eq, Read, Show)
 
 derivePersistField "KeyType"
+
+instance ToJSON KeyType where
+    toJSON (TextKey t)  = toJSON t
+    toJSON (LabelKey l) = toJSON l
 
 asText :: KeyType -> T.Text
 asText (LabelKey l) = T.pack $ show l

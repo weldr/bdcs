@@ -66,7 +66,7 @@ keyValueListToJSON lst = let
     -- Convert LabelKeys into tuples of ("labels", json).  All LabelKeys will have the same first value
     -- in their tuple - the string "labels".  This assumes that LabelKeys do not store values or extended
     -- values.  If they start doing that, this will have to change.
-    labelVals = map (\kv -> (T.pack "labels", [toJSON $ asText $ keyValKey_value kv])) labelKvs
+    labelVals = map (\kv -> (T.pack "labels", [toJSON $ keyValKey_value kv])) labelKvs
 
     -- Convert all other KeyTypes into tuples of (key, json).
     otherVals = map (\kv -> (asText $ keyValKey_value kv, [toJSON kv])) otherKvs

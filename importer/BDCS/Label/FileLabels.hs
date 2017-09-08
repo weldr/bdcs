@@ -27,6 +27,7 @@ import qualified BDCS.Label.Library as Library
 import qualified BDCS.Label.License as License
 import qualified BDCS.Label.ManPage as Man
 import qualified BDCS.Label.Service as Service
+import qualified BDCS.Label.Translation as Xlat
 import           BDCS.Label.Types(Label(..))
 import           BDCS.Label.Utils(addLabelKey)
 
@@ -38,7 +39,8 @@ checks = [(Docs.matches,    Docs.mkLabel),
           (License.matches, License.mkLabel),
           (Library.matches, Library.mkLabel),
           (Man.matches,     Man.mkLabel),
-          (Service.matches, Service.mkLabel)]
+          (Service.matches, Service.mkLabel),
+          (Xlat.matches,    Xlat.mkLabel)]
 
 apply :: MonadIO m => [(Files, Key Files)] -> SqlPersistT m [Key FileKeyValues]
 apply lst =

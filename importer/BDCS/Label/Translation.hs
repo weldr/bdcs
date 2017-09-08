@@ -14,26 +14,23 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.Translation(matches,
+                              mkLabel)
  where
 
-import           Data.Aeson((.=), ToJSON, object, toJSON)
 import qualified Data.Text as T
-import           Database.Persist.TH
 
-data Label = DocsLabel
-           | InfoPageLabel
-           | LibraryLabel
-           | LicenseLabel
-           | ManPageLabel
-           | ServiceLabel
-           | TranslationLabel T.Text
-    deriving(Eq, Read, Show)
+import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
-instance ToJSON Label where
-    toJSON (TranslationLabel lang) = object ["TranslationLabel" .= toJSON lang]
-    toJSON lbl                     = toJSON $ T.pack $ show lbl
+matches :: Files -> Bool
+matches Files{..} =
+    "/usr/share/locale/" `T.isPrefixOf` filesPath &&
+    ".mo" `T.isSuffixOf` filesPath
 
-derivePersistField "Label"
+mkLabel :: Files -> Maybe Label
+mkLabel Files{..} =
+    T.stripPrefix "/usr/share/locale/" filesPath >>= \rest ->
+        Just $ TranslationLabel $ T.takeWhile (/= '/') rest
