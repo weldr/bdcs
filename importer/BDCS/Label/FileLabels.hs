@@ -22,6 +22,7 @@ import Data.Maybe(mapMaybe)
 
 import           BDCS.DB(Files(..), FileKeyValues(..))
 import qualified BDCS.Label.Docs as Docs
+import qualified BDCS.Label.Fonts as Fonts
 import qualified BDCS.Label.InfoPage as Info
 import qualified BDCS.Label.Library as Library
 import qualified BDCS.Label.License as License
@@ -35,6 +36,7 @@ import Utils.Monad(concatForM)
 
 checks :: [(Files -> Bool, Files -> Maybe Label)]
 checks = [(Docs.matches,    Docs.mkLabel),
+          (Fonts.matches,   Fonts.mkLabel),
           (Info.matches,    Info.mkLabel),
           (License.matches, License.mkLabel),
           (Library.matches, Library.mkLabel),

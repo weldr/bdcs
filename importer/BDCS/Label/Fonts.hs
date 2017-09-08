@@ -14,27 +14,26 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.Fonts(matches,
+                        mkLabel)
  where
 
-import           Data.Aeson((.=), ToJSON, object, toJSON)
+import           Data.List(isPrefixOf, isSuffixOf)
 import qualified Data.Text as T
-import           Database.Persist.TH
+import           System.FilePath.Posix(takeFileName)
 
-data Label = DocsLabel
-           | FontsLabel
-           | InfoPageLabel
-           | LibraryLabel
-           | LicenseLabel
-           | ManPageLabel
-           | ServiceLabel
-           | TranslationLabel T.Text
-    deriving(Eq, Read, Show)
+import BDCS.DB(Files(..))
+import BDCS.Label.Types(Label(..))
 
-instance ToJSON Label where
-    toJSON (TranslationLabel lang) = object ["TranslationLabel" .= toJSON lang]
-    toJSON lbl                     = toJSON $ T.pack $ show lbl
+matches :: Files -> Bool
+matches Files{..} = let
+    filesPath' = T.unpack filesPath
+    fn         = takeFileName filesPath'
+ in
+    ("/usr/share/fonts/" `isPrefixOf` filesPath' && fn `notElem` ["encodings.dir", "donts.dir", "fonts.scale"] && not ("fonts.cache" `isPrefixOf` fn)) ||
+    ("/usr/share/X11/fonts/" `isPrefixOf` filesPath' && ".gz" `isSuffixOf` fn)
 
-derivePersistField "Label"
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just FontsLabel
