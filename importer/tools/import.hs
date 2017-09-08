@@ -35,6 +35,7 @@ import qualified BDCS.CS as CS
 import           BDCS.Exceptions(DBException)
 import           BDCS.Version
 import qualified Import.Comps as Comps
+import qualified Import.NPM as NPM
 import qualified Import.RPM as RPM
 import qualified Import.Repodata as Repodata
 import           Import.URI(isCompsFile, isPrimaryXMLFile)
@@ -45,6 +46,7 @@ processThing url = case parseURI url of
     Just uri@URI{..} -> if | isPrimaryXMLFile uri           -> Repodata.loadFromURI uri
                            | isCompsFile uri                -> Comps.loadFromURI uri
                            | ".rpm" `isSuffixOf` uriPath    -> RPM.loadFromURI uri
+                           | uriScheme == "npm:"            -> NPM.loadFromURI uri
                            | otherwise                      -> Repodata.loadRepoFromURI uri
     _ -> liftIO usage
 
