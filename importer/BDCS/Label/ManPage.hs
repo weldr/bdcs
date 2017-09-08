@@ -33,5 +33,5 @@ matches Files{..} = let
     "/usr/share/man/" `isPrefixOf` filesPath' &&
     (filesPath' =~ "\\.[0-9]$" || filesPath' =~ "\\.[0-9]\\.gz$")
 
-mkLabel :: Files -> Label
-mkLabel _ = ManPageLabel
+mkLabel :: Files -> Maybe Label
+mkLabel _ = Just ManPageLabel
