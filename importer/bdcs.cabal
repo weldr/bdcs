@@ -55,6 +55,7 @@ library
                         BDCS.KeyType,
                         BDCS.KeyValue,
                         BDCS.Label.Docs,
+                        BDCS.Label.Fonts,
                         BDCS.Label.FileLabels,
                         BDCS.Label.InfoPage,
                         BDCS.Label.Library,
