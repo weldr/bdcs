@@ -72,6 +72,7 @@ library
                         BDCS.Scripts,
                         BDCS.Signatures,
                         BDCS.Sources,
+                        BDCS.NPM.SemVer,
                         BDCS.RPM.Builds,
                         BDCS.RPM.Files,
                         BDCS.RPM.Groups,
@@ -329,6 +330,7 @@ Test-Suite test-bdcs
     main-is:            Spec.hs
 
     build-depends:      hspec,
+                        HUnit,
                         aeson,
                         base >= 4.8 && < 5.0,
                         bytestring,
