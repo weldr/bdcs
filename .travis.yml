@@ -10,7 +10,7 @@ cache:
     - ~/.cabal
 
 before_install:
-  - pip install s3cmd
+  - sudo pip install s3cmd
   - sudo docker pull welder/bdcs-build-img:latest
   - wget https://haskell.org/platform/download/8.0.2/haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
   - tar -xzvf ./haskell-platform-8.0.2-unknown-posix--minimal-x86_64.tar.gz
