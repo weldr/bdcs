@@ -12,7 +12,7 @@ import           Data.ByteString.Lazy(toStrict)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
 import           Data.List(intercalate)
-import           Data.Maybe(catMaybes, fromMaybe)
+import           Data.Maybe(catMaybes, fromMaybe, isJust, mapMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
@@ -28,7 +28,9 @@ import           Text.Regex.PCRE((=~))
 import           BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
 import qualified BDCS.CS as CS
 import           BDCS.Files(filesC, getKeyValuesForFile)
+import           BDCS.KeyType(KeyType(..))
 import           BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
+import           BDCS.Label.Types(Label)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
@@ -38,6 +40,7 @@ import Utils.IO(liftedPutStrLn)
 
 data LsOptions = LsOptions { lsJSONOutput :: Bool,
                              lsKeyVal :: Bool,
+                             lsLabelMatches :: Maybe Label,
                              lsMatches :: String,
                              lsVerbose :: Bool }
 
@@ -46,6 +49,7 @@ instance OptClass LsOptions
 defaultLsOptions :: LsOptions
 defaultLsOptions = LsOptions { lsJSONOutput = False,
                                lsKeyVal = False,
+                               lsLabelMatches = Nothing,
                                lsMatches = ".*",
                                lsVerbose = False }
 
@@ -114,6 +118,10 @@ symlinkTarget :: Maybe CS.Object -> Maybe String
 symlinkTarget (Just (CS.FileObject CS.FileContents{symlink=Just x})) = Just $ T.unpack x
 symlinkTarget _ = Nothing
 
+keyValToLabel :: KeyVal -> Maybe Label
+keyValToLabel KeyVal {keyValKey_value=LabelKey x} = Just x
+keyValToLabel _                                   = Nothing
+
 runCommand :: T.Text -> FilePath -> [String] -> IO ()
 runCommand db repoPath args = do
     repo <- CS.open repoPath
@@ -134,11 +142,20 @@ runCommand db repoPath args = do
                                                md <- getMetadata repo (rowFiles row)
                                                return $ row { rowMetadata=md }
                                            else return row)
-              -- If we were asked for keyval output, add that to the LsRow.
-                     .| CL.mapM   (\row -> if lsKeyVal opts then do
-                                               kvs <- getKeyValuesForFile (filesPath $ rowFiles row)
-                                               return $ row { rowKeyVals=Just kvs }
-                                           else return row)
+              -- keyval output comes up in two different ways:  If we were
+              -- given the --keyval flag, we want to add them to the LsRow,
+              -- If we were given the --label flag, we want to grab the keyvals
+              -- from the database and check for a match.  Note that both flags
+              -- could be given at the same time.
+                     .| CL.mapMaybeM (\row -> do kvs <- if lsKeyVal opts || isJust (lsLabelMatches opts)
+                                                        then getKeyValuesForFile (filesPath $ rowFiles row)
+                                                        else return []
+
+                                                 let labels = mapMaybe keyValToLabel kvs
+
+                                                 if | maybe False (`notElem` labels) (lsLabelMatches opts) -> return Nothing
+                                                    | lsKeyVal opts -> return $ Just $ row { rowKeyVals=Just kvs }
+                                                    | otherwise -> return $ Just row)
               -- Finally, pass it to the appropriate printer.
                      .| CL.mapM_  printer
     whenLeft result print
@@ -154,6 +171,11 @@ runCommand db repoPath args = do
         Option ['l'] []
                (NoArg (\opts -> opts { lsVerbose = True }))
                "use a long listing format",
+        Option [] ["label"]
+               (ReqArg (\d opts -> case reads d :: [(Label, String)] of
+                                       [(lbl, _)] -> opts { lsLabelMatches = Just lbl }
+                                       _          -> opts) "LABEL")
+               "return only results with the given LABEL",
         Option ['m'] ["matches"]
                (ReqArg (\d opts -> opts { lsMatches = d }) "REGEX")
                "return only results that match REGEX"
