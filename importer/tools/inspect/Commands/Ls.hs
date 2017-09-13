@@ -4,6 +4,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 import           Control.Conditional(unlessM)
+import           Control.Exception(Handler(..), catches, throw)
 import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
@@ -35,6 +36,7 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
+import Utils.Exceptions(LsErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
@@ -174,7 +176,7 @@ runCommand db repoPath args = do
         Option [] ["label"]
                (ReqArg (\d opts -> case reads d :: [(Label, String)] of
                                        [(lbl, _)] -> opts { lsLabelMatches = Just lbl }
-                                       _          -> opts) "LABEL")
+                                       _          -> throw $ InvalidLabelError d) "LABEL")
                "return only results with the given LABEL",
         Option ['m'] ["matches"]
                (ReqArg (\d opts -> opts { lsMatches = d }) "REGEX")
@@ -223,8 +225,8 @@ usage = do
     putStrLn "- repo is the path to a content store repo"
     exitFailure
 
-main :: IO ()
-main = do
+runMain :: IO ()
+runMain = do
     argv <- getArgs
     case commandLineArgs argv of
         Nothing               -> usage
@@ -238,3 +240,10 @@ main = do
                 exitFailure
 
             runCommand (T.pack db) repo args
+
+main :: IO ()
+main =
+    runMain `catches` [Handler (\(InvalidLabelError lbl) -> handleInvalidLabel lbl)]
+ where
+     handleInvalidLabel lbl =
+        putStrLn (lbl ++ " is not a recognized file label\n") >> usage
