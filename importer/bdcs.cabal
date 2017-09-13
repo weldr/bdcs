@@ -218,7 +218,8 @@ executable inspect-ls
     hs-source-dirs:     tools/inspect/Commands,
                         tools/inspect
 
-    other-modules:      Utils.GetOpt,
+    other-modules:      Utils.Exceptions,
+                        Utils.GetOpt,
                         Utils.IO
 
     build-depends:      aeson,
