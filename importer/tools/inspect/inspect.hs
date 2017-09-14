@@ -13,13 +13,16 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-import Control.Conditional(ifM)
+import Control.Conditional(condM, ifM, otherwiseM)
 import Control.Exception(SomeException, catch)
 import Control.Monad(forM_, when)
+import Data.Text(Text, pack, splitOn, unpack)
 import System.Directory(doesFileExist)
-import System.Environment(getArgs)
+import System.Environment(getArgs, lookupEnv)
 import System.Exit(exitFailure)
 import System.FilePath((</>))
 import System.Process(callProcess)
@@ -52,7 +55,23 @@ getBasePath = do
     dir <- getLibexecDir
     return $ dir </> "inspect-"
 
-{-# ANN main "HLint: ignore Use head" #-}
+findInPath :: FilePath -> IO (Maybe FilePath)
+findInPath sought = lookupEnv "PATH" >>= \case
+    Nothing -> return Nothing
+    Just p  -> do let searchPath = splitOn ":" (pack p)
+                  doit searchPath sought
+ where
+    doit :: [Text] -> FilePath -> IO (Maybe FilePath)
+    doit [] _        = return Nothing
+    doit (p:ps) name =
+        ifM (doesFileExist (unpack p </> name))
+            (return $ Just $ unpack p </> name)
+            (doit ps name)
+
+existsInPath :: FilePath -> IO Bool
+existsInPath sought = fmap (/= Nothing) (findInPath sought)
+
+{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
 main = do
     argv <- getArgs
@@ -63,21 +82,35 @@ main = do
 
     basePath <- getBasePath
 
+    let cmd1 = basePath ++ subcmd
+    let cmd2 = "inspect-" ++ subcmd
+
     case subcmd `lookup` knownSubcommands of
-        -- This is a subcommand we have built-in knowledge of.  Check to see if it exists
-        -- in /usr/libexec/weldr first.  If so, run that.  If not, try to run it using $PATH.
-        -- The latter is so we don't have to run "cabal install" every time we want to test
-        -- something during development.
-        Just _  -> ifM (doesFileExist (basePath ++ subcmd))
-                       (tryCallProcess (basePath ++ subcmd) subcmdArgs)
-                       (tryCallProcess ("inspect-" ++ subcmd) subcmdArgs)
+        -- This is a subcommand we have built-in knowledge of.  For ease of development, it
+        -- could be located in a couple different places:  Installed in /usr/libexec/weldr,
+        -- or in the $PATH.  The latter allows us to run "PATH=$PATH:dist/build/... cabal run"
+        -- without having to run "cabal install" every time we want to test something.
+        --
+        -- While tryCallProcess will search the $PATH itself, we need to know if the file
+        -- exists somewhere in the $PATH first.  This allows us to separate file not found
+        -- errors from the command failing.
+        Just _  -> condM [(doesFileExist cmd1, tryCallProcess cmd1 subcmdArgs),
+                          (existsInPath cmd1,  tryCallProcess cmd1 subcmdArgs),
+                          (doesFileExist cmd2, tryCallProcess cmd2 subcmdArgs),
+                          (existsInPath cmd2,  tryCallProcess cmd2 subcmdArgs),
+                          (otherwiseM,         putStrLn ("subcommand " ++ subcmd ++ " does not exist\n") >> usage)]
 
         -- This is a subcommand we know nothing about.  Check to see if it exists in
         -- /usr/libexec/weldr, since it could have been installed by a third party.  If so,
         -- run that.  If not, display an error message and quit.
-        Nothing -> ifM (doesFileExist (basePath ++ subcmd))
-                       (tryCallProcess (basePath ++ subcmd) subcmdArgs)
-                       usage
+        Nothing -> ifM (doesFileExist cmd1)
+                       (tryCallProcess cmd1 subcmdArgs)
+                       (putStrLn ("subcommand " ++ subcmd ++ " does not exist\n") >> usage)
  where
      tryCallProcess cmd args = catch (callProcess cmd args)
-                                     (\(_ :: SomeException) -> putStrLn ("subcommand " ++ cmd ++ " does not exist\n") >> usage)
+                                     -- We handled the case where an unknown subcommand was
+                                     -- given on the command line.  For now, the only other
+                                     -- errors possible are when the subcommand ran, but
+                                     -- failed for some reason.  Those are handled inside
+                                     -- the subcommand.  Just quit.
+                                     (\(_ :: SomeException) -> exitFailure)
