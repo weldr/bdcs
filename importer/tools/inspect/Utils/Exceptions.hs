@@ -1,9 +1,11 @@
-module Utils.Exceptions(LsErrors(..))
+module Utils.Exceptions(InspectErrors(..))
  where
 
 import Control.Exception(Exception)
 
-data LsErrors = InvalidLabelError String
+data InspectErrors = InvalidLabelError String
+                   | MissingCSError
+                   | MissingDBError
  deriving(Eq, Show)
 
-instance Exception LsErrors
+instance Exception InspectErrors
