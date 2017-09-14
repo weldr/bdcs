@@ -2,6 +2,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Conditional(unlessM)
 import           Control.Exception(Handler(..), catches, throw)
@@ -37,7 +38,7 @@ import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
 
-import Utils.Exceptions(LsErrors(..))
+import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
@@ -232,22 +233,28 @@ runMain = do
     case commandLineArgs argv of
         Nothing               -> usage
         Just (db, repo, args) -> do
-            unlessM (doesFileExist db) $ do
-                putStrLn "database does not exist"
-                exitFailure
+            unlessM (doesFileExist db) $
+                throw MissingDBError
 
-            unlessM (doesDirectoryExist repo) $ do
-                putStrLn "content store does not exist"
-                exitFailure
+            unlessM (doesDirectoryExist repo) $
+                throw MissingCSError
 
             runCommand (T.pack db) repo args
 
 main :: IO ()
 main =
-    runMain `catches` [Handler (\(InvalidLabelError lbl) -> handleInvalidLabel lbl)]
+    -- Add handlers for other exception types (IOException, whatever) here.
+    runMain `catches` [Handler (\(e :: InspectErrors) -> handleInspectErrors e)]
  where
-    handleInvalidLabel lbl = do
+    -- And then add handlers for the various kinds of InspectErrors here.
+    handleInspectErrors :: InspectErrors -> IO ()
+    handleInspectErrors (InvalidLabelError lbl) = do
         putStrLn $ lbl ++ " is not a recognized file label\n"
         putStrLn "Recognized labels:\n"
         forM_ labelDescriptions $ \(l, d) ->
             putStrLn $ "      " ++ l ++ " - " ++ d
+        exitFailure
+
+    handleInspectErrors MissingCSError = putStrLn "Content store does not exist\n" >> usage
+
+    handleInspectErrors MissingDBError = putStrLn "Metadata database does not exist\n" >> usage
