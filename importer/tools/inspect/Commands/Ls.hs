@@ -5,6 +5,7 @@
 
 import           Control.Conditional(unlessM)
 import           Control.Exception(Handler(..), catches, throw)
+import           Control.Monad(forM_)
 import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
@@ -31,7 +32,7 @@ import qualified BDCS.CS as CS
 import           BDCS.Files(filesC, getKeyValuesForFile)
 import           BDCS.KeyType(KeyType(..))
 import           BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
-import           BDCS.Label.Types(Label)
+import           BDCS.Label.Types(Label, labelDescriptions)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
 import           Utils.Mode(modeAsText)
@@ -245,5 +246,8 @@ main :: IO ()
 main =
     runMain `catches` [Handler (\(InvalidLabelError lbl) -> handleInvalidLabel lbl)]
  where
-     handleInvalidLabel lbl =
-        putStrLn (lbl ++ " is not a recognized file label\n") >> usage
+    handleInvalidLabel lbl = do
+        putStrLn $ lbl ++ " is not a recognized file label\n"
+        putStrLn "Recognized labels:\n"
+        forM_ labelDescriptions $ \(l, d) ->
+            putStrLn $ "      " ++ l ++ " - " ++ d
