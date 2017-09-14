@@ -1,7 +1,9 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Conditional(unlessM)
+import           Control.Exception(Handler(..), catches, throw)
 import           Control.Monad.Except(runExceptT)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
 import           Data.Aeson.Encode.Pretty(encodePretty)
@@ -26,6 +28,7 @@ import BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
 import BDCS.Version
 
 import Utils.Either(whenLeft)
+import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
@@ -113,14 +116,24 @@ usage = do
     putStrLn "- repo is the path to a content store repo"
     exitFailure
 
-main :: IO ()
-main = do
+runMain :: IO ()
+runMain = do
     argv <- getArgs
     case commandLineArgs argv of
         Nothing               -> usage
         Just (db, repo, args) -> do
-            unlessM (doesFileExist db) $ do
-                putStrLn "database does not exist"
-                exitFailure
+            unlessM (doesFileExist db) $
+                throw MissingDBError
 
             runCommand (T.pack db) repo args
+
+main :: IO ()
+main =
+    -- Add handlers for other exception types (IOException, whatever) here.
+    runMain `catches` [Handler (\(e :: InspectErrors) -> handleInspectErrors e)]
+ where
+    -- And then add handlers for the various kinds of InspectErrors here.
+    handleInspectErrors :: InspectErrors -> IO ()
+    handleInspectErrors MissingDBError = putStrLn "Metadata database does not exist\n" >> usage
+
+    handleInspectErrors _              = usage
