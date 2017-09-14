@@ -16,7 +16,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 
-module BDCS.Label.Types(Label(..))
+module BDCS.Label.Types(Label(..),
+                        labelDescriptions)
  where
 
 import           Data.Aeson((.=), ToJSON, object, toJSON)
@@ -38,3 +39,15 @@ instance ToJSON Label where
     toJSON lbl                     = toJSON $ T.pack $ show lbl
 
 derivePersistField "Label"
+
+labelDescriptions :: [(String, String)]
+labelDescriptions = [
+    ("DocsLabel",        "Documentation - mostly things in /usr/share/doc"),
+    ("FontsLabel",       "Fonts"),
+    ("InfoPageLabel",    "GNU info pages"),
+    ("LibraryLabel",     "Static and shared libraries"),
+    ("LicenseLabel",     "Files containing a software license"),
+    ("ManPageLabel",     "man pages"),
+    ("ServiceLabel",     "systemd .service files"),
+    ("TranslationLabel", "Translations - takes a language code as argument")
+ ]
