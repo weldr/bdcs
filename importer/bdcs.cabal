@@ -182,6 +182,7 @@ executable inspect
                         cond,
                         directory,
                         filepath,
+                        monad-loops,
                         process,
                         text
 

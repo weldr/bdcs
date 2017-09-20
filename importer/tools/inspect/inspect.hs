@@ -20,7 +20,8 @@
 import Control.Conditional(condM, ifM, otherwiseM)
 import Control.Exception(SomeException, catch)
 import Control.Monad(forM_, when)
-import Data.Text(Text, pack, splitOn, unpack)
+import Control.Monad.Loops(firstM)
+import Data.Text(pack, splitOn, unpack)
 import System.Directory(doesFileExist)
 import System.Environment(getArgs, lookupEnv)
 import System.Exit(exitFailure)
@@ -59,14 +60,8 @@ findInPath :: FilePath -> IO (Maybe FilePath)
 findInPath sought = lookupEnv "PATH" >>= \case
     Nothing -> return Nothing
     Just p  -> do let searchPath = splitOn ":" (pack p)
-                  doit searchPath sought
- where
-    doit :: [Text] -> FilePath -> IO (Maybe FilePath)
-    doit [] _        = return Nothing
-    doit (p:ps) name =
-        ifM (doesFileExist (unpack p </> name))
-            (return $ Just $ unpack p </> name)
-            (doit ps name)
+                  fmap (\d -> unpack d </> sought) <$>
+                       firstM (\d -> doesFileExist (unpack d </> sought)) searchPath
 
 existsInPath :: FilePath -> IO Bool
 existsInPath sought = fmap (/= Nothing) (findInPath sought)
