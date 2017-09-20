@@ -8,10 +8,8 @@ import System.Console.GetOpt
 class OptClass a
 
 commandLineArgs :: [String] -> Maybe (String, FilePath, [String])
-commandLineArgs argv =
-    if length argv < 2
-    then Nothing
-    else Just (head argv, argv !! 1, drop 2 argv)
+commandLineArgs (db:repo:args) = Just (db, repo, args)
+commandLineArgs _              = Nothing
 
 compilerOpts :: OptClass a => [OptDescr (a -> a)] -> a -> [String] -> String -> IO (a, [String])
 compilerOpts options defaults argv cmdName =
