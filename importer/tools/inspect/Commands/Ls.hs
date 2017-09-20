@@ -14,7 +14,6 @@ import           Data.Aeson.Encode.Pretty(encodePretty)
 import           Data.ByteString.Lazy(toStrict)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
-import           Data.List(intercalate)
 import           Data.Maybe(catMaybes, fromMaybe, isJust, mapMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
@@ -32,7 +31,7 @@ import           BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
 import qualified BDCS.CS as CS
 import           BDCS.Files(filesC, getKeyValuesForFile)
 import           BDCS.KeyType(KeyType(..))
-import           BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
+import           BDCS.KeyValue(keyValueListToJSON)
 import           BDCS.Label.Types(Label, labelDescriptions)
 import           BDCS.Version
 import           Utils.Either(whenLeft)
@@ -41,6 +40,7 @@ import           Utils.Mode(modeAsText)
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
+import Utils.KeyVal(formatKeyValList)
 
 data LsOptions = LsOptions { lsJSONOutput :: Bool,
                              lsKeyVal :: Bool,
@@ -197,11 +197,7 @@ runCommand db repoPath args = do
     simplePrinter LsRow{..} = T.pack $
         printf "%s%s"
                (filesPath rowFiles)
-               keyvals
-     where
-        keyvals = case rowKeyVals of
-            Just lst -> printf " [%s]" (intercalate ", " (map (T.unpack . formatKeyValue) lst))
-            _ -> ""
+               (maybe "" formatKeyValList rowKeyVals)
 
     verbosePrinter :: String -> LsRow -> T.Text
     verbosePrinter currentYear LsRow{..} = T.pack $
@@ -212,11 +208,7 @@ runCommand db repoPath args = do
                (maybe 0 CS.size (csMetadata rowMetadata))
                (showTime currentYear $ filesMtime rowFiles)
                (filesPath rowFiles) (maybe "" (" -> " ++) (symlinkTarget rowMetadata))
-               keyvals
-     where
-        keyvals = case rowKeyVals of
-            Just lst -> printf " [%s]" (intercalate ", " (map (T.unpack . formatKeyValue) lst))
-            _ -> ""
+               (maybe "" formatKeyValList rowKeyVals)
 
 usage :: IO ()
 usage = do

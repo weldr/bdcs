@@ -8,7 +8,6 @@ import           Control.Monad.Except(runExceptT)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
 import           Data.Aeson.Encode.Pretty(encodePretty)
 import           Data.ByteString.Lazy(toStrict)
-import           Data.List(intercalate)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Conduit((.|), runConduit)
@@ -24,13 +23,14 @@ import           Text.Regex.PCRE((=~))
 import BDCS.DB(Groups(..), KeyVal(..), checkAndRunSqlite)
 import BDCS.GroupKeyValue(getKeyValuesForGroup)
 import BDCS.Groups(groupsC)
-import BDCS.KeyValue(formatKeyValue, keyValueListToJSON)
+import BDCS.KeyValue(keyValueListToJSON)
 import BDCS.Version
 
 import Utils.Either(whenLeft)
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
+import Utils.KeyVal(formatKeyValList)
 
 data GroupsOptions = GroupsOptions { grpJSONOutput :: Bool,
                                      grpKeyVals :: Bool,
@@ -101,11 +101,7 @@ runCommand db _ args = do
     textPrinter GroupsRow{..} = T.pack $
         printf "%s%s"
                rowName
-               keyvals
-     where
-        keyvals = case rowKeyVals of
-            Just lst -> printf " [%s]" (intercalate ", " (map (T.unpack . formatKeyValue) lst))
-            _ -> ""
+               (maybe "" formatKeyValList rowKeyVals)
 
 usage :: IO ()
 usage = do

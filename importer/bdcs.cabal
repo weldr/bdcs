@@ -196,7 +196,8 @@ executable inspect-groups
                         tools/inspect
 
     other-modules:      Utils.GetOpt,
-                        Utils.IO
+                        Utils.IO,
+                        Utils.KeyVal
 
     build-depends:      aeson,
                         aeson-pretty,
@@ -222,7 +223,8 @@ executable inspect-ls
 
     other-modules:      Utils.Exceptions,
                         Utils.GetOpt,
-                        Utils.IO
+                        Utils.IO,
+                        Utils.KeyVal
 
     build-depends:      aeson,
                         aeson-pretty,
