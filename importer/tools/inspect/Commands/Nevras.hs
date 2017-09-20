@@ -33,15 +33,14 @@ instance OptClass NevrasOptions
 defaultNevrasOptions :: NevrasOptions
 defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }
 
-runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand :: T.Text -> FilePath -> [String] -> IO (Either String ())
 runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultNevrasOptions args "nevras"
-    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
+    runExceptT $ checkAndRunSqlite db $ runConduit $
         groupsC .| CL.map fst
                 .| CL.mapMaybeM groupIdToNevra
                 .| CL.filter (\g -> T.unpack g =~ nevraMatches opts)
                 .| CL.mapM_ liftedPutStrLn
-    whenLeft result (\e -> print $ "error: " ++ e)
  where
     options :: [OptDescr (NevrasOptions -> NevrasOptions)]
     options = [
@@ -68,7 +67,8 @@ runMain = do
             unlessM (doesFileExist db) $
                 throw MissingDBError
 
-            runCommand (T.pack db) repo args
+            result <- runCommand (T.pack db) repo args
+            whenLeft result (\e -> print $ "error: " ++ e)
 
 main :: IO ()
 main =

@@ -58,12 +58,12 @@ initRow (key, name) = GroupsRow { rowId=key,
                                   rowKeyVals=Nothing,
                                   rowName=name }
 
-runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand :: T.Text -> FilePath -> [String] -> IO (Either String ())
 runCommand db _ args = do
     (opts, _) <- compilerOpts options defaultGroupsOptions args "groups"
     let printer = if grpJSONOutput opts then jsonPrinter else textPrinter
 
-    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
+    runExceptT $ checkAndRunSqlite db $ runConduit $
         -- Grab all the Groups, filtering out any whose name does not match what we want.
         groupsC .| CL.filter (\(_, n) -> T.unpack n =~ grpMatches opts)
         -- Convert them into GroupsRow records.
@@ -75,8 +75,6 @@ runCommand db _ args = do
                                       else return row)
         -- Finally, pass it to the printer.
                 .| CL.mapM_  (liftedPutStrLn . printer)
-
-    whenLeft result (\e -> print $ "error: " ++ e)
  where
     options :: [OptDescr (GroupsOptions -> GroupsOptions)]
     options = [
@@ -121,7 +119,8 @@ runMain = do
             unlessM (doesFileExist db) $
                 throw MissingDBError
 
-            runCommand (T.pack db) repo args
+            result <- runCommand (T.pack db) repo args
+            whenLeft result (\e -> print $ "error: " ++ e)
 
 main :: IO ()
 main =
