@@ -126,7 +126,7 @@ keyValToLabel :: KeyVal -> Maybe Label
 keyValToLabel KeyVal {keyValKey_value=LabelKey x} = Just x
 keyValToLabel _                                   = Nothing
 
-runCommand :: T.Text -> FilePath -> [String] -> IO ()
+runCommand :: T.Text -> FilePath -> [String] -> IO (Either String ())
 runCommand db repoPath args = do
     repo <- CS.open repoPath
     (opts, _) <- compilerOpts options defaultLsOptions args "ls"
@@ -136,33 +136,32 @@ runCommand db repoPath args = do
                                          return $ liftedPutStrLn . verbosePrinter currentYear
                   | otherwise -> return $ liftedPutStrLn . simplePrinter
 
-    result <- runExceptT $ checkAndRunSqlite db $ runConduit $
-              -- Grab all the Files, filtering out any whose path does not match what we want.
-              filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
-              -- Convert them into LsRow records containing only the Files record.
-                     .| CL.map    initRow
-              -- If we were asked for verbose output, add that to the LsRow.
-                     .| CL.mapM   (\row -> if lsVerbose opts then do
-                                               md <- getMetadata repo (rowFiles row)
-                                               return $ row { rowMetadata=md }
-                                           else return row)
-              -- keyval output comes up in two different ways:  If we were
-              -- given the --keyval flag, we want to add them to the LsRow,
-              -- If we were given the --label flag, we want to grab the keyvals
-              -- from the database and check for a match.  Note that both flags
-              -- could be given at the same time.
-                     .| CL.mapMaybeM (\row -> do kvs <- if lsKeyVal opts || isJust (lsLabelMatches opts)
-                                                        then getKeyValuesForFile (filesPath $ rowFiles row)
-                                                        else return []
+    runExceptT $ checkAndRunSqlite db $ runConduit $
+        -- Grab all the Files, filtering out any whose path does not match what we want.
+        filesC .| CL.filter (\f -> T.unpack (filesPath f) =~ lsMatches opts)
+        -- Convert them into LsRow records containing only the Files record.
+               .| CL.map    initRow
+        -- If we were asked for verbose output, add that to the LsRow.
+               .| CL.mapM   (\row -> if lsVerbose opts then do
+                                         md <- getMetadata repo (rowFiles row)
+                                         return $ row { rowMetadata=md }
+                                     else return row)
+        -- keyval output comes up in two different ways:  If we were
+        -- given the --keyval flag, we want to add them to the LsRow,
+        -- If we were given the --label flag, we want to grab the keyvals
+        -- from the database and check for a match.  Note that both flags
+        -- could be given at the same time.
+               .| CL.mapMaybeM (\row -> do kvs <- if lsKeyVal opts || isJust (lsLabelMatches opts)
+                                                  then getKeyValuesForFile (filesPath $ rowFiles row)
+                                                  else return []
 
-                                                 let labels = mapMaybe keyValToLabel kvs
+                                           let labels = mapMaybe keyValToLabel kvs
 
-                                                 if | maybe False (`notElem` labels) (lsLabelMatches opts) -> return Nothing
-                                                    | lsKeyVal opts -> return $ Just $ row { rowKeyVals=Just kvs }
-                                                    | otherwise -> return $ Just row)
-              -- Finally, pass it to the appropriate printer.
-                     .| CL.mapM_  printer
-    whenLeft result print
+                                           if | maybe False (`notElem` labels) (lsLabelMatches opts) -> return Nothing
+                                              | lsKeyVal opts -> return $ Just $ row { rowKeyVals=Just kvs }
+                                              | otherwise -> return $ Just row)
+        -- Finally, pass it to the appropriate printer.
+               .| CL.mapM_  printer
  where
     options :: [OptDescr (LsOptions -> LsOptions)]
     options = [
@@ -231,7 +230,8 @@ runMain = do
             unlessM (doesDirectoryExist repo) $
                 throw MissingCSError
 
-            runCommand (T.pack db) repo args
+            result <- runCommand (T.pack db) repo args
+            whenLeft result print
 
 main :: IO ()
 main =
