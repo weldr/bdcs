@@ -182,16 +182,14 @@ instance Aeson.ToJSON KeyVal where
 -- Rus a sql query, returning the first entity as a Maybe.  Use this when you
 -- want a row out of the database.
 firstEntityResult :: Monad m => m [Entity a] -> m (Maybe a)
-firstEntityResult query = do
-    ret <- query
-    return $ listToMaybe (map entityVal ret)
+firstEntityResult query =
+    listToMaybe . map entityVal <$> query
 
 -- Run a sql query, returning the first key as a Maybe.  Use this when you want
 -- an index out of the database.
 firstKeyResult :: Monad m => m [Value a] -> m (Maybe a)
-firstKeyResult query = do
-    ret <- query
-    return $ listToMaybe (map unValue ret)
+firstKeyResult query =
+    listToMaybe . map unValue <$> query
 
 -- Like maybe, but for keys - take a default value, a function, potentially the key given
 -- by some other database query.  If the key is Nothing, return the default value.  Otherwise,
