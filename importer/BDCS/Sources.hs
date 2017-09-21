@@ -26,7 +26,7 @@ import           Database.Esqueleto
 import BDCS.DB
 
 findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
-findSource version projectId = firstResult $
+findSource version projectId = firstKeyResult $
     -- FIXME:  Is (project_id, version) unique in Sources?
     select $ from $ \src -> do
     where_ $ src ^. SourcesProject_id ==. val projectId &&.

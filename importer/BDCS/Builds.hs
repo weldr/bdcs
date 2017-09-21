@@ -27,7 +27,7 @@ import           Database.Esqueleto
 import BDCS.DB
 
 findBuild :: MonadIO m => Int -> T.Text -> T.Text -> Key Sources -> SqlPersistT m (Maybe (Key Builds))
-findBuild epoch release arch sourceId = firstResult $
+findBuild epoch release arch sourceId = firstKeyResult $
     -- FIXME: Is (source_id, epoch, release, arch) unique in Builds?
     select $ from $ \build -> do
     where_ $ build ^. BuildsSource_id ==. val sourceId &&.
