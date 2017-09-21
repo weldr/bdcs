@@ -43,7 +43,7 @@ insertPackageName packageName =
     findPackage packageName `orDo` insertKeyValue (TextKey "packageName") (Just packageName) Nothing
 
 findPackage :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key KeyVal))
-findPackage name = firstResult $
+findPackage name = firstKeyResult $
     select $ from $ \pkg -> do
     where_ $ pkg ^. KeyValKey_value ==. val (TextKey "packageName") &&.
              pkg ^. KeyValVal_value ==. just (val name)

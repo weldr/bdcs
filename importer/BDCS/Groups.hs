@@ -46,7 +46,7 @@ import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Utils(splitFilename)
 
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
-findGroupRequirements groupId reqId = firstResult $
+findGroupRequirements groupId reqId = firstKeyResult $
     select $ from $ \r -> do
     where_ $ r ^. GroupRequirementsGroup_id ==. val groupId &&.
              r ^. GroupRequirementsReq_id ==. val reqId
@@ -54,7 +54,7 @@ findGroupRequirements groupId reqId = firstResult $
     return $ r ^. GroupRequirementsId
 
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> T.Text -> SqlPersistT m (Maybe (Key Requirements))
-findRequires reqLang reqCtx reqStrength reqExpr = firstResult $
+findRequires reqLang reqCtx reqStrength reqExpr = firstKeyResult $
     select $ from $ \r -> do
     where_ $ r ^. RequirementsReq_language ==. val reqLang &&.
              r ^. RequirementsReq_context ==. val reqCtx &&.
@@ -120,7 +120,7 @@ nameToGroupIds name = do
     return $ map unValue result
 
 nevraToGroupId :: MonadIO m => (T.Text, Maybe T.Text, T.Text, T.Text, T.Text) -> SqlPersistT m (Maybe (Key Groups))
-nevraToGroupId (n, e, v, r, a) = firstResult $
+nevraToGroupId (n, e, v, r, a) = firstKeyResult $
     -- Each key/val pair to match against is a separate row in key_val, so each one needs to be joined into the
     -- query as if it were a separate table.
     -- The idea here is to create a key_val/group_key_values join for each key_val.key_value we're looking up, and

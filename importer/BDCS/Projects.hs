@@ -21,26 +21,24 @@ module BDCS.Projects(findProject,
  where
 
 import           Control.Monad.IO.Class(MonadIO)
-import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
 
 findProject :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Projects))
-findProject name = firstResult $
+findProject name = firstKeyResult $
     select $ from $ \proj -> do
     where_ $ proj ^. ProjectsName ==. val name
     limit 1
     return $ proj ^. ProjectsId
 
 getProject :: MonadIO m => Key Projects -> SqlPersistT m (Maybe Projects)
-getProject key = do
-    results <- select $ from $ \proj -> do
-               where_ $ proj ^. ProjectsId ==. val key
-               limit 1
-               return proj
-    return $ listToMaybe (map entityVal results)
+getProject key = firstEntityResult $
+    select $ from $ \proj -> do
+    where_ $ proj ^. ProjectsId ==. val key
+    limit 1
+    return proj
 
 insertProject :: MonadIO m => Projects -> SqlPersistT m (Key Projects)
 insertProject project@Projects{..} =

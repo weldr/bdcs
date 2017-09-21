@@ -34,7 +34,7 @@ import BDCS.DB
 import BDCS.KeyType
 
 findKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Maybe (Key KeyVal))
-findKeyValue k v e = firstResult $
+findKeyValue k v e = firstKeyResult $
     select $ from $ \kv -> do
     where_ $ kv ^. KeyValKey_value ==. val k &&.
              kv ^. KeyValVal_value ==? v &&.

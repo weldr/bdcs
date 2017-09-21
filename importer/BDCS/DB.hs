@@ -39,8 +39,8 @@ import           Data.Int(Int64)
 import           Data.Maybe(fromJust, listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
-import           Database.Esqueleto(Esqueleto, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
-                                    (==.), insert, isNothing, val, unValue)
+import           Database.Esqueleto(Esqueleto, Entity, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
+                                    (==.), entityVal, insert, isNothing, val, unValue)
 import           Database.Persist.Sql(rawSql, unSingle)
 import           Database.Persist.Sqlite(runSqlite)
 import           Database.Persist.TH
@@ -179,9 +179,17 @@ instance Aeson.ToJSON KeyVal where
            | v == e || e == Nothing -> fromJust v
            | otherwise              -> fromJust e
 
--- Run a sql query, returning the first value as a Maybe.
-firstResult :: Monad m => m [Value a] -> m (Maybe a)
-firstResult query = do
+-- Rus a sql query, returning the first entity as a Maybe.  Use this when you
+-- want a row out of the database.
+firstEntityResult :: Monad m => m [Entity a] -> m (Maybe a)
+firstEntityResult query = do
+    ret <- query
+    return $ listToMaybe (map entityVal ret)
+
+-- Run a sql query, returning the first key as a Maybe.  Use this when you want
+-- an index out of the database.
+firstKeyResult :: Monad m => m [Value a] -> m (Maybe a)
+firstKeyResult query = do
     ret <- query
     return $ listToMaybe (map unValue ret)
 
