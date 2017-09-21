@@ -18,6 +18,7 @@
 
 module BDCS.KeyValue(findKeyValue,
                      formatKeyValue,
+                     getKeyValue,
                      insertKeyValue,
                      keyValueListToJSON)
  where
@@ -50,6 +51,13 @@ formatKeyValue KeyVal{..} = let
               _                 -> ""
  in
     T.concat [ T.pack $ show keyValKey_value, rhs ]
+
+getKeyValue :: MonadIO m => Key KeyVal -> SqlPersistT m (Maybe KeyVal)
+getKeyValue key = firstEntityResult $
+    select $ from $ \kv -> do
+    where_ $ kv ^. KeyValId ==. val key
+    limit 1
+    return kv
 
 insertKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Key KeyVal)
 insertKeyValue k v e =

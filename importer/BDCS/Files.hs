@@ -18,6 +18,7 @@ module BDCS.Files(insertFiles,
                   associateFilesWithPackage,
                   files,
                   filesC,
+                  getFile,
                   getKeyValuesForFile,
                   groupIdToFiles,
                   groupIdToFilesC,
@@ -60,6 +61,13 @@ filesC = do
                  orderBy      [asc (file ^. FilesPath)]
                  return       file
     source .| CL.map entityVal
+
+getFile :: MonadIO m => Key Files -> SqlPersistT m (Maybe Files)
+getFile key = firstEntityResult $
+    select $ from $ \file -> do
+    where_ $ file ^. FilesId ==. val key
+    limit 1
+    return file
 
 getKeyValuesForFile :: MonadIO m => T.Text -> SqlPersistT m [KeyVal]
 getKeyValuesForFile path = do
