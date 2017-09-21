@@ -16,6 +16,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Scripts(findScript,
+                    getScript,
                     insertScript)
  where
 
@@ -33,6 +34,13 @@ findScript ty body name _ver _ndx _flags = firstKeyResult $
              script ^. ScriptsTrigger_name ==? name
     limit 1
     return $ script ^. ScriptsId
+
+getScript :: MonadIO m => Key Scripts -> SqlPersistT m (Maybe Scripts)
+getScript key = firstEntityResult $
+    select $ from $ \script -> do
+    where_ $ script ^. ScriptsId ==. val key
+    limit 1
+    return script
 
 insertScript :: MonadIO m => Key Groups -> Scripts -> SqlPersistT m (Key GroupScripts)
 insertScript groupId script@Scripts{..} =

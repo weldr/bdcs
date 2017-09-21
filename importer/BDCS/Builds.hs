@@ -17,6 +17,7 @@
 
 module BDCS.Builds(associateBuildWithPackage,
                    findBuild,
+                   getBuild,
                    insertBuild)
  where
 
@@ -36,6 +37,13 @@ findBuild epoch release arch sourceId = firstKeyResult $
              build ^. BuildsArch ==. val arch
     limit 1
     return $ build ^. BuildsId
+
+getBuild :: MonadIO m => Key Builds -> SqlPersistT m (Maybe Builds)
+getBuild key = firstEntityResult $
+    select $ from $ \build -> do
+    where_ $ build ^. BuildsId ==. val key
+    limit 1
+    return build
 
 insertBuild :: MonadIO m => Builds -> SqlPersistT m (Key Builds)
 insertBuild build@Builds{..} =

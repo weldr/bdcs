@@ -19,8 +19,11 @@
 
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
+                   getRequires,
                    getGroupId,
                    getGroupIdC,
+                   getGroup,
+                   getGroupRequirements,
                    getRequirementsForGroup,
                    groups,
                    groupsC,
@@ -53,6 +56,13 @@ findGroupRequirements groupId reqId = firstKeyResult $
     limit 1
     return $ r ^. GroupRequirementsId
 
+getGroupRequirements :: MonadIO m => Key GroupRequirements -> SqlPersistT m (Maybe GroupRequirements)
+getGroupRequirements key = firstEntityResult $
+    select $ from $ \r -> do
+    where_ $ r ^. GroupRequirementsId ==. val key
+    limit 1
+    return r
+
 findRequires :: MonadIO m => RT.ReqLanguage -> RT.ReqContext -> RT.ReqStrength -> T.Text -> SqlPersistT m (Maybe (Key Requirements))
 findRequires reqLang reqCtx reqStrength reqExpr = firstKeyResult $
     select $ from $ \r -> do
@@ -63,6 +73,13 @@ findRequires reqLang reqCtx reqStrength reqExpr = firstKeyResult $
     limit 1
     return $ r ^. RequirementsId
 
+getRequires :: MonadIO m => Key Requirements -> SqlPersistT m (Maybe Requirements)
+getRequires key = firstEntityResult $
+    select $ from $ \r -> do
+    where_ $ r ^. RequirementsId ==. val key
+    limit 1
+    return r
+
 getGroupId :: (MonadError String m, MonadIO m) => T.Text -> SqlPersistT m (Key Groups)
 getGroupId thing =
     nevraToGroupId (splitFilename thing) >>= \case
@@ -71,6 +88,13 @@ getGroupId thing =
 
 getGroupIdC :: (MonadError String m, MonadIO m) => Conduit T.Text (SqlPersistT m) (Key Groups)
 getGroupIdC = CL.mapM getGroupId
+
+getGroup :: MonadIO m => Key Groups -> SqlPersistT m (Maybe Groups)
+getGroup key = firstEntityResult $
+    select $ from $ \group -> do
+    where_ $ group ^. GroupsId ==. val key
+    limit 1
+    return group
 
 groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
 groups = do

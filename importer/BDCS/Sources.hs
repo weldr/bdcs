@@ -16,6 +16,7 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Sources(findSource,
+                    getSource,
                     insertSource)
  where
 
@@ -33,6 +34,13 @@ findSource version projectId = firstKeyResult $
              src ^. SourcesVersion    ==. val version
     limit 1
     return $ src ^. SourcesId
+
+getSource :: MonadIO m => Key Sources -> SqlPersistT m (Maybe Sources)
+getSource key = firstEntityResult $
+    select $ from $ \source -> do
+    where_ $ source ^. SourcesId ==. val key
+    limit 1
+    return source
 
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)
 insertSource source@Sources{..} =
