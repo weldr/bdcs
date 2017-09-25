@@ -85,10 +85,10 @@ sudo rm -rf $EXPORT_DIR
 
 
 # import last so we don't have to parse the commit log to figure out what "HEAD" is
-$IMPORT $METADATA_DB $CS_REPO http://mirror.centos.org/centos/7/os/x86_64/Packages/yum-rhn-plugin-2.0.1-6.el7.noarch.rpm
+$IMPORT $METADATA_DB $CS_REPO http://mirror.centos.org/centos/7/os/x86_64/Packages/yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
 
 
-sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-6.el7.noarch
+sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch
 if [[ $? != 0 ]]; then
     echo "ERROR: Exit code should be zero"
     exit 1
@@ -102,7 +102,7 @@ sudo rm -rf $EXPORT_DIR $OSTREE_DIR
 ## When exporting existing package into .tar image
 ## Then untarred contents match the export from an ostree checkout
 
-sudo $EXPORT $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-6.el7.noarch
+sudo $EXPORT $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch
 if [[ $? != 0 ]]; then
     echo "ERROR: Exit code should be zero"
     exit 1
@@ -130,12 +130,12 @@ sudo rm -rf tar_contents/ exported.tar $OSTREE_DIR
 
 # these two packages both provide /usr/lib64/libcmpiCppImpl.so
 # normally libcmpiCppImpl0 lives in the @conflicts group
-$IMPORT $METADATA_DB $CS_REPO http://mirror.centos.org/centos/7/os/x86_64/Packages/tog-pegasus-libs-2.14.1-3.el7.x86_64.rpm
+$IMPORT $METADATA_DB $CS_REPO http://mirror.centos.org/centos/7/os/x86_64/Packages/tog-pegasus-libs-2.14.1-5.el7.x86_64.rpm
 $IMPORT $METADATA_DB $CS_REPO http://mirror.centos.org/centos/7/os/x86_64/Packages/libcmpiCppImpl0-2.0.3-5.el7.x86_64.rpm
 
 
 # first libcmpiCppImpl0, second tog-pegasus-libs
-sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-3.el7.x86_64 2>&1
+sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64 2>&1
 if [[ $? != 0 ]]; then
     echo "ERROR: Exit code should be zero"
     exit 1
@@ -149,7 +149,7 @@ sudo rm -rf $EXPORT_DIR $OSTREE_DIR
 
 
 # first tog-pegasus-libs, second libcmpiCppImpl0
-sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch tog-pegasus-libs-2:2.14.1-3.el7.x86_64 libcmpiCppImpl0-2.0.3-5.el7.x86_64
+sudo $EXPORT $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch tog-pegasus-libs-2:2.14.1-5.el7.x86_64 libcmpiCppImpl0-2.0.3-5.el7.x86_64
 if [[ $? != 0 ]]; then
     echo "ERROR: Exit code should be zero"
     exit 1
