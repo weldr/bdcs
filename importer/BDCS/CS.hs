@@ -11,6 +11,7 @@ module BDCS.CS(ChecksumMap,
                FileContents(..),
                commit,
                commitContents,
+               commitContentToFile,
                filesToObjectsC,
                load,
                objectToTarEntry,
@@ -40,8 +41,10 @@ import           GI.Gio
 import           GI.OSTree
 import           System.Directory(doesDirectoryExist)
 import           System.Endian(fromBE32)
+import           System.FilePath((</>), isAbsolute, makeRelative, normalise)
 import           System.IO(hClose)
 import           System.IO.Temp(withSystemTempFile)
+import           System.Posix.Files(getSymbolicLinkStatus, modificationTimeHiRes)
 import           System.Posix.Types(CMode(..))
 
 import BDCS.DB
@@ -290,3 +293,22 @@ withTransaction repo fn =
     bracket_ (repoPrepareTransaction repo noCancellable)
              (repoCommitTransaction repo noCancellable)
              (fn repo)
+
+-- | Create a "Files" record for the given path
+commitContentToFile :: FilePath         -- ^ A path prefix to use as the root of the file import
+                    -> (T.Text, T.Text) -- ^ The path to convert, relative to the prefix, and the content store checksum
+                    -> IO Files         -- ^ The resulting record
+commitContentToFile prefix (path, checksum) = do
+    -- combine the prefix and the path. If the path already starts with a /, remove it
+    let normalPrefix = normalise prefix
+    let normalPath   = normalise (T.unpack path)
+    let relativePath = if isAbsolute normalPath then makeRelative "/" normalPath else normalPath
+    let fullPath = normalPrefix </> relativePath
+
+    -- use getSymbolicLinkStatus (lstat) since there may be broken symlinks
+    stat <- getSymbolicLinkStatus fullPath
+    let mtime = floor $ modificationTimeHiRes stat
+
+    -- TODO user/group
+
+    return $ Files (T.pack ("/" </> relativePath)) "root" "root" mtime (Just checksum)
