@@ -26,7 +26,7 @@ module Import.RPM(consume,
                   rpmExistsInMDDB)
  where
 
-import           Codec.RPM.Parse(parseRPMC)
+import           Codec.RPM.Conduit(parseRPMC)
 import           Codec.RPM.Tags
 import           Codec.RPM.Types
 import           Control.Conditional(ifM)
