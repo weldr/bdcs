@@ -14,14 +14,17 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Export.Ostree(ostreeSink)
  where
 
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
 import           Control.Conditional(condM, otherwiseM, whenM)
+import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(void, when)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -30,6 +33,7 @@ import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
 import qualified Data.Conduit.List as CL
 import           Data.List(isPrefixOf)
+import qualified Data.Text as T
 import           System.Directory
 import           System.FilePath((</>), takeDirectory, takeFileName)
 import           System.IO.Temp(createTempDirectory, withTempDirectory)
@@ -37,10 +41,10 @@ import           System.Posix.Files(createSymbolicLink, fileGroup, fileMode, fil
 import           System.Process(callProcess)
 import           Text.Printf(printf)
 
-import           GI.Gio(noCancellable)
-import           GI.OSTree(repoRegenerateSummary)
+import           GI.Gio(File, fileNewForPath, noCancellable)
+import           GI.OSTree
 
-import qualified BDCS.CS as CS
+import qualified BDCS.CS as CS hiding(commit, open, storeDirectory, withTransaction)
 import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
 import           Export.Utils(runHacks)
@@ -59,7 +63,7 @@ ostreeSink outPath = do
     --
     -- Note that writing and importing a tar file does not work, because ostree chokes on paths with symlinks
     -- (e.g., /lib64/libaudit.so.1)
-    dst_repo <- liftIO $ CS.open outPath
+    dst_repo <- liftIO $ open outPath
 
     bracketP (createTempDirectory (takeDirectory outPath) "export")
         removePathForcibly
@@ -116,9 +120,9 @@ ostreeSink outPath = do
                 callProcess "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
 
                 -- import the directory as a new commit
-                void $ CS.withTransaction dst_repo $ \r -> do
-                    f <- CS.storeDirectory r tmpDir
-                    CS.commit r f "Export commit" Nothing)
+                void $ withTransaction dst_repo $ \r -> do
+                    f <- storeDirectory r tmpDir
+                    commit r f "Export commit" Nothing)
 
     -- Regenerate the summary, necessary for mirroring
     repoRegenerateSummary dst_repo Nothing noCancellable
@@ -268,3 +272,51 @@ ostreeSink outPath = do
 
         createSymbolicLink "/usr/lib/systemd/system/getty@.service" $ systemdDir </> "getty.target.wants" </> "getty@tty1.service"
         createSymbolicLink "/usr/lib/systemd/system/ostree-remount.service" $ systemdDir </> "local-fs.target.wants" </> "ostree-remount.service"
+
+-- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
+-- function also requires a commit subject and optionally a commit body.  The subject and body are
+-- visible if you use "ostree log master".  Returns the checksum of the commit.
+commit :: IsRepo a => a -> File -> T.Text -> Maybe T.Text -> IO T.Text
+commit repo repoFile subject body =
+    unsafeCastTo RepoFile repoFile >>= \root -> do
+        -- Get the parent, which should always be whatever "master" points to.  If there is no parent
+        -- (likely because nothing has been imported into this repo before), just return Nothing.
+        -- ostree will know what to do.
+        parent <- parentCommit repo "master"
+        checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
+        repoTransactionSetRef repo Nothing "master" (Just checksum)
+        return checksum
+
+-- Open the named ostree repo.  If the repo does not already exist, it will first be created.
+-- It is created in Z2 mode because that can be modified without being root.
+open :: FilePath -> IO Repo
+open fp = do
+    path <- fileNewForPath fp
+    repo <- repoNew path
+
+    doesDirectoryExist fp >>= \case
+        True  -> repoOpen repo noCancellable >> return repo
+        False -> repoCreate repo RepoModeArchiveZ2 noCancellable >> return repo
+
+-- Given a commit, return the parent of it or Nothing if no parent exists.
+parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
+parentCommit repo commitSum =
+    catch (Just <$> repoResolveRev repo commitSum False)
+          (\(_ :: SomeException) -> return Nothing)
+
+-- Same as store, but takes a path to a directory to import
+storeDirectory :: IsRepo a => a -> FilePath -> IO File
+storeDirectory repo path = do
+    importFile <- fileNewForPath path
+    mtree <- mutableTreeNew
+
+    repoWriteDirectoryToMtree repo importFile mtree Nothing noCancellable
+    repoWriteMtree repo mtree noCancellable
+
+-- Wrap some repo-manipulating function in a transaction, committing it if the function succeeds.
+-- Returns the checksum of the commit.
+withTransaction :: IsRepo a => a -> (a -> IO b) -> IO b
+withTransaction repo fn =
+    bracket_ (repoPrepareTransaction repo noCancellable)
+             (repoCommitTransaction repo noCancellable)
+             (fn repo)
