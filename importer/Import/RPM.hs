@@ -40,10 +40,10 @@ import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString.Char8 as C8
 import           Data.CPIO(Entry(..))
-import           Data.Conduit((.|), Consumer, ZipConduit(..), await, runConduitRes, yield)
+import           Data.Conduit((.|), Consumer, ZipConduit(..), await, runConduit, runConduitRes, yield)
 import           Data.Conduit.Combinators(sinkList)
 import qualified Data.Conduit.List as CL
-import           Data.ContentStore(ContentStore, CsMonad, storeLazyByteStringC)
+import           Data.ContentStore(ContentStore, CsMonad, runCsMonad, storeLazyByteStringC)
 import           Data.ContentStore.Digest(ObjectDigest)
 import           Database.Esqueleto
 import           Database.Persist.Sqlite(runSqlite)
@@ -101,15 +101,17 @@ unsafeConsume :: ContentStore -> FilePath -> RPM -> Consumer RPM CsMonad Bool
 unsafeConsume repo db rpm = do
     -- One source that takes an RPM, extracts its payload, and decompresses it.
     let src       = yield rpm .| payloadContentsC
-    -- The first conduit just extracts filenames out of each cpio entry.
-        filenames = CL.map (decodeUtf8 . cpioFileName) .| sinkList
+    -- The first conduit just extracts filenames out of each cpio entry.  cpio puts a leading . on
+    -- each filename, but the RPM headers do not have that.  Thus, we trim it out so the paths look
+    -- the same.
+        filenames = CL.map (T.dropWhile (== '.') . decodeUtf8 . cpioFileName) .| sinkList
     -- The second conduit extracts each file from a cpio entry, stores it in the content store,
     -- and returns its digest.
         digests   = CL.map cpioFileData .| storeLazyByteStringC repo .| sinkList
 
     -- And then those two conduits run in parallel and the results are packaged up together so
     -- we have filenames and their digests matched up.
-    result <- liftIO $ runExceptT $ runConduitRes $ src
+    result <- liftIO $ runCsMonad $ runConduit $ src
                     .| getZipConduit ((,) <$> ZipConduit filenames
                                           <*> ZipConduit digests)
 
@@ -186,7 +188,7 @@ loadFromURI uri = do
     case result of
         Left e           -> liftIO $ putStrLn $ "Error fetching " ++ uriPath uri ++ ": " ++ show e
         Right (Just rpm) -> do
-            result' <- liftIO $ runExceptT $ runConduitRes $ yield rpm .| consume repo db
+            result' <- liftIO $ runCsMonad $ runConduit $ yield rpm .| consume repo db
             case result' of
                 Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
                 Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e

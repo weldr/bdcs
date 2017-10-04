@@ -168,6 +168,7 @@ executable import
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
                         cond,
+                        content-store,
                         directory,
                         mtl >= 2.2.1,
                         network-uri

@@ -24,6 +24,7 @@ import Control.Exception(catch)
 import Control.Monad(void, when)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Reader(ReaderT, runReaderT)
+import Data.ContentStore(mkContentStore, runCsMonad)
 import Data.List(isSuffixOf)
 import Network.URI(URI(..), parseURI)
 import System.Directory(doesFileExist)
@@ -31,7 +32,6 @@ import System.Environment(getArgs)
 import System.Exit(exitFailure)
 import System.IO(hPutStrLn, stderr)
 
-import qualified BDCS.CS as CS
 import           BDCS.Exceptions(DBException)
 import           BDCS.Version
 import qualified Import.Comps as Comps
@@ -71,8 +71,12 @@ main = do
     when (length argv < 3) usage
 
     let db     = argv !! 0
-    repo      <- CS.open (argv !! 1)
     let things = drop 2 argv
+
+    result <- runCsMonad $ mkContentStore (argv !! 1)
+    repo   <- case result of
+                   Left e  -> print e >> exitFailure
+                   Right r -> return r
 
     unlessM (doesFileExist db) $ do
         putStrLn "Database must already exist - create with sqlite3 schema.sql"
