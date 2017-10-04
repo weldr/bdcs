@@ -44,7 +44,7 @@ import           Text.Printf(printf)
 import           GI.Gio(File, fileNewForPath, noCancellable)
 import           GI.OSTree
 
-import qualified BDCS.CS as CS hiding(commit, open, storeDirectory, withTransaction)
+import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
 import           Export.Utils(runHacks)
