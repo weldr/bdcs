@@ -53,7 +53,6 @@ import           Data.Text.Encoding(decodeUtf8)
 import           Network.URI(URI(..))
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
-import BDCS.CS(commit, commitContents, store, withTransaction)
 import BDCS.DB
 import BDCS.Exceptions(DBException(..), isMissingRPMTagException, throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)

@@ -5,54 +5,37 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module BDCS.CS(ChecksumMap,
-               Object(..),
+module BDCS.CS(Object(..),
                Metadata(..),
                FileContents(..),
-               commit,
-               commitContents,
                commitContentToFile,
                filesToObjectsC,
                load,
-               objectToTarEntry,
-               open,
-               store,
-               storeDirectory,
-               withTransaction)
+               objectToTarEntry)
  where
 
 import qualified Codec.Archive.Tar as Tar
 import qualified Codec.Archive.Tar.Entry as Tar
 import           Control.Conditional((<&&>), condM, ifM, otherwiseM, whenM)
-import           Control.Exception(SomeException, bracket_, catch)
-import           Control.Monad(forM_)
 import           Control.Monad.Except(ExceptT(..), MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.State(StateT, lift, modify)
 import           Control.Monad.Trans.Resource(runResourceT)
 import qualified Data.ByteString as BS
 import           Data.Conduit((.|), Conduit, runConduit, yield)
 import           Data.Conduit.Binary(sinkLbs)
-import           Data.GI.Base.ManagedPtr(unsafeCastTo)
 import           Data.Maybe(isNothing)
 import qualified Data.Text as T
 import           Data.Word(Word32, Word64)
 import           GI.Gio
 import           GI.OSTree
-import           System.Directory(doesDirectoryExist)
 import           System.Endian(fromBE32)
 import           System.FilePath((</>), isAbsolute, makeRelative, normalise)
-import           System.IO(hClose)
-import           System.IO.Temp(withSystemTempFile)
 import           System.Posix.Files(getSymbolicLinkStatus, modificationTimeHiRes)
 import           System.Posix.Types(CMode(..))
 
 import BDCS.DB
 import Utils.Conduit(awaitWith, sourceInputStream)
 import Utils.Either(maybeToEither)
-
--- A mapping from a file path to its checksum in an ostree repo.
-type ChecksumMap = [(T.Text, T.Text)]
 
 data Object = DirMeta Metadata
             | FileObject FileContents
@@ -68,73 +51,6 @@ data Metadata = Metadata { uid :: Word32,
 data FileContents = FileContents { metadata :: Metadata,
                                    symlink :: Maybe T.Text,
                                    contents :: Maybe InputStream }
-
--- Given a commit, return the parent of it or Nothing if no parent exists.
-parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
-parentCommit repo commitSum =
-    catch (Just <$> repoResolveRev repo commitSum False)
-          (\(_ :: SomeException) -> return Nothing)
-
--- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
--- function also requires a commit subject and optionally a commit body.  The subject and body are
--- visible if you use "ostree log master".  Returns the checksum of the commit.
-commit :: IsRepo a => a -> File -> T.Text -> Maybe T.Text -> IO T.Text
-commit repo repoFile subject body =
-    unsafeCastTo RepoFile repoFile >>= \root -> do
-        -- Get the parent, which should always be whatever "master" points to.  If there is no parent
-        -- (likely because nothing has been imported into this repo before), just return Nothing.
-        -- ostree will know what to do.
-        parent <- parentCommit repo "master"
-        checksum <- repoWriteCommit repo parent (Just subject) body Nothing root noCancellable
-        repoTransactionSetRef repo Nothing "master" (Just checksum)
-        return checksum
-
--- Given an open ostree repo and a checksum to some commit, return a ChecksumMap.  This is useful for
--- creating a mapping in the MDDB from some MDDB object to its content in the ostree store.
-commitContents :: IsRepo a => a -> T.Text -> StateT ChecksumMap IO ()
-commitContents repo commitSum = do
-    (root, _) <- repoReadCommit repo commitSum noCancellable
-    file <- fileResolveRelativePath root "/"
-    info <- fileQueryInfo file "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
-    walk file info
- where
-    walk :: File -> FileInfo -> StateT ChecksumMap IO ()
-    walk f i = lift (fileInfoGetFileType i) >>= \case
-        FileTypeDirectory -> do getPathAndChecksum FileTypeDirectory f >>= addPathAndChecksum
-
-                                -- Grab the info for everything in this directory.
-                                dirEnum <- fileEnumerateChildren f "*" [FileQueryInfoFlagsNofollowSymlinks] noCancellable
-                                childrenInfo <- getAllChildren dirEnum []
-
-                                -- Examine the contents of this directory recursively - this results in all
-                                -- the files being added by the other branch of the case, and other directories
-                                -- being handled recusrively.  Thus, we do this depth-first.
-                                forM_ childrenInfo $ \childInfo -> do
-                                    child <- fileInfoGetName childInfo >>= fileGetChild f
-                                    walk child childInfo
-
-        ty                -> getPathAndChecksum ty f >>= addPathAndChecksum
-
-    addPathAndChecksum :: (Maybe T.Text, T.Text) -> StateT ChecksumMap IO ()
-    addPathAndChecksum (Just p, c) = modify (++ [(p, c)])
-    addPathAndChecksum _           = return ()
-
-    getAllChildren :: FileEnumerator -> [FileInfo] -> StateT ChecksumMap IO [FileInfo]
-    getAllChildren enum accum =
-        fileEnumeratorNextFile enum noCancellable >>= \case
-            Just next -> getAllChildren enum (accum ++ [next])
-            Nothing   -> return accum
-
-    getPathAndChecksum :: FileType -> File -> StateT ChecksumMap IO (Maybe T.Text, T.Text)
-    getPathAndChecksum ty f = lift $ unsafeCastTo RepoFile f >>= \repoFile -> do
-        checksum <- case ty of
-                        FileTypeDirectory -> do -- this needs to be called before repoFileTreeGetMetadataChecksum to populate the data
-                                                repoFileEnsureResolved repoFile
-                                                repoFileTreeGetMetadataChecksum repoFile
-                        _                 -> repoFileGetChecksum repoFile
-
-        path <- fileGetPath f
-        return (fmap T.pack path, checksum)
 
 filesToObjectsC :: (IsRepo a, MonadError String m, MonadIO m) => a -> Conduit Files m (Files, Object)
 filesToObjectsC repo = awaitWith $ \f@Files{..} -> case filesCs_object of
@@ -187,44 +103,6 @@ objectToTarEntry = awaitWith $ \(f@Files{..}, obj) -> do
                                                        Tar.ownerName = "",
                                                        Tar.groupName = "" },
                 Tar.entryTime = fromIntegral filesMtime }
-
--- Open the named ostree repo.  If the repo does not already exist, it will first be created.
--- It is created in Z2 mode because that can be modified without being root.
-open :: FilePath -> IO Repo
-open fp = do
-    path <- fileNewForPath fp
-    repo <- repoNew path
-
-    doesDirectoryExist fp >>= \case
-        True  -> repoOpen repo noCancellable >> return repo
-        False -> repoCreate repo RepoModeArchiveZ2 noCancellable >> return repo
-
--- Given an open ostree repo and an RPM payload as a ByteString, store that payload's files into the repo.
--- Returns a File (really, a RepoFile) pointing to the root of the archive.
-store :: IsRepo a => a -> BS.ByteString -> IO File
-store repo content =
-    -- We use a temp file here because there's no ostree function that allows reading from a stream
-    -- or open file handle or something.  There's also ostree_repo_import_archive_to_mtree but that
-    -- wants the archive in a libarchive-specific structure, which would mean more bindings.  This
-    -- requires more disk space but is a lot easier.
-    withSystemTempFile "archive" $ \tmpFile hFile -> do
-        BS.hPut hFile content
-        hClose hFile
-
-        archive <- fileNewForPath tmpFile
-        mtree   <- mutableTreeNew
-
-        repoWriteArchiveToMtree repo archive mtree Nothing True noCancellable
-        repoWriteMtree repo mtree noCancellable
-
--- Same as store, but takes a path to a directory to import
-storeDirectory :: IsRepo a => a -> FilePath -> IO File
-storeDirectory repo path = do
-    importFile <- fileNewForPath path
-    mtree <- mutableTreeNew
-
-    repoWriteDirectoryToMtree repo importFile mtree Nothing noCancellable
-    repoWriteMtree repo mtree noCancellable
 
 -- Given an open ostree repo and a checksum, read an object from the content store.
 -- The checksums stored in the mddb can be either dirmeta objects, which will contain
@@ -285,14 +163,6 @@ load repo checksum =
     variantToXattrs :: Maybe GVariant -> IO (Maybe [(BS.ByteString, BS.ByteString)])
     variantToXattrs (Just v)  = fromGVariant v
     variantToXattrs Nothing   = return $ Just []
-
--- Wrap some repo-manipulating function in a transaction, committing it if the function succeeds.
--- Returns the checksum of the commit.
-withTransaction :: IsRepo a => a -> (a -> IO b) -> IO b
-withTransaction repo fn =
-    bracket_ (repoPrepareTransaction repo noCancellable)
-             (repoCommitTransaction repo noCancellable)
-             (fn repo)
 
 -- | Create a "Files" record for the given path
 commitContentToFile :: FilePath         -- ^ A path prefix to use as the root of the file import
