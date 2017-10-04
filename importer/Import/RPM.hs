@@ -26,25 +26,30 @@ module Import.RPM(consume,
                   rpmExistsInMDDB)
  where
 
-import           Codec.RPM.Conduit(parseRPMC)
+import           Codec.RPM.Conduit(parseRPMC, payloadContentsC)
 import           Codec.RPM.Tags
 import           Codec.RPM.Types
 import           Control.Conditional(ifM)
 import           Control.Exception(evaluate, tryJust)
 import           Control.Monad(guard, void)
-import           Control.Monad.Except(MonadError, runExceptT)
+import           Control.Monad.Except
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
-import           Control.Monad.State(execStateT)
 import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Resource(MonadBaseControl)
+import           Control.Monad.Trans.Control(MonadBaseControl)
+import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString.Char8 as C8
-import           Data.Conduit((.|), Consumer, await, runConduitRes)
+import           Data.CPIO(Entry(..))
+import           Data.Conduit((.|), Consumer, ZipConduit(..), await, runConduitRes, yield)
+import           Data.Conduit.Combinators(sinkList)
+import qualified Data.Conduit.List as CL
+import           Data.ContentStore(ContentStore, CsMonad, storeLazyByteStringC)
+import           Data.ContentStore.Digest(ObjectDigest)
 import           Database.Esqueleto
+import           Database.Persist.Sqlite(runSqlite)
 import           Data.Foldable(toList)
 import qualified Data.Text as T
-import           GI.Gio(noCancellable)
-import           GI.OSTree(IsRepo, repoRegenerateSummary)
+import           Data.Text.Encoding(decodeUtf8)
 import           Network.URI(URI(..))
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
@@ -84,33 +89,42 @@ buildImported sigs =
 -- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
 -- information into the mddb.  The return value is whether or not an import occurred.  This is not the
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
-consume :: (IsRepo a, MonadIO m, MonadBaseControl IO m, MonadError String m) => a -> FilePath -> Consumer RPM m Bool
+consume :: ContentStore -> FilePath -> Consumer RPM CsMonad Bool
 consume repo db = await >>= \case
-    Just rpm -> lift $ checkAndRunSqlite (T.pack db) $ ifM (rpmExistsInMDDB rpm)
-                                                           (return False)
-                                                           (unsafeConsume repo rpm)
+    Just rpm -> do imported <- lift $ runSqlite (T.pack db) (rpmExistsInMDDB rpm)
+                   if imported then return False else unsafeConsume repo db rpm
     Nothing  -> return False
 
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only,
 -- but that might change in the future.  If so, its type should also change to be a Consumer.
-unsafeConsume :: (IsRepo a, MonadIO m) => a -> RPM -> SqlPersistT m Bool
-unsafeConsume repo rpm@RPM{..} = do
-   let name = maybe "Unknown RPM" T.pack (findStringTag "Name" (headerTags $ head rpmHeaders))
+unsafeConsume :: ContentStore -> FilePath -> RPM -> Consumer RPM CsMonad Bool
+unsafeConsume repo db rpm = do
+    -- One source that takes an RPM, extracts its payload, and decompresses it.
+    let src       = yield rpm .| payloadContentsC
+    -- The first conduit just extracts filenames out of each cpio entry.
+        filenames = CL.map (decodeUtf8 . cpioFileName) .| sinkList
+    -- The second conduit extracts each file from a cpio entry, stores it in the content store,
+    -- and returns its digest.
+        digests   = CL.map cpioFileData .| storeLazyByteStringC repo .| sinkList
 
-   checksum <- liftIO $ withTransaction repo $ \r -> do
-       f <- store r rpmArchive
-       commit r f (T.concat ["Import of ", name, " into the repo"]) Nothing
+    -- And then those two conduits run in parallel and the results are packaged up together so
+    -- we have filenames and their digests matched up.
+    result <- liftIO $ runExceptT $ runConduitRes $ src
+                    .| getZipConduit ((,) <$> ZipConduit filenames
+                                          <*> ZipConduit digests)
 
-   repoRegenerateSummary repo Nothing noCancellable
+    -- checksums comes back as a ([filename], [digest]).  We need to turn that around
+    -- to be [(filename, digest]).
+    checksums <- either throwError (return . uncurry zip) result
 
-   checksums <- liftIO $ execStateT (commitContents repo checksum) []
-   loadIntoMDDB rpm checksums
+    lift $ runSqlite (T.pack db) $
+        loadIntoMDDB rpm checksums
 
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
 -- package already exists in the mddb.
-loadIntoMDDB :: MonadIO m => RPM -> [(T.Text, T.Text)] -> SqlPersistT m Bool
+loadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, ObjectDigest)] -> SqlPersistT m Bool
 loadIntoMDDB rpm checksums =
     ifM (rpmExistsInMDDB rpm)
         (return False)
@@ -119,7 +133,7 @@ loadIntoMDDB rpm checksums =
 -- Like loadIntoMDDB, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
 -- that might change in the future.
-unsafeLoadIntoMDDB :: MonadIO m => RPM -> [(T.Text, T.Text)] -> SqlPersistT m Bool
+unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, ObjectDigest)] -> SqlPersistT m Bool
 unsafeLoadIntoMDDB RPM{..} checksums = do
     let sigHeaders = headerTags $ head rpmSignatures
     let tagHeaders = headerTags $ head rpmHeaders
@@ -164,13 +178,20 @@ loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
-    result <- runExceptT $ runConduitRes (pipeline repo db uri)
+
+    -- Ideally, this would all be one big conduit.  However, I can't figure out how to make that work
+    -- when parseRPMC returns one type of error (MonadError ParseError) and consume returns some other
+    -- type of error (CsError, hiding in CsMonad).  There doesn't appear to be any good way to
+    -- transform error types.  Thus, it's exploded out into two distinct steps.
+    result <- runExceptT $ runConduitRes $ getFromURI uri .| parseRPMC .| CL.head
     case result of
-        Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
-        Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e
-        _          -> return ()
- where
-    pipeline r d f = getFromURI f .| parseRPMC .| consume r d
+        Left e           -> liftIO $ putStrLn $ "Error fetching " ++ uriPath uri ++ ": " ++ show e
+        Right (Just rpm) -> do
+            result' <- liftIO $ runExceptT $ runConduitRes $ yield rpm .| consume repo db
+            case result' of
+                Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
+                Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e
+                _          -> return ()
 
 -- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
 -- from being added to the content store a second time.  Note that loadIntoMDDB also performs this

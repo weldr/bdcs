@@ -1,7 +1,7 @@
 module Import.State(ImportState(..))
  where
 
-import GI.OSTree(Repo)
+import Data.ContentStore(ContentStore)
 
 data ImportState = ImportState { stDB :: FilePath,
-                                 stRepo :: Repo }
+                                 stRepo :: ContentStore }
