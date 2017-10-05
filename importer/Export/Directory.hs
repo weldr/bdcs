@@ -13,7 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -22,9 +21,8 @@ module Export.Directory(directorySink)
 
 import           Control.Conditional(unlessM)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.Trans.Resource(runResourceT)
-import           Data.Conduit((.|), Consumer, await, runConduit)
-import           Data.Conduit.Binary(sinkFile)
+import qualified Data.ByteString as BS
+import           Data.Conduit(Consumer, awaitForever)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           System.Directory(createDirectoryIfMissing, doesPathExist, setModificationTime)
@@ -34,43 +32,39 @@ import           System.Posix.Types(CMode(..))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
-import           Utils.Conduit(sourceInputStream)
 
 directorySink :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
-directorySink outPath = await >>= \case
-    Nothing                         -> return ()
-    Just (f, CS.DirMeta dirmeta)    -> liftIO (checkoutDir f dirmeta)  >> directorySink outPath
-    Just (f, CS.FileObject fileObj) -> liftIO (checkoutFile f fileObj) >> directorySink outPath
+directorySink outPath = awaitForever $ \obj -> case obj of
+    (f, CS.DirObject)     -> liftIO (checkoutDir f)
+    (f, CS.FileObject bs) -> liftIO (checkoutFile f bs)
  where
-    checkoutDir :: Files -> CS.Metadata -> IO ()
-    checkoutDir f@Files{..} metadata = do
+    checkoutDir :: Files -> IO ()
+    checkoutDir f@Files{..} = do
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
         -- create the directory if it isn't there already
         createDirectoryIfMissing True fullPath
 
-        setMetadata f fullPath metadata
+        setMetadata f fullPath
 
-    checkoutFile :: Files -> CS.FileContents -> IO ()
-    checkoutFile f@Files{..} CS.FileContents{..} = do
+    checkoutFile :: Files -> BS.ByteString -> IO ()
+    checkoutFile f@Files{..} contents = do
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
         createDirectoryIfMissing True $ takeDirectory fullPath
 
         -- Write the data or the symlink, depending
         -- Skip creating the symbolic link if the target already exists
-        case (symlink, contents) of
-            (Just symlinkTarget, _) -> unlessM (doesPathExist fullPath) (createSymbolicLink (T.unpack symlinkTarget) fullPath)
-            (_, Just c)             -> do
-                runResourceT $ runConduit $ sourceInputStream c .| sinkFile fullPath
-                setMetadata f fullPath metadata
-            -- TODO?
-            _                       -> return ()
+        case (filesTarget, contents) of
+            (Just target, _) -> unlessM (doesPathExist fullPath) (createSymbolicLink (T.unpack target) fullPath)
+            (_, c)           -> do
+                BS.writeFile fullPath c
+                setMetadata f fullPath
 
-    setMetadata :: Files -> FilePath -> CS.Metadata -> IO ()
-    setMetadata Files{..} fullPath CS.Metadata{..} = do
+    setMetadata :: Files -> FilePath -> IO ()
+    setMetadata Files{..} fullPath = do
         -- set the mode
-        setFileMode fullPath (CMode mode)
+        setFileMode fullPath (CMode $ fromIntegral filesMode)
 
         -- set the mtime
         setModificationTime fullPath (posixSecondsToUTCTime $ realToFrac filesMtime)

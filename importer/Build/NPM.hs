@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Build.NPM(rebuildNPM)
@@ -23,14 +24,13 @@ import           Control.Exception.Lifted(bracket)
 import           Control.Monad(forM_, void, when)
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.State(execStateT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Bifunctor(bimap)
 import           Data.Conduit((.|), runConduit)
+import           Data.ContentStore(ContentStore, runCsMonad, storeDirectory)
 import qualified Data.Text as T
 import           Data.Time.Clock(getCurrentTime)
 import           Database.Esqueleto
-import           GI.OSTree(IsRepo)
 import           Shelly(shelly, cp_r, fromText)
 import           System.Directory(createDirectory, createDirectoryIfMissing, listDirectory, removePathForcibly)
 import           System.FilePath((</>), joinPath)
@@ -38,14 +38,14 @@ import           System.IO.Temp(createTempDirectory)
 import           System.Posix.Files(createSymbolicLink)
 
 import BDCS.Builds(insertBuild, insertBuildKeyValue)
-import BDCS.CS(commit, commitContents, commitContentToFile, filesToObjectsC, storeDirectory, withTransaction)
+import BDCS.CS(commitContentToFile, filesToObjectsC)
 import BDCS.DB
 import BDCS.Files(associateFilesWithBuild, insertFiles, sourceIdToFiles)
 import BDCS.KeyType
 import BDCS.NPM.SemVer(SemVer, SemVerRangeSet, parseSemVer, parseSemVerRangeSet, satisfies, toText)
 import Export.Directory(directorySink)
 
-rebuildNPM :: (IsRepo a, MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => a -> Key Sources -> SqlPersistT m [Key Builds]
+rebuildNPM :: (MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => ContentStore -> Key Sources -> SqlPersistT m [Key Builds]
 rebuildNPM repo sourceId = do
     -- get the name and version for this source
     (name, version) <- getNameVer
@@ -148,12 +148,12 @@ rebuildNPM repo sourceId = do
                 mapM_ (createDepLink module_dir) depList
 
                 -- Import this directory into the content store
-                commitChecksum <- withTransaction repo $ \r -> do
-                    f <- storeDirectory r importPath
-                    commit r f (T.concat ["Import of build of NPM package ", name, "@", ver]) Nothing
-
-                -- Get the list of files we just imported
-                checksums <- execStateT (commitContents repo commitChecksum) []
+                -- FIXME:  storeDirectory returns an ExceptT, which could include an error value.  I don't know how to
+                -- propagate an error all the way out of this function, so for now just return an empty list.  At least
+                -- that way we won't do anything.
+                checksums <- runCsMonad (storeDirectory repo importPath) >>= \case
+                    Left _  -> return []
+                    Right c -> return $ map (\(fp, d) -> (T.pack fp, T.pack $ show d)) c
 
                 -- Convert the commit contents to Files records
                 mapM (commitContentToFile importPath) checksums

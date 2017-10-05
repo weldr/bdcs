@@ -27,26 +27,24 @@ import           Control.Monad.Catch(MonadThrow)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
-import           Control.Monad.State(execStateT)
 import           Control.Monad.Trans.Resource(MonadBaseControl)
 import           Data.Aeson(FromJSON(..), Object, Value(..), (.:), (.:?), (.!=), eitherDecode, withObject, withText)
 import           Data.Aeson.Types(Parser, typeMismatch)
 import qualified Data.ByteString.Lazy as BSL
 import           Data.Conduit((.|), runConduitRes)
 import           Data.Conduit.Binary(sinkLbs)
+import           Data.ContentStore(ContentStore, runCsMonad, storeDirectory)
 import qualified Data.HashMap.Lazy as HM
 import           Data.List(isPrefixOf)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Database.Persist.Sql(SqlPersistT)
-import           GI.Gio(noCancellable)
-import           GI.OSTree(IsRepo, repoRegenerateSummary)
 import           Network.URI(URI(..), URIAuth(..), nullURI, parseURI, relativeTo)
 import           System.FilePath((</>), makeRelative, normalise, takeDirectory, takeFileName)
 import           System.IO.Temp(withSystemTempDirectory)
 import           Text.Regex.PCRE((=~))
 
-import BDCS.CS(commit, commitContents, commitContentToFile, storeDirectory, withTransaction)
+import BDCS.CS(commitContentToFile)
 import BDCS.DB
 import BDCS.Files(associateFilesWithSource, insertFiles)
 import BDCS.KeyType
@@ -170,16 +168,16 @@ readRegistryJSON pkgname = do
     jsonData <- runConduitRes $ getFromURI uri .| sinkLbs
     either throwError return $ eitherDecode jsonData
 
-importNPMDirToCS :: (MonadError String m, MonadIO m, IsRepo a) => a -> FilePath -> m (T.Text, PackageJSON)
+importNPMDirToCS :: (MonadError String m, MonadIO m) => ContentStore -> FilePath -> m ([(T.Text, T.Text)], PackageJSON)
 importNPMDirToCS repo path = do
     -- Parse the package.json file
     jsonData <- liftIO $ BSL.readFile $ path </> "package.json"
     json <- either throwError return $ eitherDecode jsonData
 
-    liftIO $ withTransaction repo $ \r -> do
-        f <- storeDirectory r path
-        c <- commit r f (T.concat ["Import of NPM package ", packageName json, "@", packageVersion json, " into the repo"]) Nothing
-        return (c, json)
+    result <- liftIO $ runCsMonad (storeDirectory repo path)
+    case result of
+        Left e  -> throwError (show e)
+        Right c -> return (map (\(fp, d) -> (T.pack fp, T.pack $ show d)) c, json)
 
 loadIntoMDDB :: MonadIO m => PackageJSON -> [Files] -> SqlPersistT m (Key Sources)
 loadIntoMDDB PackageJSON{..} files = do
@@ -280,20 +278,14 @@ loadFromURI uri@URI{..} = do
             let packagePath = path </> "package"
 
             -- import the temp directory into the content store
-            (commitChecksum, packageJson) <- importNPMDirToCS repo packagePath
-
-            -- get the list of files we just imported into the content store
-            checksums <- liftIO (execStateT (commitContents repo commitChecksum) [])
+            (commitChecksums, packageJson) <- importNPMDirToCS repo packagePath
 
             -- gather the metadata for all of paths as Files DB objects
-            files <- liftIO $ mapM (commitContentToFile packagePath) checksums
+            files <- liftIO $ mapM (commitContentToFile packagePath) commitChecksums
 
             -- import the npm data into the mddb
             checkAndRunSqlite (T.pack db) $ do
                 sourceId <- loadIntoMDDB packageJson files
                 void $ rebuildNPM repo sourceId
-
-            -- regenerate the content store summary
-            liftIO $ repoRegenerateSummary repo Nothing noCancellable
 
     whenLeft result (\e -> liftIO $ print $ "Error importing " ++ show uri ++ ": " ++ show e)
