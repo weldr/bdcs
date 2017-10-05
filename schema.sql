@@ -152,7 +152,8 @@ create table files (
     mtime integer not null,
     cs_object text,
     mode integer not null,
-    size integer not null
+    size integer not null,
+    target text
 );
 create index files_path_idx on files(path);
 

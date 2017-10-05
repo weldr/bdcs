@@ -21,7 +21,7 @@ module BDCS.RPM.Files(mkFiles)
 import           Codec.RPM.Tags(Tag, findWord16ListTag, findWord32ListTag, findStringListTag, findTag, tagValue)
 import           Control.Monad.IO.Class(MonadIO)
 import           Data.ContentStore.Digest(ObjectDigest)
-import           Data.List(zip6)
+import           Data.List(zip7)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
 import           Data.Word(Word32)
@@ -30,16 +30,16 @@ import           System.FilePath.Posix((</>))
 
 import BDCS.DB
 
-type FileTuple = (T.Text, T.Text, T.Text, Int, Int, Int)
+type FileTuple = (T.Text, T.Text, T.Text, Int, Int, Int, Maybe T.Text)
 
 mkFiles :: MonadIO m => [Tag] -> [(T.Text, ObjectDigest)] -> SqlPersistT m [Files]
 mkFiles rpm checksums =
     mapM mkOneFile (zipFiles rpm)
  where
     mkOneFile :: MonadIO m => FileTuple -> SqlPersistT m Files
-    mkOneFile (path, user, group, mtime, mode, size) = do
+    mkOneFile (path, user, group, mtime, mode, size, target) = do
         let cksum = fmap (T.pack . show) (lookup path checksums)
-        return $ Files path user group mtime cksum mode size
+        return $ Files path user group mtime cksum mode size target
 
     filePaths :: [Tag] -> [FilePath]
     filePaths tags = let
@@ -57,5 +57,7 @@ mkFiles rpm checksums =
         mtimes  = fromMaybe [] $ findTag "FileMTimes" tags    >>= \t -> (tagValue t :: Maybe [Word32]) >>= Just . map fromIntegral
         modes   = map fromIntegral $ findWord16ListTag "FileModes" tags
         sizes   = map fromIntegral $ findWord32ListTag "FileSizes" tags
+        targets = map (\t -> if t == "" then Nothing else Just $ T.pack t)
+                      (findStringListTag "FileLinkTos" tags)
      in
-        zip6 paths users groups mtimes modes sizes
+        zip7 paths users groups mtimes modes sizes targets

@@ -108,6 +108,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     cs_object T.Text Maybe
     mode Int
     size Int
+    target T.Text Maybe
     deriving Eq Show
  SourceFiles
     source_id SourcesId

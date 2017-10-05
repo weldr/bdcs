@@ -30,7 +30,7 @@ import           GI.Gio
 import           GI.OSTree
 import           System.Endian(fromBE32)
 import           System.FilePath((</>), isAbsolute, makeRelative, normalise)
-import           System.Posix.Files(getSymbolicLinkStatus, modificationTimeHiRes)
+import           System.Posix.Files(getFileStatus, getSymbolicLinkStatus, isSymbolicLink, modificationTimeHiRes, readSymbolicLink)
 import           System.Posix.Types(CMode(..))
 
 import BDCS.DB
@@ -179,6 +179,10 @@ commitContentToFile prefix (path, checksum) = do
     stat <- getSymbolicLinkStatus fullPath
     let mtime = floor $ modificationTimeHiRes stat
 
+    target <- ifM (isSymbolicLink <$> getFileStatus fullPath)
+                  (Just <$> readSymbolicLink fullPath)
+                  (return Nothing)
+
     -- TODO user/group/mode/size
 
-    return $ Files (T.pack ("/" </> relativePath)) "root" "root" mtime (Just checksum) 0 0
+    return $ Files (T.pack ("/" </> relativePath)) "root" "root" mtime (Just checksum) 0 0 (fmap T.pack target)
