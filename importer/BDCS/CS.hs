@@ -179,6 +179,6 @@ commitContentToFile prefix (path, checksum) = do
     stat <- getSymbolicLinkStatus fullPath
     let mtime = floor $ modificationTimeHiRes stat
 
-    -- TODO user/group
+    -- TODO user/group/mode/size
 
-    return $ Files (T.pack ("/" </> relativePath)) "root" "root" mtime (Just checksum)
+    return $ Files (T.pack ("/" </> relativePath)) "root" "root" mtime (Just checksum) 0 0

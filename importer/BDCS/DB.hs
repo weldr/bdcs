@@ -54,7 +54,7 @@ import BDCS.ReqType
 
 -- This must match the PRAGMA user_version value in schema.sql
 schemaVersion :: Int64
-schemaVersion = 2
+schemaVersion = 3
 
 getDbVersion :: MonadIO m => SqlPersistT m Int64
 getDbVersion = unSingle <$> head <$> rawSql "pragma user_version" []
@@ -106,6 +106,8 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_group T.Text
     mtime Int
     cs_object T.Text Maybe
+    mode Int
+    size Int
     deriving Eq Show
  SourceFiles
     source_id SourcesId
