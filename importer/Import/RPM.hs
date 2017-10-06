@@ -43,10 +43,9 @@ import           Data.CPIO(Entry(..))
 import           Data.Conduit((.|), Consumer, ZipConduit(..), await, runConduit, runConduitRes, yield)
 import           Data.Conduit.Combinators(sinkList)
 import qualified Data.Conduit.List as CL
-import           Data.ContentStore(ContentStore, CsMonad, runCsMonad, storeLazyByteStringC)
+import           Data.ContentStore(ContentStore, CsError(..), CsMonad, runCsMonad, storeLazyByteStringC)
 import           Data.ContentStore.Digest(ObjectDigest)
 import           Database.Esqueleto
-import           Database.Persist.Sqlite(runSqlite)
 import           Data.Foldable(toList)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
@@ -90,8 +89,11 @@ buildImported sigs =
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
 consume :: ContentStore -> FilePath -> Consumer RPM CsMonad Bool
 consume repo db = await >>= \case
-    Just rpm -> do imported <- lift $ runSqlite (T.pack db) (rpmExistsInMDDB rpm)
-                   if imported then return False else unsafeConsume repo db rpm
+    Just rpm -> do imported <- lift $ runExceptT $ checkAndRunSqlite (T.pack db) (rpmExistsInMDDB rpm)
+                   case imported of
+                       Left e      -> throwError (CsError $ show e)
+                       Right True  -> return False
+                       Right False -> unsafeConsume repo db rpm
     Nothing  -> return False
 
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
@@ -119,8 +121,10 @@ unsafeConsume repo db rpm = do
     -- to be [(filename, digest]).
     checksums <- either throwError (return . uncurry zip) result
 
-    lift $ runSqlite (T.pack db) $
-        loadIntoMDDB rpm checksums
+    loaded <- lift $ runExceptT $ checkAndRunSqlite (T.pack db) (loadIntoMDDB rpm checksums)
+    case loaded of
+        Left e  -> throwError (CsError $ show e)
+        Right v -> return v
 
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
