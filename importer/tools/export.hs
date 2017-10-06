@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -23,6 +24,7 @@ import           Control.Monad.Except(runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit(Consumer, (.|), runConduit)
 import qualified Data.Conduit.List as CL
+import           Data.ContentStore(openContentStore, runCsMonad)
 import           Data.List(isSuffixOf, isPrefixOf, partition)
 import qualified Data.Text as T
 import           System.Directory(doesFileExist, removePathForcibly)
@@ -87,9 +89,12 @@ main = do
     when (length argv < 4) usage
 
     let db_path = T.pack (argv !! 0)
-    repo <- CS.open (argv !! 1)
     let out_path = argv !! 2
     allThings <- expandFileThings $ drop 3 argv
+
+    repo <- runCsMonad (openContentStore (argv !! 1)) >>= \case
+        Left e  -> print e >> exitFailure
+        Right r -> return r
 
     let (match, otherThings) = partition (isPrefixOf "filesystem-") allThings
     when (length match < 1) needFilesystem
