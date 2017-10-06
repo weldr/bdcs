@@ -89,11 +89,11 @@ buildImported sigs =
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
 consume :: ContentStore -> FilePath -> Consumer RPM CsMonad Bool
 consume repo db = await >>= \case
-    Just rpm -> do imported <- lift $ runExceptT $ checkAndRunSqlite (T.pack db) (rpmExistsInMDDB rpm)
-                   case imported of
-                       Left e      -> throwError (CsError $ show e)
-                       Right True  -> return False
-                       Right False -> unsafeConsume repo db rpm
+    Just rpm ->
+        lift (runExceptT $ checkAndRunSqlite (T.pack db) (rpmExistsInMDDB rpm)) >>= \case
+            Left e      -> throwError (CsError $ show e)
+            Right True  -> return False
+            Right False -> unsafeConsume repo db rpm
     Nothing  -> return False
 
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
@@ -121,8 +121,7 @@ unsafeConsume repo db rpm = do
     -- to be [(filename, digest]).
     checksums <- either throwError (return . uncurry zip) result
 
-    loaded <- lift $ runExceptT $ checkAndRunSqlite (T.pack db) (loadIntoMDDB rpm checksums)
-    case loaded of
+    lift (runExceptT $ checkAndRunSqlite (T.pack db) (loadIntoMDDB rpm checksums)) >>= \case
         Left e  -> throwError (CsError $ show e)
         Right v -> return v
 
@@ -188,12 +187,10 @@ loadFromURI uri = do
     -- when parseRPMC returns one type of error (MonadError ParseError) and consume returns some other
     -- type of error (CsError, hiding in CsMonad).  There doesn't appear to be any good way to
     -- transform error types.  Thus, it's exploded out into two distinct steps.
-    result <- runExceptT $ runConduitRes $ getFromURI uri .| parseRPMC .| CL.head
-    case result of
+    runExceptT (runConduitRes $ getFromURI uri .| parseRPMC .| CL.head) >>= \case
         Left e           -> liftIO $ putStrLn $ "Error fetching " ++ uriPath uri ++ ": " ++ show e
-        Right (Just rpm) -> do
-            result' <- liftIO $ runCsMonad $ runConduit $ yield rpm .| consume repo db
-            case result' of
+        Right (Just rpm) ->
+            liftIO (runCsMonad $ runConduit $ yield rpm .| consume repo db) >>= \case
                 Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
                 Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e
                 _          -> return ()
