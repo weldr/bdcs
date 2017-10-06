@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -37,9 +38,8 @@ filesToObjectsC repo = awaitForever $ \f@Files{..} -> case filesCs_object of
     -- FIXME:  Is that a valid assumption?  Could there ever be a row without a
     -- reference that is completely invalid?
     Nothing    -> yield (f, DirObject)
-    Just cksum -> do
-        result <- liftIO $ runCsMonad $ fetchByteString repo (T.unpack cksum)
-        case result of
+    Just cksum ->
+        liftIO (runCsMonad $ fetchByteString repo (T.unpack cksum)) >>= \case
             Left e    -> throwError (show e)
             Right obj -> yield (f, FileObject obj)
 
