@@ -7,8 +7,7 @@
 import           Control.Conditional(unlessM)
 import           Control.Exception(Handler(..), catches, throw)
 import           Control.Monad(forM_)
-import           Control.Monad.Except(MonadError, runExceptT)
-import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.Except(runExceptT)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
 import           Data.Aeson.Encode.Pretty(encodePretty)
 import           Data.ByteString.Lazy(toStrict)
@@ -19,23 +18,21 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
 import           Data.Time.Format(defaultTimeLocale, formatTime)
-import           GI.OSTree(IsRepo)
 import           System.Console.GetOpt
-import           System.Directory(doesDirectoryExist, doesFileExist)
+import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           Text.Printf(printf)
 import           Text.Regex.PCRE((=~))
 
-import           BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
-import qualified BDCS.CS as CS
-import           BDCS.Files(filesC, getKeyValuesForFile)
-import           BDCS.KeyType(KeyType(..))
-import           BDCS.KeyValue(keyValueListToJSON)
-import           BDCS.Label.Types(Label, labelDescriptions)
-import           BDCS.Version
-import           Utils.Either(whenLeft)
-import           Utils.Mode(modeAsText)
+import BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
+import BDCS.Files(filesC, getKeyValuesForFile)
+import BDCS.KeyType(KeyType(..))
+import BDCS.KeyValue(keyValueListToJSON)
+import BDCS.Label.Types(Label, labelDescriptions)
+import BDCS.Version
+import Utils.Either(whenLeft)
+import Utils.Mode(modeAsText)
 
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
@@ -59,51 +56,40 @@ defaultLsOptions = LsOptions { lsJSONOutput = False,
 
 data LsRow = LsRow { rowFiles :: Files,
                      rowKeyVals :: Maybe [KeyVal],
-                     rowMetadata :: Maybe CS.Object }
+                     rowUseMetadata :: Bool }
 
 instance ToJSON LsRow where
     toJSON r = let namePair = T.pack "path" .= toJSON (filesPath $ rowFiles r)
                    keyvals  = maybe [] keyValueListToJSON (rowKeyVals r)
-                   optional = catMaybes [ -- You may be tempted to rewrite the beginnings of these as "fileTypeString (rowMetadata r)",
-                                          -- but don't.  We first want to check that there is any rowMetadata and if not, return Nothing.
-                                          -- Doing it the other way passes Nothing to fileTypeString, which is set up to return something
-                                          -- when given Nothing.
-                                          rowMetadata r >>= fileTypeString . Just >>= \ty     -> Just $ T.pack "fileType" .= toJSON ty,
-                                          rowMetadata r >>= csMetadata . Just     >>= \md     -> Just $ T.pack "mode" .= toJSON (CS.mode md),
-                                          rowMetadata r >>= csMetadata . Just     >>= \md     -> Just $ T.pack "size" .= toJSON (CS.size md),
-                                          rowMetadata r >>= symlinkTarget . Just  >>= \target -> Just $ T.pack "symlinkTarget" .= toJSON target,
+                   optional = if not (rowUseMetadata r) then [] else catMaybes [
+                       fileTypeString (rowFiles r)   >>= \ty     -> Just $ T.pack "fileType" .= toJSON ty,
+                       Just $ T.pack "mode" .= toJSON (filesMode $ rowFiles r),
+                       Just $ T.pack "size" .= toJSON (filesSize $ rowFiles r),
+                       symlinkTarget (rowFiles r)    >>= \target -> Just $ T.pack "symlinkTarget" .= toJSON target,
 
-                                          -- rowMetadata is only here as a test, which is why the result is thrown away.
-                                          -- If rowMetadata is not Nothing, it means we were told to be verbose.  We only
-                                          -- want to display user and group in verbose mode.
-                                          rowMetadata r >>= \_ -> Just $ T.pack "user" .= toJSON (filesFile_user $ rowFiles r),
-                                          rowMetadata r >>= \_ -> Just $ T.pack "group" .= toJSON (filesFile_group $ rowFiles r),
+                       Just $ T.pack "user"  .= toJSON (filesFile_user $ rowFiles r),
+                       Just $ T.pack "group" .= toJSON (filesFile_group $ rowFiles r),
 
-                                          -- Don't do any special formatting of the mtime - leave that up to the consumer.
-                                          rowMetadata r >>= \_ -> Just $ T.pack "mtime" .= toJSON (filesMtime $ rowFiles r)
-                               ]
+                       -- Don't do any special formatting of the mtime - leave that up to the consumer.
+                       Just $ T.pack "mtime" .= toJSON (filesMtime $ rowFiles r)
+                    ]
                in
                    object $ [namePair] ++ keyvals ++ optional
 
 initRow :: Files -> LsRow
 initRow f = LsRow { rowFiles=f,
-                    rowMetadata=Nothing,
+                    rowUseMetadata=False,
                     rowKeyVals=Nothing }
 
-fileType :: Maybe CS.Object -> Maybe Char
-fileType (Just (CS.DirMeta _)) = Just 'd'
-fileType (Just (CS.FileObject CS.FileContents{symlink=Just _})) = Just 'l'
+fileType :: Files -> Maybe Char
+fileType Files{filesCs_object=Nothing, ..} = Just 'd'
+fileType Files{filesTarget=Just _, ..} = Just 'l'
 fileType _ = Nothing
 
-fileTypeString :: Maybe CS.Object -> Maybe String
-fileTypeString (Just (CS.DirMeta _)) = Just "Directory"
-fileTypeString (Just (CS.FileObject CS.FileContents{symlink=Just _})) = Just "Symlink"
+fileTypeString :: Files -> Maybe String
+fileTypeString Files{filesCs_object=Nothing, ..} = Just "Directory"
+fileTypeString Files{filesTarget=Just _, ..} = Just "Symlink"
 fileTypeString _ = Just "File"
-
-csMetadata :: Maybe CS.Object -> Maybe CS.Metadata
-csMetadata (Just (CS.DirMeta metadata)) = Just metadata
-csMetadata (Just (CS.FileObject CS.FileContents{metadata})) = Just metadata
-csMetadata _ = Nothing
 
 -- Figure out how to format the file's time.  If the time is in the current year, display
 -- month, day, and hours/minutes.  If the time is in any other year, display that year
@@ -118,17 +104,16 @@ showTime currentYear mtime = let
  in
     formatTime defaultTimeLocale fmt utcMtime
 
-symlinkTarget :: Maybe CS.Object -> Maybe String
-symlinkTarget (Just (CS.FileObject CS.FileContents{symlink=Just x})) = Just $ T.unpack x
+symlinkTarget :: Files -> Maybe String
+symlinkTarget Files{filesTarget=Just x, ..} = Just $ T.unpack x
 symlinkTarget _ = Nothing
 
 keyValToLabel :: KeyVal -> Maybe Label
 keyValToLabel KeyVal {keyValKey_value=LabelKey x} = Just x
 keyValToLabel _                                   = Nothing
 
-runCommand :: T.Text -> FilePath -> [String] -> IO (Either String ())
-runCommand db repoPath args = do
-    repo <- CS.open repoPath
+runCommand :: T.Text -> [String] -> IO (Either String ())
+runCommand db args = do
     (opts, _) <- compilerOpts options defaultLsOptions args "ls"
 
     printer <- if | lsJSONOutput opts -> return $ liftedPutStrLn . jsonPrinter
@@ -142,9 +127,7 @@ runCommand db repoPath args = do
         -- Convert them into LsRow records containing only the Files record.
                .| CL.map    initRow
         -- If we were asked for verbose output, add that to the LsRow.
-               .| CL.mapM   (\row -> if lsVerbose opts then do
-                                         md <- getMetadata repo (rowFiles row)
-                                         return $ row { rowMetadata=md }
+               .| CL.mapM   (\row -> if lsVerbose opts then return row { rowUseMetadata=True }
                                      else return row)
         -- keyval output comes up in two different ways:  If we were
         -- given the --keyval flag, we want to add them to the LsRow,
@@ -184,11 +167,6 @@ runCommand db repoPath args = do
                "return only results that match REGEX"
      ]
 
-    getMetadata :: (IsRepo a, MonadIO m, MonadError String m) => a -> Files -> m (Maybe CS.Object)
-    getMetadata repo Files{..} = case filesCs_object of
-        Nothing    -> return Nothing
-        Just cksum -> Just <$> CS.load repo cksum
-
     jsonPrinter :: LsRow -> T.Text
     jsonPrinter = decodeUtf8 . toStrict . encodePretty
 
@@ -201,12 +179,12 @@ runCommand db repoPath args = do
     verbosePrinter :: String -> LsRow -> T.Text
     verbosePrinter currentYear LsRow{..} = T.pack $
         printf "%c%s %8s %8s %10Ld %s %s%s%s"
-               (fromMaybe '-' (fileType rowMetadata))
-               (maybe "--ghost--" (T.unpack . modeAsText . CS.mode) (csMetadata rowMetadata))
+               (fromMaybe '-' (fileType rowFiles))
+               (if rowUseMetadata then T.unpack $ modeAsText $ fromIntegral $ filesMode rowFiles else "--ghost--")
                (T.unpack $ filesFile_user rowFiles) (T.unpack $ filesFile_group rowFiles)
-               (maybe 0 CS.size (csMetadata rowMetadata))
+               (if rowUseMetadata then filesSize rowFiles else 0)
                (showTime currentYear $ filesMtime rowFiles)
-               (filesPath rowFiles) (maybe "" (" -> " ++) (symlinkTarget rowMetadata))
+               (filesPath rowFiles) (maybe "" (" -> " ++) (symlinkTarget rowFiles))
                (maybe "" formatKeyValList rowKeyVals)
 
 usage :: IO ()
@@ -223,14 +201,11 @@ runMain = do
     argv <- getArgs
     case commandLineArgs argv of
         Nothing               -> usage
-        Just (db, repo, args) -> do
+        Just (db, _, args) -> do
             unlessM (doesFileExist db) $
                 throw MissingDBError
 
-            unlessM (doesDirectoryExist repo) $
-                throw MissingCSError
-
-            result <- runCommand (T.pack db) repo args
+            result <- runCommand (T.pack db) args
             whenLeft result print
 
 main :: IO ()
