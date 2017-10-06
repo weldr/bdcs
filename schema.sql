@@ -1,6 +1,6 @@
 -- Increment this number any time the schema is changed, and update schemaVersion
 -- in BDCS/DB.hs
-PRAGMA user_version = 2;
+PRAGMA user_version = 3;
 
 -- This describes the schema used by the metadata database (mddb).  We
 -- considered several options for how to implement the mddb, finally deciding
