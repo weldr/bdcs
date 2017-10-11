@@ -14,39 +14,34 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
 
 module Build.NPM(rebuildNPM)
  where
 
-import           Control.Exception.Lifted(bracket)
 import           Control.Monad(forM_, void, when)
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Bifunctor(bimap)
-import           Data.Conduit((.|), runConduit)
-import           Data.ContentStore(ContentStore, runCsMonad, storeDirectory)
+import           Data.Bits((.|.))
+import           Data.Conduit(sourceToList)
 import qualified Data.Text as T
-import           Data.Time.Clock(getCurrentTime)
+import           Data.Time.Clock(UTCTime, getCurrentTime)
+import           Data.Time.Clock.POSIX(utcTimeToPOSIXSeconds)
 import           Database.Esqueleto
-import           Shelly(shelly, cp_r, fromText)
-import           System.Directory(createDirectory, createDirectoryIfMissing, listDirectory, removePathForcibly)
-import           System.FilePath((</>), joinPath)
-import           System.IO.Temp(createTempDirectory)
-import           System.Posix.Files(createSymbolicLink)
+import           System.FilePath((</>), joinPath, makeRelative, splitDirectories)
+import           System.Posix.Files(directoryMode, symbolicLinkMode)
 
 import BDCS.Builds(insertBuild, insertBuildKeyValue)
-import BDCS.CS(commitContentToFile, filesToObjectsC)
 import BDCS.DB
-import BDCS.Files(associateFilesWithBuild, insertFiles, sourceIdToFiles)
+import BDCS.Files(associateFilesWithBuild, insertFile, sourceIdToFiles)
 import BDCS.KeyType
 import BDCS.NPM.SemVer(SemVer, SemVerRangeSet, parseSemVer, parseSemVerRangeSet, satisfies, toText)
-import Export.Directory(directorySink)
 
-rebuildNPM :: (MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => ContentStore -> Key Sources -> SqlPersistT m [Key Builds]
-rebuildNPM repo sourceId = do
+rebuildNPM :: (MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => Key Sources -> SqlPersistT m [Key Builds]
+rebuildNPM sourceId = do
     -- get the name and version for this source
     (name, version) <- getNameVer
 
@@ -56,14 +51,18 @@ rebuildNPM repo sourceId = do
     -- to get all of the possible combinations that satisfy all dependencies.
     dependencies <- sequence <$> getDeps
 
-    -- run with a temp directory for the export
-    bracket (liftIO $ createTempDirectory "." "npm-export") (liftIO . removePathForcibly) $ \exportPath -> do
-        -- start by copying the files for the source to a temp directory
-        runConduit $ sourceIdToFiles sourceId .| filesToObjectsC repo .| directorySink exportPath
+    -- get the list of files for this source
+    sourceFiles <- sourceToList $ sourceIdToFiles sourceId
 
-        -- For each dependency list, create a new build
-        mapM (relink exportPath (name, version)) dependencies
+    -- For each dependency list, create a new build
+    mapM (relink sourceFiles (name, version)) dependencies
  where
+    copyFile :: Files -> FilePath -> Files
+    copyFile f@Files{..} newPath = let
+        basePath = makeRelative "/package" $ T.unpack filesPath
+     in
+        f {filesPath = T.pack $ newPath </> basePath}
+
     getDeps :: (MonadIO m, MonadError String m) => SqlPersistT m [[(T.Text, SemVer)]]
     getDeps = do
         -- fetch the list of dependencies
@@ -119,57 +118,48 @@ rebuildNPM repo sourceId = do
 
         return $ bimap unValue unValue $ head nv
 
-    relink :: (MonadBaseControl IO m, MonadIO m) => FilePath -> (T.Text, T.Text) -> [(T.Text, SemVer)] -> SqlPersistT m (Key Builds)
-    relink exportPath (name, ver) depList = do
-        -- Create a temp directory for the build
-        files <- bracket (liftIO $ createTempDirectory "." "npm-build") (liftIO . removePathForcibly) $ \importPath -> do
-            -- Create a directory for this module in /usr/lib/node_modules
-            -- NB: In order to allow multiple versions of an npm module to be included in the same export,
-            -- the /usr/lib/node_modules name is <module-name>@<module-version> instead of just <module-name>,
-            -- and none of the bin or man symlinks are installed to /usr/bin and /usr/share/man. It's up to the
-            -- export to determine which modules need to be accessible system-wide and to create the bin and man
-            -- symlinks and the /usr/lib/node_modules/<module-name> directory.
-            let module_dir = importPath </> "usr" </> "lib" </> "node_modules" </> T.unpack (T.concat [name, "@", ver])
+    relink :: (MonadBaseControl IO m, MonadIO m) => [Files] -> (T.Text, T.Text) -> [(T.Text, SemVer)] -> SqlPersistT m (Key Builds)
+    relink sourceFiles (name, ver) depList = do
+        buildTime <- liftIO getCurrentTime
 
-            liftIO $ do
-                createDirectoryIfMissing True module_dir
+        -- Create a directory for this module in /usr/lib/node_modules
+        -- NB: In order to allow multiple versions of an npm module to be included in the same export,
+        -- the /usr/lib/node_modules name is <module-name>@<module-version> instead of just <module-name>,
+        -- and none of the bin or man symlinks are installed to /usr/bin and /usr/share/man. It's up to the
+        -- export to determine which modules need to be accessible system-wide and to create the bin and man
+        -- symlinks and the /usr/lib/node_modules/<module-name> directory.
+        let module_dir = "/" </> "usr" </> "lib" </> "node_modules" </> T.unpack (T.concat [name, "@", ver])
 
-                -- Copy everything from the Source into the module directory
-                -- convert the paths into the other kind of FilePath so shelly can use them
-                filelist <- map (fromText . T.pack . (exportPath </>)) <$> listDirectory exportPath
-                let module_fp = fromText $ T.pack module_dir
-                shelly $ mapM_ (`cp_r` module_fp) filelist
+        -- Create the /usr/lib/node_modules/<package> directory, and a node_modules directory under that
+        moduleDirIds <- mkdirs buildTime $ module_dir </> "node_modules"
 
-                -- Create the node_modules directory for the module's dependencies
-                createDirectory $ module_dir </> "node_modules"
+        -- Copy everything from the Source into the module directory
+        packageIds <- mapM (insert . (`copyFile` module_dir)) sourceFiles
 
-                -- For each for the dependencies, create a symlink from the /usr/lib/node_modules/<name>@<version> directory
-                -- to this module's node_modules directory.
-                mapM_ (createDepLink module_dir) depList
-
-                -- Import this directory into the content store
-                -- FIXME:  storeDirectory returns an ExceptT, which could include an error value.  I don't know how to
-                -- propagate an error all the way out of this function, so for now just return an empty list.  At least
-                -- that way we won't do anything.
-                checksums <- runCsMonad (storeDirectory repo importPath) >>= \case
-                    Left _  -> return []
-                    Right c -> return $ map (\(fp, d) -> (T.pack fp, T.pack $ show d)) c
-
-                -- Convert the commit contents to Files records
-                mapM (commitContentToFile importPath) checksums
+        -- For each of the dependencies, create a symlink from the /usr/lib/node_modules/<name>@<version> directory
+        -- to this module's node_modules directory.
+        deplinkIds <- mapM (createDepLink module_dir buildTime) depList
 
         -- Create a build and add the files to it
-        createBuild files
+        createBuild $ moduleDirIds ++ packageIds ++ deplinkIds
      where
-        createDepLink module_dir (depname, depver) = let
+        createDepLink :: MonadIO m => FilePath -> UTCTime -> (T.Text, SemVer) -> SqlPersistT m (Key Files)
+        createDepLink module_dir buildTime (depname, depver) = let
             verstr = toText depver
-            source = joinPath ["/", "usr", "lib", "node_modules", T.unpack (T.concat [depname, "@", verstr])]
-            dest   = joinPath [module_dir, "node_modules", T.unpack depname]
+            source = T.pack $ joinPath ["/", "usr", "lib", "node_modules", T.unpack (T.concat [depname, "@", verstr])]
+            dest   = T.pack $ joinPath [module_dir, "node_modules", T.unpack depname]
+            link   = Files dest "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ symbolicLinkMode .|. 0o0644) 0 (Just source)
          in
-            createSymbolicLink source dest
+            insertFile link
 
-        createBuild :: MonadIO m => [Files] -> SqlPersistT m (Key Builds)
-        createBuild files = do
+        mkdirs :: MonadIO m => UTCTime -> FilePath -> SqlPersistT m [Key Files]
+        mkdirs buildTime path = mapM mkdir $ scanl1 (</>) $ splitDirectories path
+         where
+            mkdir :: MonadIO m => FilePath -> SqlPersistT m (Key Files)
+            mkdir subPath = insertFile $ Files (T.pack subPath) "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ directoryMode .|. 0o0755) 0 Nothing
+
+        createBuild :: MonadIO m => [Key Files] -> SqlPersistT m (Key Builds)
+        createBuild fids = do
             buildTime <- liftIO getCurrentTime
 
             -- There is no equivalent to epoch or release in npm, so use 0 and ""
@@ -184,7 +174,6 @@ rebuildNPM repo sourceId = do
             let build_env_ref = "BUILD_ENV_REF"
 
             buildId <- insertBuild $ Builds sourceId epoch release arch buildTime changelog build_config_ref build_env_ref
-            fids <- insertFiles files
             void $ associateFilesWithBuild fids buildId
 
             -- Record the exact-version dependencies used for this build

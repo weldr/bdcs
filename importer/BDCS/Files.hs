@@ -13,7 +13,11 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-module BDCS.Files(insertFiles,
+{-# LANGUAGE RecordWildCards #-}
+
+module BDCS.Files(findFile,
+                  insertFile,
+                  insertFiles,
                   associateFilesWithBuild,
                   associateFilesWithSource,
                   associateFilesWithPackage,
@@ -40,6 +44,24 @@ import Utils.Conduit(awaitWith)
 
 insertFiles :: MonadIO m => [Files] -> SqlPersistT m [Key Files]
 insertFiles = mapM insert
+
+insertFile :: MonadIO m => Files -> SqlPersistT m (Key Files)
+insertFile file@Files{..} =
+    findFile filesPath filesFile_user filesFile_group filesMtime filesCs_object filesMode filesSize filesTarget  `orInsert` file
+
+findFile :: MonadIO m => T.Text -> T.Text -> T.Text -> Int -> Maybe T.Text -> Int -> Int -> Maybe T.Text -> SqlPersistT m (Maybe (Key Files))
+findFile path user group mtime cs_object mode size target = firstKeyResult $
+    select $ from $ \f -> do
+    where_ $ f ^. FilesPath ==. val path &&.
+             f ^. FilesFile_user ==. val user &&.
+             f ^. FilesFile_group ==. val group &&.
+             f ^. FilesMtime ==. val mtime &&.
+             f ^. FilesCs_object ==? cs_object &&.
+             f ^. FilesMode ==. val mode &&.
+             f ^. FilesSize ==. val size &&.
+             f ^. FilesTarget ==? target
+    limit 1
+    return $ f ^. FilesId
 
 associateFilesWithBuild :: MonadIO m => [Key Files] -> Key Builds -> SqlPersistT m [Key BuildFiles]
 associateFilesWithBuild fs build =
