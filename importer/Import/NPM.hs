@@ -21,30 +21,39 @@
 module Import.NPM(loadFromURI)
  where
 
-import qualified Codec.Archive.Tar as Tar
 import           Control.Monad(void)
 import           Control.Monad.Catch(MonadThrow)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
+import           Control.Monad.State(MonadState, get, modify)
 import           Control.Monad.Trans.Resource(MonadBaseControl)
 import           Data.Aeson(FromJSON(..), Object, Value(..), (.:), (.:?), (.!=), eitherDecode, withObject, withText)
 import           Data.Aeson.Types(Parser, typeMismatch)
+import           Data.Bits((.|.))
+import qualified Data.ByteString as BS
+import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BSL
-import           Data.Conduit((.|), runConduitRes)
+import qualified Data.ByteString.Short as BSS
+import           Data.Conduit(Conduit, Consumer, ZipConduit(..), (.|), getZipConduit, runConduitRes, yield)
 import           Data.Conduit.Binary(sinkLbs)
-import           Data.ContentStore(ContentStore, runCsMonad, storeDirectory)
+import qualified Data.Conduit.Combinators as CC
+import qualified Data.Conduit.List as CL
+import           Data.Conduit.Lift(evalStateLC)
+import qualified Data.Conduit.Tar as CT
+import           Data.ContentStore(ContentStore, storeByteString)
+import           Data.ContentStore.Digest(ObjectDigest)
 import qualified Data.HashMap.Lazy as HM
 import           Data.List(isPrefixOf)
 import           Data.Maybe(fromMaybe)
 import qualified Data.Text as T
+import           Data.Text.Encoding(decodeUtf8)
 import           Database.Persist.Sql(SqlPersistT)
 import           Network.URI(URI(..), URIAuth(..), nullURI, parseURI, relativeTo)
 import           System.FilePath((</>), makeRelative, normalise, takeDirectory, takeFileName)
-import           System.IO.Temp(withSystemTempDirectory)
+import           System.Posix.Files(blockSpecialMode, characterSpecialMode, directoryMode, namedPipeMode, regularFileMode, symbolicLinkMode)
 import           Text.Regex.PCRE((=~))
 
-import BDCS.CS(commitContentToFile)
 import BDCS.DB
 import BDCS.Files(associateFilesWithSource, insertFiles)
 import BDCS.KeyType
@@ -54,6 +63,7 @@ import Build.NPM(rebuildNPM)
 import Import.Conduit(getFromURI, ungzipIfCompressed)
 import Import.State(ImportState(..))
 import Utils.Either(whenLeft)
+import Utils.Error(mapError)
 import Utils.Monad((>>?))
 
 -- base URI for the package.json information
@@ -168,17 +178,6 @@ readRegistryJSON pkgname = do
     jsonData <- runConduitRes $ getFromURI uri .| sinkLbs
     either throwError return $ eitherDecode jsonData
 
-importNPMDirToCS :: (MonadError String m, MonadIO m) => ContentStore -> FilePath -> m ([(T.Text, T.Text)], PackageJSON)
-importNPMDirToCS repo path = do
-    -- Parse the package.json file
-    jsonData <- liftIO $ BSL.readFile $ path </> "package.json"
-    json <- either throwError return $ eitherDecode jsonData
-
-    result <- liftIO $ runCsMonad (storeDirectory repo path)
-    case result of
-        Left e  -> throwError (show e)
-        Right c -> return (map (\(fp, d) -> (T.pack fp, T.pack $ show d)) c, json)
-
 loadIntoMDDB :: MonadIO m => PackageJSON -> [Files] -> SqlPersistT m (Key Sources)
 loadIntoMDDB PackageJSON{..} files = do
     -- Create the project/source/build entries from the package.json data
@@ -257,35 +256,127 @@ loadFromURI uri@URI{..} = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
 
-    -- run the whole thing with a temp directory
-    result <- liftIO $ withSystemTempDirectory "npm-import" $ \path ->
-        runExceptT $ do
-            -- Fetch the JSON describing the package
-            distJson <- readRegistryJSON uriPath
+    result <- runExceptT $ do
+        -- Fetch the JSON describing the package
+        distJson <- readRegistryJSON uriPath
 
-            -- Fetch the tarball
-            let distTarball = T.unpack $ tarball distJson
-            distURI <- maybe (throwError $ "Error parsing dist URI: " ++ distTarball) return $ parseURI distTarball
-            distBytes <- runConduitRes $ getFromURI distURI .| ungzipIfCompressed .| sinkLbs
+        -- Get the URI to the tarball out of the JSON
+        let distTarball = T.unpack $ tarball distJson
+        distURI <- maybe (throwError $ "Error parsing dist URI: " ++ distTarball) return $ parseURI distTarball
 
-            -- TODO verify checksum
+        -- conduits for consuming the tar entries:
+        -- this one loads the content into the content store and returns a list of (uninserted) Files records
+        let pathPipe = tarEntryToFile repo .| CL.consume
+        -- this one returns the parsed package.json
+        let jsonPipe = parsePackageJson
 
-            -- unpack the tarball to a temp directory
-            (liftIO . Tar.unpack path) $ Tar.read distBytes
+        -- Zip them together into a sink returning a tuple
+        let tarSink = getZipConduit ((,) <$> ZipConduit pathPipe
+                                         <*> ZipConduit jsonPipe)
 
-            -- All of the files in a NPM tarball are in a "package/" directory,
-            -- so use that as the root of the import.
-            let packagePath = path </> "package"
+        -- Import the tarball to the content store
+        (files, packageJson) <- runConduitRes $
+                                         getFromURI distURI
+                                      .| ungzipIfCompressed
+                                      .| CT.untar
+                                      .| tarSink
 
-            -- import the temp directory into the content store
-            (commitChecksums, packageJson) <- importNPMDirToCS repo packagePath
+        -- Insert the metadata
+        checkAndRunSqlite (T.pack db) $ do
+            source <- loadIntoMDDB packageJson files
 
-            -- gather the metadata for all of paths as Files DB objects
-            files <- liftIO $ mapM (commitContentToFile packagePath) commitChecksums
-
-            -- import the npm data into the mddb
-            checkAndRunSqlite (T.pack db) $ do
-                sourceId <- loadIntoMDDB packageJson files
-                void $ rebuildNPM repo sourceId
+            -- Link the dependencies for the source
+            rebuildNPM source
 
     whenLeft result (\e -> liftIO $ print $ "Error importing " ++ show uri ++ ": " ++ show e)
+
+ where
+    -- TODO handle TarExceptions
+    tarEntryToFile :: (MonadError String m, MonadThrow m, MonadIO m) => ContentStore -> Conduit CT.TarChunk m Files
+    tarEntryToFile cs =
+        -- Run the tar processing in a state with a map from FilePath to (ObjectDigest, CT.Size),
+        -- so hardlinks can get the data they need from earlier entries.
+        evalStateLC HM.empty $ CT.withEntries handleEntry
+     where
+        handleEntry :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadIO m) => CT.Header -> Conduit BS.ByteString m Files
+        handleEntry header@CT.Header{..} = do
+            let entryPath = CT.headerFilePath header
+
+            -- Add the file type bits to the mode based on the tar header type
+            let typeBits = case CT.headerFileType header of
+                    CT.FTNormal           -> regularFileMode
+                    CT.FTHardLink         -> regularFileMode
+                    CT.FTSymbolicLink     -> symbolicLinkMode
+                    CT.FTCharacterSpecial -> characterSpecialMode
+                    CT.FTBlockSpecial     -> blockSpecialMode
+                    CT.FTDirectory        -> directoryMode
+                    CT.FTFifo             -> namedPipeMode
+                    -- TODO?
+                    CT.FTOther _          -> 0
+
+            -- Make the start of a record with the path and all of the permissions-y stuff
+            let baseFile = Files{filesPath       = T.pack ("/" </> normalise entryPath),
+                                 filesFile_user  = packShort headerOwnerName,
+                                 filesFile_group = packShort headerGroupName,
+                                 filesMtime      = fromIntegral headerTime,
+                                 filesMode       = fromIntegral headerFileMode .|. fromIntegral typeBits,
+                                 filesTarget     = Nothing,
+                                 filesCs_object  = Nothing,
+                                 filesSize       = 0}
+
+            file <- case CT.headerFileType header of
+                -- for NormalFile, add the object to the content store, add the digest and size to the state, and add the digest in the record
+                CT.FTNormal       -> handleRegularFile baseFile entryPath headerPayloadSize
+                -- For hard links, the content is the link target: look it up in the state and fill in the digest and size
+                CT.FTHardLink     -> handleHardLink baseFile
+
+                -- for symlinks, set the target
+                CT.FTSymbolicLink -> handleSymlink baseFile
+
+                -- TODO?
+                CT.FTOther code   -> throwError $ "Unknown tar entry type " ++ show code
+
+                -- TODO: need somewhere for block/char special major and minor
+                -- otherwise nothing else has anything special
+                _                 -> return baseFile
+
+            yield file
+
+        handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadIO m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
+        handleRegularFile baseFile entryPath size = do
+            content <- CC.fold
+            digest <- mapError show (storeByteString cs content)
+            modify (HM.insert entryPath (digest, size))
+            return $ baseFile {filesSize      = fromIntegral size,
+                               filesCs_object = Just $ T.pack $ show digest}
+
+        handleHardLink :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m) => Files -> Consumer BS.ByteString m Files
+        handleHardLink baseFile = do
+            -- Use the same ByteString -> FilePath unpacking that headerFilePath uses
+            target <- S8.unpack <$> CC.fold
+            (HM.lookup target <$> get) >>=
+                maybe (throwError $ "Broken hard link to " ++ target)
+                      (\(digest, size) -> return $ baseFile {filesSize      = fromIntegral size,
+                                                             filesCs_object = Just $ T.pack $ show digest})
+
+        handleSymlink :: Monad m => Files -> Consumer BS.ByteString m Files
+        handleSymlink baseFile = do
+            target <- decodeUtf8 <$> CC.fold
+            return $ baseFile {filesTarget = Just target}
+
+    -- TODO handle TarExceptions
+    parsePackageJson :: (MonadError String m, MonadThrow m) => Consumer CT.TarChunk m PackageJSON
+    parsePackageJson = CT.withEntry handler >>= maybe parsePackageJson return
+     where
+        handler :: MonadError String m => CT.Header -> Consumer BS.ByteString m (Maybe PackageJSON)
+        handler header = let
+            path = makeRelative "/" $ normalise $ CT.headerFilePath header
+         in
+            -- Everything in an npm tarball is under "package/"
+            if path == ("package" </> "package.json") then
+                (eitherDecode <$> BSL.fromStrict <$> CC.fold) >>= either throwError (return . Just)
+            else
+                return Nothing
+
+    packShort :: BSS.ShortByteString -> T.Text
+    packShort = decodeUtf8 . BSS.fromShort
