@@ -712,7 +712,7 @@ spec = describe "BDCS.Depclose Tests" $ do
 
     addFile :: MonadIO m => Key Groups -> T.Text -> SqlPersistT m ()
     addFile groupid path = do
-        fid <- insert $ Files path "root" "root" 0 (Just "checksum")
+        fid <- insert $ Files path "root" "root" 0 (Just "checksum") 0 0 Nothing
         void $ insert $ GroupFiles groupid fid
 
     addReq :: MonadIO m => Key Groups -> T.Text -> SqlPersistT m ()
