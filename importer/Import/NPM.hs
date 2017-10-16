@@ -34,7 +34,6 @@ import           Data.Bits((.|.))
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BSL
-import qualified Data.ByteString.Short as BSS
 import           Data.Conduit(Conduit, Consumer, ZipConduit(..), (.|), getZipConduit, runConduitRes, yield)
 import           Data.Conduit.Binary(sinkLbs)
 import qualified Data.Conduit.Combinators as CC
@@ -302,6 +301,9 @@ loadFromURI uri@URI{..} = do
         handleEntry header@CT.Header{..} = do
             let entryPath = CT.headerFilePath header
 
+            -- Ignore the mode from tar. Set everything to 0644 if it's a file, 0755 if it's a directory
+            let modeBits = if CT.headerFileType header == CT.FTDirectory then 0o0755 else 0o0644
+
             -- Add the file type bits to the mode based on the tar header type
             let typeBits = case CT.headerFileType header of
                     CT.FTNormal           -> regularFileMode
@@ -314,12 +316,12 @@ loadFromURI uri@URI{..} = do
                     -- TODO?
                     CT.FTOther _          -> 0
 
-            -- Make the start of a record with the path and all of the permissions-y stuff
+            -- Make the start of a Files record. Ignore the user/group/mode from tar
             let baseFile = Files{filesPath       = T.pack ("/" </> normalise entryPath),
-                                 filesFile_user  = packShort headerOwnerName,
-                                 filesFile_group = packShort headerGroupName,
+                                 filesFile_user  = "root",
+                                 filesFile_group = "root",
                                  filesMtime      = fromIntegral headerTime,
-                                 filesMode       = fromIntegral headerFileMode .|. fromIntegral typeBits,
+                                 filesMode       = modeBits .|. fromIntegral typeBits,
                                  filesTarget     = Nothing,
                                  filesCs_object  = Nothing,
                                  filesSize       = 0}
@@ -377,6 +379,3 @@ loadFromURI uri@URI{..} = do
                 (eitherDecode <$> BSL.fromStrict <$> CC.fold) >>= either throwError (return . Just)
             else
                 return Nothing
-
-    packShort :: BSS.ShortByteString -> T.Text
-    packShort = decodeUtf8 . BSS.fromShort
