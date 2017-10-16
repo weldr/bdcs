@@ -36,7 +36,7 @@ import           System.Posix.Files(directoryMode, symbolicLinkMode)
 
 import BDCS.Builds(insertBuild, insertBuildKeyValue)
 import BDCS.DB
-import BDCS.Files(associateFilesWithBuild, insertFile, sourceIdToFiles)
+import BDCS.Files(associateFilesWithBuild, sourceIdToFiles)
 import BDCS.KeyType
 import BDCS.NPM.SemVer(SemVer, SemVerRangeSet, parseSemVer, parseSemVerRangeSet, satisfies, toText)
 
@@ -150,13 +150,13 @@ rebuildNPM sourceId = do
             dest   = T.pack $ joinPath [module_dir, "node_modules", T.unpack depname]
             link   = Files dest "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ symbolicLinkMode .|. 0o0644) 0 (Just source)
          in
-            insertFile link
+            insert link
 
         mkdirs :: MonadIO m => UTCTime -> FilePath -> SqlPersistT m [Key Files]
         mkdirs buildTime path = mapM mkdir $ scanl1 (</>) $ splitDirectories path
          where
             mkdir :: MonadIO m => FilePath -> SqlPersistT m (Key Files)
-            mkdir subPath = insertFile $ Files (T.pack subPath) "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ directoryMode .|. 0o0755) 0 Nothing
+            mkdir subPath = insert $ Files (T.pack subPath) "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ directoryMode .|. 0o0755) 0 Nothing
 
         createBuild :: MonadIO m => [Key Files] -> SqlPersistT m (Key Builds)
         createBuild fids = do
