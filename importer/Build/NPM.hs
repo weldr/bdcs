@@ -16,6 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE TupleSections #-}
 
 module Build.NPM(rebuildNPM)
  where
@@ -38,6 +39,7 @@ import BDCS.Builds(insertBuild, insertBuildKeyValue)
 import BDCS.DB
 import BDCS.Files(associateFilesWithBuild, sourceIdToFiles)
 import BDCS.KeyType
+import BDCS.Label.FileLabels(apply)
 import BDCS.NPM.SemVer(SemVer, SemVerRangeSet, parseSemVer, parseSemVerRangeSet, satisfies, toText)
 
 rebuildNPM :: (MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => Key Sources -> SqlPersistT m [Key Builds]
@@ -131,32 +133,41 @@ rebuildNPM sourceId = do
         let module_dir = "/" </> "usr" </> "lib" </> "node_modules" </> T.unpack (T.concat [name, "@", ver])
 
         -- Create the /usr/lib/node_modules/<package> directory, and a node_modules directory under that
-        moduleDirIds <- mkdirs buildTime $ module_dir </> "node_modules"
+        moduleDirsIds <- mkdirs buildTime $ module_dir </> "node_modules"
 
         -- Copy everything from the Source into the module directory
-        packageIds <- mapM (insert . (`copyFile` module_dir)) sourceFiles
+        let packageFiles = map (`copyFile` module_dir) sourceFiles
+        packageFilesIds <- mapM (\file -> (file,) <$> insert file) packageFiles
 
         -- For each of the dependencies, create a symlink from the /usr/lib/node_modules/<name>@<version> directory
         -- to this module's node_modules directory.
-        deplinkIds <- mapM (createDepLink module_dir buildTime) depList
+        deplinkFilesIds <- mapM (createDepLink module_dir buildTime) depList
+
+
+        -- Apply the file-based labels
+        let buildFilesIds = moduleDirsIds ++ packageFilesIds ++ deplinkFilesIds
+        void $ apply buildFilesIds
 
         -- Create a build and add the files to it
-        createBuild $ moduleDirIds ++ packageIds ++ deplinkIds
+        createBuild $ map snd buildFilesIds
      where
-        createDepLink :: MonadIO m => FilePath -> UTCTime -> (T.Text, SemVer) -> SqlPersistT m (Key Files)
+        createDepLink :: MonadIO m => FilePath -> UTCTime -> (T.Text, SemVer) -> SqlPersistT m (Files, Key Files)
         createDepLink module_dir buildTime (depname, depver) = let
             verstr = toText depver
             source = T.pack $ joinPath ["/", "usr", "lib", "node_modules", T.unpack (T.concat [depname, "@", verstr])]
             dest   = T.pack $ joinPath [module_dir, "node_modules", T.unpack depname]
             link   = Files dest "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ symbolicLinkMode .|. 0o0644) 0 (Just source)
          in
-            insert link
+            (link,) <$> insert link
 
-        mkdirs :: MonadIO m => UTCTime -> FilePath -> SqlPersistT m [Key Files]
+        mkdirs :: MonadIO m => UTCTime -> FilePath -> SqlPersistT m [(Files, Key Files)]
         mkdirs buildTime path = mapM mkdir $ scanl1 (</>) $ splitDirectories path
          where
-            mkdir :: MonadIO m => FilePath -> SqlPersistT m (Key Files)
-            mkdir subPath = insert $ Files (T.pack subPath) "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ directoryMode .|. 0o0755) 0 Nothing
+            mkdir :: MonadIO m => FilePath -> SqlPersistT m (Files, Key Files)
+            mkdir subPath = let
+                newdir = Files (T.pack subPath) "root" "root" (floor $ utcTimeToPOSIXSeconds buildTime) Nothing (fromIntegral $ directoryMode .|. 0o0755) 0 Nothing
+             in
+                (newdir,) <$> insert newdir
 
         createBuild :: MonadIO m => [Key Files] -> SqlPersistT m (Key Builds)
         createBuild fids = do
