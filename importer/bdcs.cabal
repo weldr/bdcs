@@ -114,7 +114,6 @@ library
                         conduit-extra,
                         content-store,
                         cpio-conduit,
-                        cpu,
                         cryptonite,
                         directory,
                         esqueleto >= 2.5.3,
@@ -124,7 +123,6 @@ library
                         gi-glib,
                         gi-ostree >= 1.0.3,
                         gitrev >= 1.3.1,
-                        haskell-gi-base,
                         http-conduit,
                         monad-control,
                         monad-logger,
@@ -147,7 +145,6 @@ library
                         unix,
                         unordered-containers,
                         xml-conduit
-
     pkgconfig-depends:  ostree-1 >= 2017.8
 
     other-modules:      Paths_bdcs
@@ -215,7 +212,6 @@ executable inspect-groups
                         bytestring,
                         cond,
                         conduit >= 1.2.8,
-                        containers,
                         directory,
                         mtl >= 2.2.1,
                         persistent-sqlite,
@@ -242,12 +238,8 @@ executable inspect-ls
                         bytestring,
                         cond,
                         conduit >= 1.2.8,
-                        containers,
-                        content-store,
                         directory,
-                        gi-ostree,
                         mtl >= 2.2.1,
-                        persistent-sqlite,
                         regex-pcre,
                         text,
                         time
@@ -269,7 +261,6 @@ executable inspect-nevras
                         conduit >= 1.2.8,
                         directory,
                         mtl >= 2.2.1,
-                        persistent-sqlite,
                         regex-pcre,
                         text
 
@@ -287,7 +278,6 @@ executable export
                         content-store,
                         directory,
                         mtl >= 2.2.1,
-                        persistent-sqlite,
                         text
 
     default-language:   Haskell2010
@@ -313,7 +303,6 @@ executable depsolve
     build-depends:      bdcs,
                         base >= 4.9 && < 5.0,
                         mtl >= 2.2.1,
-                        persistent-sqlite,
                         text
 
     default-language:   Haskell2010
