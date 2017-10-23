@@ -37,10 +37,17 @@ after_success:
 
             docker login -u atodorov -p $DOCKER_PASSWORD
             docker push welder/bdcs-build-img
-
-            s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/import/import s3://weldr/import
-            s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/export/export s3://weldr/export
         fi
+
+        TARGET_DIR="artifacts/bdcs"
+        if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+            TARGET_DIR="$TARGET_DIR/$TRAVIS_PULL_REQUEST"
+        fi
+
+        # upload artifacts on which other test activities depend
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/import/import s3://weldr/$TARGET_DIR/import
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/export/export s3://weldr/$TARGET_DIR/export
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./schema.sql s3://weldr/$TARGET_DIR/schema.sql
 
 notifications:
   email:
