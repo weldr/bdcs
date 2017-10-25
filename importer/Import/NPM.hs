@@ -31,16 +31,17 @@ import           Control.Monad.Trans.Resource(MonadBaseControl)
 import           Data.Aeson(FromJSON(..), Object, Value(..), (.:), (.:?), (.!=), eitherDecode, withObject, withText)
 import           Data.Aeson.Types(Parser, typeMismatch)
 import           Data.Bits((.|.))
+import           Data.ByteArray(convert)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Char8 as S8
 import qualified Data.ByteString.Lazy as BSL
-import           Data.Conduit(Conduit, Consumer, ZipConduit(..), (.|), getZipConduit, runConduitRes, yield)
+import           Data.Conduit(Conduit, Consumer, ZipConduit(..), (.|), getZipConduit, runConduitRes, toConsumer, yield)
 import           Data.Conduit.Binary(sinkLbs)
 import qualified Data.Conduit.Combinators as CC
 import qualified Data.Conduit.List as CL
 import           Data.Conduit.Lift(evalStateLC)
 import qualified Data.Conduit.Tar as CT
-import           Data.ContentStore(ContentStore, storeByteString)
+import           Data.ContentStore(ContentStore, storeByteStringSink)
 import           Data.ContentStore.Digest(ObjectDigest)
 import qualified Data.HashMap.Lazy as HM
 import           Data.List(isPrefixOf)
@@ -62,7 +63,6 @@ import Build.NPM(rebuildNPM)
 import Import.Conduit(getFromURI, ungzipIfCompressed)
 import Import.State(ImportState(..))
 import Utils.Either(whenLeft)
-import Utils.Error(mapError)
 import Utils.Monad((>>?))
 
 -- base URI for the package.json information
@@ -346,11 +346,10 @@ loadFromURI uri@URI{..} = do
 
         handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadIO m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
         handleRegularFile baseFile entryPath size = do
-            content <- CC.fold
-            digest <- mapError show (storeByteString cs content)
+            digest <- toConsumer $ storeByteStringSink cs
             modify (HM.insert entryPath (digest, size))
             return $ baseFile {filesSize      = fromIntegral size,
-                               filesCs_object = Just $ T.pack $ show digest}
+                               filesCs_object = Just $ convert digest}
 
         handleHardLink :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m) => Files -> Consumer BS.ByteString m Files
         handleHardLink baseFile = do
@@ -359,7 +358,7 @@ loadFromURI uri@URI{..} = do
             (HM.lookup target <$> get) >>=
                 maybe (throwError $ "Broken hard link to " ++ target)
                       (\(digest, size) -> return $ baseFile {filesSize      = fromIntegral size,
-                                                             filesCs_object = Just $ T.pack $ show digest})
+                                                             filesCs_object = Just $ convert digest})
 
         handleSymlink :: Monad m => Files -> Consumer BS.ByteString m Files
         handleSymlink baseFile = do

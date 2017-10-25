@@ -54,17 +54,19 @@ import BDCS.ReqType
 
 -- This must match the PRAGMA user_version value in schema.sql
 schemaVersion :: Int64
-schemaVersion = 3
+schemaVersion = 4
 
 getDbVersion :: MonadIO m => SqlPersistT m Int64
 getDbVersion = unSingle <$> head <$> rawSql "pragma user_version" []
 
+-- The change from version 3 to version 4 involves changing the content store, so there
+-- is no automatic upgrade path.
 checkDbVersion :: (MonadError String m, MonadIO m) => SqlPersistT m ()
 checkDbVersion = do
     userVersion <- getDbVersion
     unless (userVersion == schemaVersion) $ throwError $
         "Database version " ++ show userVersion ++ " does not match expected version " ++ show schemaVersion ++
-            ", use migratedb to upgrade the database"
+            ", please re-import your data"
 
 checkAndRunSqlite :: (MonadError String m, MonadBaseControl IO m, MonadIO m) =>
     T.Text -> SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
@@ -105,7 +107,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     file_user T.Text
     file_group T.Text
     mtime Int
-    cs_object T.Text Maybe
+    cs_object ByteString Maybe
     mode Int
     size Int
     target T.Text Maybe
