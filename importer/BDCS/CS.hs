@@ -17,7 +17,8 @@ import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import           Data.ByteString.Lazy(fromStrict)
 import           Data.Conduit(Conduit, awaitForever, yield)
-import           Data.ContentStore(ContentStore, fetchByteString, runCsMonad)
+import           Data.ContentStore(ContentStore, contentStoreDigest, fetchByteString, runCsMonad)
+import           Data.ContentStore.Digest(fromByteString)
 import qualified Data.Text as T
 import           System.Posix.Types(CMode(..))
 
@@ -34,8 +35,9 @@ filesToObjectsC repo = awaitForever $ \f@Files{..} -> case filesCs_object of
     -- FIXME:  Is that a valid assumption?  Could there ever be a row without a
     -- reference that is completely invalid?
     Nothing    -> yield (f, DirObject)
-    Just cksum ->
-        liftIO (runCsMonad $ fetchByteString repo (T.unpack cksum)) >>= \case
+    Just cksum -> do
+        digest <- maybe (throwError "Invalid cs_object") return $ fromByteString (contentStoreDigest repo) cksum
+        liftIO (runCsMonad $ fetchByteString repo digest) >>= \case
             Left e    -> throwError (show e)
             Right obj -> yield (f, FileObject obj)
 

@@ -20,6 +20,7 @@ module BDCS.RPM.Files(mkFiles)
 
 import           Codec.RPM.Tags(Tag, findWord16ListTag, findWord32ListTag, findStringListTag, findTag, tagValue)
 import           Control.Monad.IO.Class(MonadIO)
+import           Data.ByteArray(convert)
 import           Data.ContentStore.Digest(ObjectDigest)
 import           Data.List(zip7)
 import           Data.Maybe(fromMaybe)
@@ -38,7 +39,7 @@ mkFiles rpm checksums =
  where
     mkOneFile :: MonadIO m => FileTuple -> SqlPersistT m Files
     mkOneFile (path, user, group, mtime, mode, size, target) = do
-        let cksum = fmap (T.pack . show) (lookup path checksums)
+        let cksum = fmap convert (lookup path checksums)
         return $ Files path user group mtime cksum mode size target
 
     filePaths :: [Tag] -> [FilePath]

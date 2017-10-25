@@ -1,6 +1,6 @@
 -- Increment this number any time the schema is changed, and update schemaVersion
 -- in BDCS/DB.hs
-PRAGMA user_version = 3;
+PRAGMA user_version = 4;
 
 -- This describes the schema used by the metadata database (mddb).  We
 -- considered several options for how to implement the mddb, finally deciding
@@ -150,7 +150,7 @@ create table files (
     file_user text not null,
     file_group text not null,
     mtime integer not null,
-    cs_object text,
+    cs_object blob,
     mode integer not null,
     size integer not null,
     target text
