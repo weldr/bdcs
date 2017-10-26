@@ -49,15 +49,17 @@ api-mddb:
 	@if [ ! -e ${d}/api-rpms ]; then \
 	    mkdir ${d}/api-rpms; \
 	fi; \
+	if [ ! -e ${d}/api-mddb ]; then \
+	    mkdir ${d}/api-mddb; \
+	fi; \
 	cd ${d}/api-rpms; \
 	wget -c http://mirror.centos.org/centos/7/os/x86_64/Packages/basesystem-10.0-7.el7.centos.noarch.rpm \
 	    http://mirror.centos.org/centos/7/os/x86_64/Packages/filesystem-3.2-21.el7.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/os/x86_64/Packages/httpd-2.4.6-45.el7.centos.x86_64.rpm \
-	    http://vault.centos.org/7.2.1511/os/x86_64/Packages/bash-4.2.46-19.el7.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-20.el7_2.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-21.el7_3.x86_64.rpm
+	    http://mirror.centos.org/centos/7/os/x86_64/Packages/httpd-2.4.6-67.el7.centos.x86_64.rpm \
+	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-28.el7.x86_64.rpm \
+	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-29.el7_4.x86_64.rpm
 	docker volume create -d local --name api-test-mddb-volume
-	docker run -v api-test-mddb-volume:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" --rm $(ORG_NAME)/bdcs-import-img
+	docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" $(ORG_NAME)/bdcs-import-img
 
 
 .PHONY: importer mddb api-mddb
