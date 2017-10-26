@@ -40,7 +40,7 @@ import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString.Char8 as C8
 import           Data.CPIO(Entry(..))
-import           Data.Conduit((.|), Consumer, ZipConduit(..), await, runConduit, runConduitRes, yield)
+import           Data.Conduit((.|), Conduit, Consumer, ZipConduit(..), await, awaitForever, mapOutput, runConduit, runConduitRes, yield)
 import           Data.Conduit.Combinators(sinkList)
 import qualified Data.Conduit.List as CL
 import           Data.ContentStore(ContentStore, CsError(..), CsMonad, runCsMonad, storeLazyByteStringC)
@@ -50,6 +50,7 @@ import           Data.Foldable(toList)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Network.URI(URI(..))
+import           System.Posix.Files(fileTypeModes, intersectFileModes, regularFileMode)
 
 import BDCS.Builds(associateBuildWithPackage, insertBuild)
 import BDCS.DB
@@ -109,7 +110,7 @@ unsafeConsume repo db rpm = do
         filenames = CL.map (T.dropWhile (== '.') . decodeUtf8 . cpioFileName) .| sinkList
     -- The second conduit extracts each file from a cpio entry, stores it in the content store,
     -- and returns its digest.
-        digests   = CL.map cpioFileData .| storeLazyByteStringC repo .| sinkList
+        digests = maybeStore .| sinkList
 
     -- And then those two conduits run in parallel and the results are packaged up together so
     -- we have filenames and their digests matched up.
@@ -124,11 +125,21 @@ unsafeConsume repo db rpm = do
     lift (runExceptT $ checkAndRunSqlite (T.pack db) (loadIntoMDDB rpm checksums)) >>= \case
         Left e  -> throwError (CsError $ show e)
         Right v -> return v
+ where
+    maybeStore :: (MonadIO m, MonadError CsError m) => Conduit Entry m (Maybe ObjectDigest)
+    maybeStore = awaitForever $ \Entry{..} ->
+        -- Only store regular files in the content store
+        -- Checking the type is more complicated then you'd think it should be, because
+        -- the type mode is more than just one bit. e.g., regular == 100000, symlink == 120000
+        if fromIntegral cpioMode `intersectFileModes` fileTypeModes == regularFileMode then
+            mapOutput Just $ yield cpioFileData .| storeLazyByteStringC repo
+        else
+            yield Nothing
 
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
 -- package already exists in the mddb.
-loadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, ObjectDigest)] -> SqlPersistT m Bool
+loadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
 loadIntoMDDB rpm checksums =
     ifM (rpmExistsInMDDB rpm)
         (return False)
@@ -137,7 +148,7 @@ loadIntoMDDB rpm checksums =
 -- Like loadIntoMDDB, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
 -- that might change in the future.
-unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, ObjectDigest)] -> SqlPersistT m Bool
+unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
 unsafeLoadIntoMDDB RPM{..} checksums = do
     let sigHeaders = headerTags $ head rpmSignatures
     let tagHeaders = headerTags $ head rpmHeaders
