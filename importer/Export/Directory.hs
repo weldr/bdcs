@@ -13,6 +13,8 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
@@ -20,6 +22,7 @@ module Export.Directory(directorySink)
  where
 
 import           Control.Conditional(unlessM)
+import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import qualified Data.ByteString as BS
 import           Data.Conduit(Consumer, awaitForever)
@@ -27,39 +30,42 @@ import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           System.Directory(createDirectoryIfMissing, doesPathExist, setModificationTime)
 import           System.FilePath((</>), dropDrive, takeDirectory)
-import           System.Posix.Files(createSymbolicLink, setFileMode)
+import           System.Posix.Files(createNamedPipe, createSymbolicLink, directoryMode, fileTypeModes, intersectFileModes, namedPipeMode, setFileMode, symbolicLinkMode)
 import           System.Posix.Types(CMode(..))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
 
-directorySink :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
+directorySink :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 directorySink outPath = awaitForever $ \obj -> case obj of
-    (f, CS.DirObject)     -> liftIO (checkoutDir f)
-    (f, CS.FileObject bs) -> liftIO (checkoutFile f bs)
+    (f, CS.SpecialObject) -> checkoutSpecial f
+    (f, CS.FileObject bs) -> checkoutFile f bs
  where
-    checkoutDir :: Files -> IO ()
-    checkoutDir f@Files{..} = do
+    checkoutSpecial :: (MonadError String m, MonadIO m) => Files -> m ()
+    checkoutSpecial f@Files{..} =
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
+            fileType = fromIntegral filesMode `intersectFileModes` fileTypeModes
+        in
+           if | fileType == symbolicLinkMode -> checkoutSymlink fullPath f
+              | fileType == directoryMode    -> liftIO $ createDirectoryIfMissing True fullPath >> setMetadata f fullPath
+              | fileType == namedPipeMode    -> liftIO $ createNamedPipe fullPath $ fromIntegral filesMode
+              -- TODO, not storing major/minor for char/block special
+              | otherwise -> throwError "Invalid file type"
 
-        -- create the directory if it isn't there already
-        createDirectoryIfMissing True fullPath
+    checkoutSymlink :: (MonadError String m, MonadIO m) => FilePath -> Files -> m ()
+    checkoutSymlink _ Files{filesTarget=Nothing, ..} = throwError "Missing symlink target"
+    checkoutSymlink fullPath Files{filesTarget=Just target, ..} =
+        -- Skip creating the symbolic link if the target already exists
+        liftIO $ unlessM (doesPathExist fullPath) (createSymbolicLink (T.unpack target) fullPath)
 
-        setMetadata f fullPath
-
-    checkoutFile :: Files -> BS.ByteString -> IO ()
-    checkoutFile f@Files{..} contents = do
+    checkoutFile :: MonadIO m => Files -> BS.ByteString -> m ()
+    checkoutFile f@Files{..} contents = liftIO $ do
         let fullPath = outPath </> dropDrive (T.unpack filesPath)
 
         createDirectoryIfMissing True $ takeDirectory fullPath
 
-        -- Write the data or the symlink, depending
-        -- Skip creating the symbolic link if the target already exists
-        case (filesTarget, contents) of
-            (Just target, _) -> unlessM (doesPathExist fullPath) (createSymbolicLink (T.unpack target) fullPath)
-            (_, c)           -> do
-                BS.writeFile fullPath c
-                setMetadata f fullPath
+        BS.writeFile fullPath contents
+        setMetadata f fullPath
 
     setMetadata :: Files -> FilePath -> IO ()
     setMetadata Files{..} fullPath = do

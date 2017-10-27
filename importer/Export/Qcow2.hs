@@ -13,11 +13,13 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
 module Export.Qcow2(qcow2Sink)
  where
 
+import Control.Monad.Except(MonadError)
 import Control.Monad.IO.Class(MonadIO, liftIO)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
@@ -31,7 +33,7 @@ import           BDCS.DB(Files)
 import           Export.Directory(directorySink)
 import           Export.Utils(runHacks, runTmpfiles)
 
-qcow2Sink :: (MonadResource m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
+qcow2Sink :: (MonadResource m, MonadIO m, MonadError String m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =
     -- Writing and importing a tar file probably will not work, because some rpms contain paths
     -- with symlinks (e.g., /lib64/libaudit.so.1 is expected to be written to /usr/lib64).

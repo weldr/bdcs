@@ -20,7 +20,7 @@
 
 import           Control.Conditional(cond, ifM)
 import           Control.Monad(unless, when)
-import           Control.Monad.Except(runExceptT)
+import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit(Consumer, (.|), runConduit)
 import qualified Data.Conduit.List as CL
@@ -116,7 +116,7 @@ main = do
 
     whenLeft result (\e -> handler e >> exitFailure)
  where
-    directoryOutput :: MonadIO m => FilePath -> Consumer (Files, CS.Object) m ()
+    directoryOutput :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
         -- Apply tmpfiles.d to the directory first
         liftIO $ runTmpfiles path
