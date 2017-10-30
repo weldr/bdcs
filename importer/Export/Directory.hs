@@ -28,13 +28,14 @@ import qualified Data.ByteString as BS
 import           Data.Conduit(Consumer, awaitForever)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
-import           System.Directory(createDirectoryIfMissing, doesPathExist, setModificationTime)
+import           System.Directory(createDirectoryIfMissing, setModificationTime)
 import           System.FilePath((</>), dropDrive, takeDirectory)
 import           System.Posix.Files(createNamedPipe, createSymbolicLink, directoryMode, fileTypeModes, intersectFileModes, namedPipeMode, setFileMode, symbolicLinkMode)
 import           System.Posix.Types(CMode(..))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
+import           Utils.Filesystem(doesPathExist)
 
 directorySink :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 directorySink outPath = awaitForever $ \obj -> case obj of
