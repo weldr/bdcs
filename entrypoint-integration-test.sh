@@ -2,7 +2,7 @@
 
 set -ex
 
-cd /importer/
+cd /bdcs/
 
 ./tests/test_tmpfiles.sh
 ./tests/test_import.sh

@@ -10,4 +10,4 @@ welder-deployment/
 *.repo/
 *.db
 **.tix
-importer/dist
+src/dist
