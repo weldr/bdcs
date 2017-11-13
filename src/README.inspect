@@ -10,7 +10,7 @@ file in the top level of the bdcs source.
 However, because of how inspect finds various runtime files, it is better
 if you follow these instructions:
 
-$ cd importer
+$ cd src
 $ cabal sandbox init
 $ cabal install --dependencies-only --enable-tests
 $ cabal install
@@ -19,9 +19,9 @@ $ sqlite3 metadata.db < ../schema.sql
 $ for f in ${PWD}/Packages/*rpm; do import metadata.db cs.repo file://${f}; done
 
 For the rest of this readme, it is assumed the mddb is named metadata.db and
-the content store is named cs.repo, and that they are in the importer
-subdirectory (the same directory you built from).  It is also assumed you have
-done the installation step and set your $PATH.
+the content store is named cs.repo, and that they are in the src subdirectory
+(the same directory you built from).  It is also assumed you have done the
+installation step and set your $PATH.
 
 Like a lot of programs, the inspect tool uses subcommands with options to
 figure out what to do.  Regardless of what subcommand you use, however, you

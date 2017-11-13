@@ -20,7 +20,7 @@ You will first need a directory full of RPMs somewhere.  Here, I assume that
 is the $PWD/Packages directory.  Then run:
 
 ```
-$ cd importer
+$ cd src
 $ cabal sandbox init
 $ cabal install --dependencies-only --enable-tests
 $ cabal build
@@ -79,13 +79,13 @@ Building the project locally
 `cabal` is used to install and manage Haskell dependencies from upstream.
 
 ```
-$ cd importer/ && cabal sandbox init && cabal install
+$ cd src/ && cabal sandbox init && cabal install
 ```
 
 Executing unit tests
 ====================
 
-    $ cd importer/
+    $ cd src/
     $ cabal sandbox init
     $ cabal install --dependencies-only --enable-tests
     $ cabal test
@@ -98,7 +98,7 @@ Executing unit tests
 Produce code coverage report
 ============================
 
-    $ cd importer/
+    $ cd src/
     $ cabal sandbox init
     $ cabal install --enable-tests --enable-coverage
     $ cabal test

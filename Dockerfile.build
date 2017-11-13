@@ -9,16 +9,16 @@ RUN cabal update
 RUN cabal install happy
 RUN cabal install hlint
 
-RUN mkdir /importer
+RUN mkdir /bdcs
 
 # install the build dependencies first so we can cache this layer
-COPY importer/*.cabal /importer
-RUN cd /importer/ && cabal update && cabal install --dependencies-only --enable-tests --force-reinstall
+COPY src/*.cabal /bdcs
+RUN cd /bdcs/ && cabal update && cabal install --dependencies-only --enable-tests --force-reinstall
 
 # copy the rest of the code and build the application
-COPY importer/ /importer/
+COPY src/ /bdcs/
 
-WORKDIR /importer/
+WORKDIR /bdcs/
 RUN hlint .
 RUN cabal configure --enable-tests --enable-coverage
 RUN cabal build

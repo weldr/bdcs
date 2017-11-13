@@ -25,12 +25,12 @@ script:
 after_success:
   - |
         # copy coverage data & compiled binaries out of the container
-        sudo docker cp tests:/importer/dist ./importer/dist
+        sudo docker cp tests:/bdcs/dist ./bdcs/dist
         sudo docker rm tests
 
         # report to coveralls here because we need access to git
-        sudo chown travis:travis -R ./importer/dist
-        cd importer/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles depsolve && cd ../
+        sudo chown travis:travis -R ./bdcs/dist
+        cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles depsolve && cd ../
 
         if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
             sudo docker tag welder/bdcs-build-img:latest welder/bdcs-build-img:$TRAVIS_BUILD_NUMBER
@@ -45,8 +45,8 @@ after_success:
         fi
 
         # upload artifacts on which other test activities depend
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/import/import s3://weldr/$TARGET_DIR/import
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./importer/dist/build/export/export s3://weldr/$TARGET_DIR/export
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/import/import s3://weldr/$TARGET_DIR/import
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/export/export s3://weldr/$TARGET_DIR/export
         s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./schema.sql s3://weldr/$TARGET_DIR/schema.sql
 
 notifications:
