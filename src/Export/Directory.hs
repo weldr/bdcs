@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -38,7 +39,7 @@ import           BDCS.DB
 import           Utils.Filesystem(doesPathExist)
 
 directorySink :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
-directorySink outPath = awaitForever $ \obj -> case obj of
+directorySink outPath = awaitForever $ \case
     (f, CS.SpecialObject) -> checkoutSpecial f
     (f, CS.FileObject bs) -> checkoutFile f bs
  where
