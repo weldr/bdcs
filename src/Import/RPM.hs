@@ -37,13 +37,13 @@ import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.Trans(lift)
 import           Control.Monad.Trans.Control(MonadBaseControl)
-import           Control.Monad.Trans.Resource(MonadResource)
+import           Control.Monad.Trans.Resource(MonadResource, MonadThrow)
 import qualified Data.ByteString.Char8 as C8
 import           Data.CPIO(Entry(..))
-import           Data.Conduit((.|), Conduit, Consumer, ZipConduit(..), await, awaitForever, mapOutput, runConduit, runConduitRes, yield)
+import           Data.Conduit((.|), Conduit, Consumer, ZipConduit(..), await, awaitForever, mapOutput, runConduit, runConduitRes, transPipe, yield)
 import           Data.Conduit.Combinators(sinkList)
 import qualified Data.Conduit.List as CL
-import           Data.ContentStore(ContentStore, CsError(..), CsMonad, runCsMonad, storeLazyByteStringC)
+import           Data.ContentStore(ContentStore, CsError(..), runCsMonad, storeLazyByteStringC)
 import           Data.ContentStore.Digest(ObjectDigest)
 import           Database.Esqueleto
 import           Data.Foldable(toList)
@@ -69,6 +69,7 @@ import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
 import Import.Conduit(getFromURI)
 import Import.State(ImportState(..))
+import Utils.Error(mapError)
 
 #ifdef SCRIPTS
 import BDCS.Scripts(insertScript)
@@ -88,7 +89,7 @@ buildImported sigs =
 -- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
 -- information into the mddb.  The return value is whether or not an import occurred.  This is not the
 -- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
-consume :: ContentStore -> FilePath -> Consumer RPM CsMonad Bool
+consume :: (MonadBaseControl IO m, MonadIO m, MonadThrow m, MonadError CsError m) => ContentStore -> FilePath -> Consumer RPM m Bool
 consume repo db = await >>= \case
     Just rpm ->
         lift (runExceptT $ checkAndRunSqlite (T.pack db) (rpmExistsInMDDB rpm)) >>= \case
@@ -100,7 +101,7 @@ consume repo db = await >>= \case
 -- Like consume, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only,
 -- but that might change in the future.  If so, its type should also change to be a Consumer.
-unsafeConsume :: ContentStore -> FilePath -> RPM -> Consumer RPM CsMonad Bool
+unsafeConsume :: (MonadIO m, MonadBaseControl IO m, MonadThrow m, MonadError CsError m) => ContentStore -> FilePath -> RPM -> Consumer RPM m Bool
 unsafeConsume repo db rpm = do
     -- One source that takes an RPM, extracts its payload, and decompresses it.
     let src       = yield rpm .| payloadContentsC
@@ -194,17 +195,19 @@ loadFromURI uri = do
     db <- stDB <$> ask
     repo <- stRepo <$> ask
 
-    -- Ideally, this would all be one big conduit.  However, I can't figure out how to make that work
-    -- when parseRPMC returns one type of error (MonadError ParseError) and consume returns some other
-    -- type of error (CsError, hiding in CsMonad).  There doesn't appear to be any good way to
-    -- transform error types.  Thus, it's exploded out into two distinct steps.
-    runExceptT (runConduitRes $ getFromURI uri .| parseRPMC .| CL.head) >>= \case
-        Left e           -> liftIO $ putStrLn $ "Error fetching " ++ uriPath uri ++ ": " ++ show e
-        Right (Just rpm) ->
-            liftIO (runCsMonad $ runConduit $ yield rpm .| consume repo db) >>= \case
-                Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
-                Left e     -> liftIO $ putStrLn $ "Error importing " ++ uriPath uri ++ ": " ++ show e
-                _          -> return ()
+    result <- runExceptT $ runConduitRes $
+           getFromURI uri
+        .| transPipe (mapError showParseError) parseRPMC
+        .| transPipe (mapError showCsError) (consume repo db)
+
+    case result of
+        Left e     -> liftIO $ putStrLn e
+        Right True -> liftIO $ putStrLn $ "Imported " ++ uriPath uri
+        _          -> return ()
+
+ where
+    showParseError e = "Error fetching " ++ uriPath uri ++ ": " ++ show e
+    showCsError    e = "Error importing " ++ uriPath uri ++ ": " ++ show e
 
 -- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
 -- from being added to the content store a second time.  Note that loadIntoMDDB also performs this
