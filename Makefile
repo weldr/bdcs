@@ -62,7 +62,7 @@ api-mddb:
 	docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" $(ORG_NAME)/bdcs-import-img
 
 
-.PHONY: importer mddb api-mddb
+.PHONY: importer mddb api-mddb ci
 
 import-centos7:
 	make weld-f25
@@ -99,3 +99,5 @@ import-centos7:
 	    make mddb; \
 	    python ./tests/is_import_busted.py -v $$REPO; \
 	done
+
+ci: integration-test
