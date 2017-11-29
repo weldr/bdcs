@@ -14,7 +14,11 @@ weld-f25:
 	-rm -rf ./welder-deployment
 
 build: Dockerfile.build
-	docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .
+	if [ -n "$$TRAVIS" ]; then \
+	    docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .; \
+	else \
+	    docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
+	fi;
 	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
 	docker cp build-cont:/root/.cabal/bin/import ./import
 	docker cp build-cont:/root/.cabal/bin/export ./export
