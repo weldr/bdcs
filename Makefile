@@ -105,3 +105,12 @@ import-centos7:
 	done
 
 ci: integration-test
+
+ci_after_success:
+	# copy coverage data & compiled binaries out of the container
+	sudo docker cp tests:/bdcs/dist ./bdcs/dist
+	sudo docker rm tests
+
+	sudo chown travis:travis -R ./bdcs/dist
+	[ -x ~/.cabal/bin/hpc-coveralls ] || cabal update && cabal install hpc-coveralls
+	cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles depsolve && cd ..
