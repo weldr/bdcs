@@ -27,7 +27,7 @@ import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.State(MonadState, get, modify)
-import           Control.Monad.Trans.Resource(MonadBaseControl)
+import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Aeson(FromJSON(..), Object, Value(..), (.:), (.:?), (.!=), eitherDecode, withObject, withText)
 import           Data.Aeson.Types(Parser, typeMismatch)
 import           Data.Bits((.|.))
@@ -291,13 +291,13 @@ loadFromURI uri@URI{..} = do
 
  where
     -- TODO handle TarExceptions
-    tarEntryToFile :: (MonadError String m, MonadThrow m, MonadIO m) => ContentStore -> Conduit CT.TarChunk m Files
+    tarEntryToFile :: (MonadError String m, MonadThrow m, MonadResource m) => ContentStore -> Conduit CT.TarChunk m Files
     tarEntryToFile cs =
         -- Run the tar processing in a state with a map from FilePath to (ObjectDigest, CT.Size),
         -- so hardlinks can get the data they need from earlier entries.
         evalStateLC HM.empty $ CT.withEntries handleEntry
      where
-        handleEntry :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadIO m) => CT.Header -> Conduit BS.ByteString m Files
+        handleEntry :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadResource m) => CT.Header -> Conduit BS.ByteString m Files
         handleEntry header@CT.Header{..} = do
             let entryPath = CT.headerFilePath header
 
@@ -344,7 +344,7 @@ loadFromURI uri@URI{..} = do
 
             yield file
 
-        handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadIO m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
+        handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadResource m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
         handleRegularFile baseFile entryPath size = do
             digest <- toConsumer $ storeByteStringSink cs
             modify (HM.insert entryPath (digest, size))

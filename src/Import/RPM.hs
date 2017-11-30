@@ -33,7 +33,7 @@ import           Control.Conditional(ifM)
 import           Control.Exception(evaluate, tryJust)
 import           Control.Monad(guard, void)
 import           Control.Monad.Except
-import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.IO.Class(liftIO)
 import           Control.Monad.Reader(ReaderT, ask)
 import           Control.Monad.Trans(lift)
 import           Control.Monad.Trans.Control(MonadBaseControl)
@@ -76,7 +76,7 @@ import BDCS.Scripts(insertScript)
 import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
 #endif
 
-buildImported :: MonadIO m => [Tag] ->  SqlPersistT m Bool
+buildImported :: MonadResource m => [Tag] ->  SqlPersistT m Bool
 buildImported sigs =
     case findStringTag "SHA1Header" sigs of
         Just sha -> do ndx <- select $ from $ \signatures -> do
@@ -127,7 +127,7 @@ unsafeConsume repo db rpm = do
         Left e  -> throwError (CsError $ show e)
         Right v -> return v
  where
-    maybeStore :: (MonadIO m, MonadError CsError m) => Conduit Entry m (Maybe ObjectDigest)
+    maybeStore :: (MonadResource m, MonadError CsError m) => Conduit Entry m (Maybe ObjectDigest)
     maybeStore = awaitForever $ \Entry{..} ->
         -- Only store regular files in the content store
         -- Checking the type is more complicated then you'd think it should be, because
@@ -140,7 +140,7 @@ unsafeConsume repo db rpm = do
 -- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
 -- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
 -- package already exists in the mddb.
-loadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
+loadIntoMDDB :: (MonadBaseControl IO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
 loadIntoMDDB rpm checksums =
     ifM (rpmExistsInMDDB rpm)
         (return False)
@@ -149,7 +149,7 @@ loadIntoMDDB rpm checksums =
 -- Like loadIntoMDDB, but does not first check to see if the RPM has previously been imported.  Running
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
 -- that might change in the future.
-unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadIO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
+unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
 unsafeLoadIntoMDDB RPM{..} checksums = do
     let sigHeaders = headerTags $ head rpmSignatures
     let tagHeaders = headerTags $ head rpmHeaders
@@ -212,7 +212,7 @@ loadFromURI uri = do
 -- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
 -- from being added to the content store a second time.  Note that loadIntoMDDB also performs this
 -- check, but both of these functions are public and therefore both need to prevent duplicate imports.
-rpmExistsInMDDB :: MonadIO m => RPM -> SqlPersistT m Bool
+rpmExistsInMDDB :: MonadResource m => RPM -> SqlPersistT m Bool
 rpmExistsInMDDB RPM{..} = do
     let sigHeaders = headerTags $ head rpmSignatures
     buildImported sigHeaders

@@ -113,7 +113,7 @@ library
                         conduit >= 1.2.8,
                         conduit-combinators,
                         conduit-extra,
-                        content-store >= 0.1.0 && < 0.2.0,
+                        content-store >= 0.2.0 && < 0.3.0,
                         cpio-conduit,
                         cryptonite,
                         directory,
@@ -166,7 +166,7 @@ executable import
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
                         cond,
-                        content-store >= 0.1.0 && < 0.2.0,
+                        content-store >= 0.2.0 && < 0.3.0,
                         directory,
                         mtl >= 2.2.1,
                         network-uri
@@ -277,7 +277,7 @@ executable export
                         base >= 4.9 && < 5.0,
                         cond,
                         conduit >= 1.2.8,
-                        content-store >= 0.1.0 && < 0.2.0,
+                        content-store >= 0.2.0 && < 0.3.0,
                         directory,
                         mtl >= 2.2.1,
                         text
