@@ -15,21 +15,21 @@ weld-f25:
 
 build: Dockerfile.build
 	if [ -n "$$TRAVIS" ]; then \
-	    docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .; \
+	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .; \
 	else \
-	    docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
+	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
 	fi;
-	docker create --name build-cont $(ORG_NAME)/bdcs-build-img
-	docker cp build-cont:/root/.cabal/bin/import ./import
-	docker cp build-cont:/root/.cabal/bin/export ./export
-	docker rm build-cont
+	sudo docker create --name build-cont $(ORG_NAME)/bdcs-build-img
+	sudo docker cp build-cont:/root/.cabal/bin/import ./import
+	sudo docker cp build-cont:/root/.cabal/bin/export ./export
+	sudo docker rm build-cont
 
 importer: build
-	docker build -t $(ORG_NAME)/bdcs-import-img .
+	sudo docker build -t $(ORG_NAME)/bdcs-import-img .
 
 integration-test: build Dockerfile.integration-test
-	docker build -t $(ORG_NAME)/bdcs-integration-test -f Dockerfile.integration-test .
-	docker run --name tests $(ORG_NAME)/bdcs-integration-test
+	sudo docker build -t $(ORG_NAME)/bdcs-integration-test -f Dockerfile.integration-test .
+	sudo docker run --name tests $(ORG_NAME)/bdcs-integration-test
 
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
@@ -38,8 +38,8 @@ mddb:
 	@if [ ! -e ${d}/mddb ]; then \
 	    mkdir ${d}/mddb; \
 	fi;
-	docker rm -f mddb-container || true
-	docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label=disable" \
+	sudo docker rm -f mddb-container || true
+	sudo docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label=disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
 	    -e "KEEP_STORE=$(KEEP_STORE)"   \
@@ -47,7 +47,7 @@ mddb:
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
 	    $(ORG_NAME)/bdcs-import-img
-	docker rm mddb-container
+	sudo docker rm mddb-container
 
 api-mddb:
 	@if [ ! -e ${d}/api-rpms ]; then \
@@ -62,8 +62,8 @@ api-mddb:
 	    http://mirror.centos.org/centos/7/os/x86_64/Packages/httpd-2.4.6-67.el7.centos.x86_64.rpm \
 	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-28.el7.x86_64.rpm \
 	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-29.el7_4.x86_64.rpm
-	docker volume create -d local --name api-test-mddb-volume
-	docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" $(ORG_NAME)/bdcs-import-img
+	sudo docker volume create -d local --name api-test-mddb-volume
+	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" $(ORG_NAME)/bdcs-import-img
 
 
 .PHONY: importer mddb api-mddb ci
