@@ -42,8 +42,8 @@ import           BDCS.Groups(getGroupId, getRequirementsForGroup)
 import           BDCS.GroupKeyValue(getGroupsByKeyVal, getKeyValuesForGroup, getValueForGroup)
 import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
-import           Utils.Error(errorToMaybe)
-import           Utils.Monad(concatMapM, foldMaybeM, mapMaybeM)
+import           BDCS.Utils.Error(errorToMaybe)
+import           BDCS.Utils.Monad(concatMapM, foldMaybeM, mapMaybeM)
 
 data ParentItem = GroupId (Key Groups)
                 | Provides DepRequirement

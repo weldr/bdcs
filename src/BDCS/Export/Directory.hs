@@ -19,7 +19,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Export.Directory(directorySink)
+module BDCS.Export.Directory(directorySink)
  where
 
 import           Control.Conditional(unlessM)
@@ -36,7 +36,7 @@ import           System.Posix.Types(CMode(..))
 
 import qualified BDCS.CS as CS
 import           BDCS.DB
-import           Utils.Filesystem(doesPathExist)
+import           BDCS.Utils.Filesystem(doesPathExist)
 
 directorySink :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 directorySink outPath = awaitForever $ \case

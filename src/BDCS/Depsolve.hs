@@ -41,7 +41,7 @@ import           Data.Maybe(isNothing, mapMaybe)
 import           Data.Set(Set)
 import qualified Data.Set as Set
 
-import Utils.Monad(concatMapM)
+import BDCS.Utils.Monad(concatMapM)
 
 -- A logical proposition in negation normal form
 -- (i.e., NOT is applied only to atoms, not sub-formulas)

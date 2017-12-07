@@ -25,7 +25,7 @@ import           System.Posix.Files(blockSpecialMode, characterSpecialMode, dire
 import           System.Posix.Types(CMode(..), FileMode)
 
 import BDCS.DB
-import Utils.Either(maybeToEither)
+import BDCS.Utils.Either(maybeToEither)
 
 -- A content object is either a regular file with corresponding data,
 -- or something else (directory, symlink) described by the Files metadata

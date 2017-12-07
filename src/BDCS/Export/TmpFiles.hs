@@ -30,7 +30,7 @@
 -- L    Create a new symlink. Do nothing if it already exists.
 -- L+   Remove file, directory tree, or symlink before creating it. WARNING this will remove a whole directory tree.
 --
-module Export.TmpFiles(
+module BDCS.Export.TmpFiles(
     TmpFileEntry(..),
     TmpFileType(..),
     parseConfString,

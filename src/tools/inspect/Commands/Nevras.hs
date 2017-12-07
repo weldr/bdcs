@@ -14,9 +14,9 @@ import           Text.Regex.PCRE((=~))
 
 import BDCS.DB(checkAndRunSqlite)
 import BDCS.Groups(groupsC, groupIdToNevra)
+import BDCS.Utils.Either(whenLeft)
 import BDCS.Version
 
-import Utils.Either(whenLeft)
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)

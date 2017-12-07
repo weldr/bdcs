@@ -19,7 +19,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Export.Ostree(ostreeSink)
+module BDCS.Export.Ostree(ostreeSink)
  where
 
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
@@ -46,9 +46,9 @@ import           GI.OSTree
 
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
-import           Export.Directory(directorySink)
-import           Export.Utils(runHacks)
-import           Utils.Conduit(awaitWith)
+import           BDCS.Export.Directory(directorySink)
+import           BDCS.Export.Utils(runHacks)
+import           BDCS.Utils.Conduit(awaitWith)
 
 import           Paths_bdcs(getDataFileName)
 

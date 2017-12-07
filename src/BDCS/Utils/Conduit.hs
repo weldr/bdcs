@@ -2,9 +2,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Utils.Conduit(awaitWith,
-                     identityC,
-                     sourceInputStream)
+module BDCS.Utils.Conduit(awaitWith,
+                          identityC,
+                          sourceInputStream)
  where
 
 import Conduit(mapC)

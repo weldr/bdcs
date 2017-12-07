@@ -18,9 +18,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Import.Comps(CompsPkg(..),
-                    CompsGroup(..),
-                    loadFromURI)
+module BDCS.Import.Comps(CompsPkg(..),
+                         CompsGroup(..),
+                         loadFromURI)
  where
 
 import           Control.Monad.Reader(ReaderT)
@@ -31,8 +31,8 @@ import           Text.XML(Document, sinkDoc)
 import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
 
-import Import.Conduit(getFromURI, ungzipIfCompressed)
-import Import.State(ImportState)
+import BDCS.Import.Conduit(getFromURI, ungzipIfCompressed)
+import BDCS.Import.State(ImportState)
 
 data CompsPkg = CPMandatory T.Text
               | CPDefault T.Text

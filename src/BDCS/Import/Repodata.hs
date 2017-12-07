@@ -18,9 +18,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
-module Import.Repodata(RepoException,
-                       loadFromURI,
-                       loadRepoFromURI)
+module BDCS.Import.Repodata(RepoException,
+                            loadFromURI,
+                            loadRepoFromURI)
  where
 
 import           Control.Applicative((<|>))
@@ -37,13 +37,12 @@ import           Text.XML(Document, sinkDoc)
 import           Text.XML.Cursor
 import           Text.XML.Stream.Parse(def)
 
-import qualified Import.Comps as Comps
-import           Import.Conduit(getFromURI, ungzipIfCompressed)
-import qualified Import.RPM as RPM
-import           Import.State(ImportState(..))
-import           Import.URI(appendURI, baseURI)
-
 import           BDCS.Exceptions(throwIfNothing)
+import qualified BDCS.Import.Comps as Comps
+import           BDCS.Import.Conduit(getFromURI, ungzipIfCompressed)
+import qualified BDCS.Import.RPM as RPM
+import           BDCS.Import.State(ImportState(..))
+import           BDCS.Import.URI(appendURI, baseURI)
 
 data RepoException = RepoException
  deriving(Show, Typeable)

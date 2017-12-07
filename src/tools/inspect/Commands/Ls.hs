@@ -30,9 +30,9 @@ import BDCS.Files(filesC, getKeyValuesForFile)
 import BDCS.KeyType(KeyType(..))
 import BDCS.KeyValue(keyValueListToJSON)
 import BDCS.Label.Types(Label, labelDescriptions)
+import BDCS.Utils.Either(whenLeft)
+import BDCS.Utils.Mode(modeAsText)
 import BDCS.Version
-import Utils.Either(whenLeft)
-import Utils.Mode(modeAsText)
 
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)

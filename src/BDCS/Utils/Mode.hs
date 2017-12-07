@@ -1,6 +1,6 @@
 {-# LANGUAGE MultiWayIf #-}
 
-module Utils.Mode(modeAsText)
+module BDCS.Utils.Mode(modeAsText)
  where
 
 import           Data.Bits(testBit)

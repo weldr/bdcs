@@ -1,6 +1,6 @@
-module Utils.Either(maybeToEither,
-                    whenLeft,
-                    whenRight)
+module BDCS.Utils.Either(maybeToEither,
+                         whenLeft,
+                         whenRight)
  where
 
 import Control.Monad.Except(MonadError, throwError)

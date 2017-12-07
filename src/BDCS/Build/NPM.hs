@@ -18,7 +18,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TupleSections #-}
 
-module Build.NPM(rebuildNPM)
+module BDCS.Build.NPM(rebuildNPM)
  where
 
 import           Control.Monad(forM_, void, when)

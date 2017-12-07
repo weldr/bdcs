@@ -36,7 +36,7 @@ import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
-import Utils.Conduit(awaitWith)
+import BDCS.Utils.Conduit(awaitWith)
 
 insertFiles :: MonadIO m => [Files] -> SqlPersistT m [Key Files]
 insertFiles = mapM insert

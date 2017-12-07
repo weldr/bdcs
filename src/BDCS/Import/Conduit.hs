@@ -16,8 +16,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Import.Conduit(getFromURI,
-                      ungzipIfCompressed)
+module BDCS.Import.Conduit(getFromURI,
+                           ungzipIfCompressed)
  where
 
 import           Conduit(Conduit, Producer, (.|), leftover, sourceFile)
@@ -30,8 +30,8 @@ import           Data.Word(Word8)
 import           Network.HTTP.Simple(getResponseBody, httpSource, parseRequest)
 import           Network.URI(URI(..))
 
-import           Import.URI(showURI, uriToPath)
-import           Utils.Conduit(identityC)
+import           BDCS.Import.URI(showURI, uriToPath)
+import           BDCS.Utils.Conduit(identityC)
 
 -- Load data from a given file: or http: URL
 getFromURI :: MonadResource m => URI -> Producer m BS.ByteString
