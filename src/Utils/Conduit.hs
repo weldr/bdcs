@@ -3,9 +3,11 @@
 {-# LANGUAGE RankNTypes #-}
 
 module Utils.Conduit(awaitWith,
+                     identityC,
                      sourceInputStream)
  where
 
+import Conduit(mapC)
 import Control.Monad(unless)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Trans.Resource(MonadResource)
@@ -19,6 +21,10 @@ awaitWith :: Monad m => (i -> Conduit i m o) -> Conduit i m o
 awaitWith fn = await >>= \case
     Nothing -> return ()
     Just v  -> fn v
+
+-- A conduit that takes its input and returns that as its output.
+identityC :: Monad m => Conduit a m a
+identityC = mapC id
 
 -- Convert a GInputStream to a conduit source
 sourceInputStream :: (MonadResource m, IsInputStream i) => i -> Producer m ByteString
