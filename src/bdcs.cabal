@@ -12,8 +12,8 @@ author:                 Chris Lumens
 maintainer:             clumens@redhat.com
 license:                LGPL
 license-file:           LICENSE
-cabal-version:          >= 1.10
 build-type:             Custom
+cabal-version:          >= 1.10
 
 data-dir:               data
 data-files:             sysusers-default.conf,
@@ -104,49 +104,50 @@ library
                         Utils.Mode,
                         Utils.Monad
 
-    build-depends:      aeson,
-                        base >=4.9 && <5.0,
-                        bytestring,
+    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
+                        base >= 4.9 && < 5.0,
+                        bytestring >= 0.10 && < 0.11,
                         codec-rpm >= 0.2.0 && < 0.3,
-                        cond,
-                        containers,
-                        conduit >= 1.2.8,
-                        conduit-combinators,
-                        conduit-extra,
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
+                        conduit-combinators >= 1.1.0 && < 1.2,
+                        conduit-extra >= 1.1.0 && < 1.2,
+                        containers >= 0.5.7.1 && < 0.6,
                         content-store >= 0.2.0 && < 0.3.0,
-                        cpio-conduit,
-                        cryptonite,
-                        directory,
-                        esqueleto >= 2.5.3,
-                        exceptions,
-                        filepath,
-                        gi-gio,
-                        gi-glib,
-                        gi-ostree >= 1.0.3,
-                        gitrev >= 1.3.1,
-                        http-conduit,
-                        memory,
-                        monad-control,
-                        monad-logger,
-                        mtl >= 2.2.1,
-                        network-uri,
-                        parsec,
-                        parsec-numbers,
-                        persistent,
-                        persistent-sqlite,
-                        persistent-template,
-                        process,
-                        regex-pcre,
-                        resourcet,
-                        split,
-                        tar,
-                        tar-conduit,
-                        temporary,
-                        text,
-                        time,
-                        unix,
-                        unordered-containers,
-                        xml-conduit
+                        cpio-conduit >= 0.7.0 && < 0.8.0,
+                        cryptonite >= 0.22 && < 0.30,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        esqueleto >= 2.5.3 && < 2.6.0,
+                        exceptions >= 0.8.0 && < 0.9.0,
+                        filepath >= 1.4.1.1 && < 1.5.0.0,
+                        gi-gio >= 2.0.14 && < 2.1.0,
+                        gi-glib >= 2.0.14 && < 2.1.0,
+                        gi-ostree >= 1.0.3 && < 1.1.0,
+                        gitrev >= 1.3.1 && < 1.4.0,
+                        http-conduit >= 2.2.3 && < 2.3.0,
+                        memory >= 0.14.3 && < 0.15.0,
+                        monad-control >= 1.0.1.0 && < 1.1.0.0,
+                        monad-logger >= 0.3.20.2 && < 0.4.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        network-uri >= 2.6.0 && < 2.7.0,
+                        parsec >= 3.1.10 && < 3.2.0,
+                        parsec-numbers >= 0.1.0 && < 0.2.0,
+                        persistent >= 2.7.0 && < 2.8.0,
+                        persistent-sqlite >= 2.6.0 && < 2.7.0,
+                        persistent-template >= 2.5.0 && < 2.6.0,
+                        process >= 1.4.3.0 && < 2.0,
+                        regex-pcre >= 0.94 && < 0.95,
+                        resourcet >= 1.1.9 && < 1.2,
+                        split >= 0.2.3 && < 0.3,
+                        tar >= 0.5 && < 0.6,
+                        tar-conduit >= 0.1.0 && < 0.2.0,
+                        temporary >= 1.2.0.4 && < 1.3.0.0,
+                        text >= 1.2.2.0 && < 1.3,
+                        time >= 1.6.0.1 && < 2.0,
+                        unix >= 2.7.2.1 && < 2.8.0.0,
+                        unordered-containers >= 0.2.7.2 && < 0.2.9.0,
+                        xml-conduit >= 1.4.0.4 && < 1.8.0
+
     pkgconfig-depends:  ostree-1 >= 2017.8
 
     other-modules:      Paths_bdcs
@@ -165,9 +166,9 @@ executable import
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
-                        cond,
+                        cond >= 0.4.1.1 && < 0.5.0.0,
                         content-store >= 0.2.0 && < 0.3.0,
-                        directory,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
                         mtl >= 2.2.1,
                         network-uri
 
@@ -187,12 +188,12 @@ executable inspect
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
-                        cond,
-                        directory,
-                        filepath,
-                        monad-loops,
-                        process,
-                        text
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        filepath >= 1.4.1.1 && < 1.5.0.0,
+                        monad-loops >= 0.4.0 && < 0.5,
+                        process >= 1.4.3.0 && < 2.0,
+                        text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
 
@@ -207,18 +208,18 @@ executable inspect-groups
                         Utils.IO,
                         Utils.KeyVal
 
-    build-depends:      aeson,
+    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
                         aeson-pretty,
                         base >= 4.7 && < 5.0,
                         bdcs,
-                        bytestring,
-                        cond,
-                        conduit >= 1.2.8,
-                        directory,
-                        mtl >= 2.2.1,
-                        persistent-sqlite,
-                        regex-pcre,
-                        text
+                        bytestring >= 0.10 && < 0.11,
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        persistent-sqlite >= 2.6.0 && < 2.7.0,
+                        regex-pcre >= 0.94 && < 0.95,
+                        text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
     ghc-options:        -Wall
@@ -233,18 +234,18 @@ executable inspect-ls
                         Utils.IO,
                         Utils.KeyVal
 
-    build-depends:      aeson,
+    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
                         aeson-pretty,
                         base >= 4.7 && < 5.0,
                         bdcs,
-                        bytestring,
-                        cond,
-                        conduit >= 1.2.8,
-                        directory,
-                        mtl >= 2.2.1,
-                        regex-pcre,
-                        text,
-                        time
+                        bytestring >= 0.10 && < 0.11,
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        regex-pcre >= 0.94 && < 0.95,
+                        text >= 1.2.2.0 && < 1.3,
+                        time >= 1.6.0.1 && < 2.0
 
     default-language:   Haskell2010
     ghc-options:        -Wall
@@ -259,12 +260,12 @@ executable inspect-nevras
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
-                        cond,
-                        conduit >= 1.2.8,
-                        directory,
-                        mtl >= 2.2.1,
-                        regex-pcre,
-                        text
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        regex-pcre >= 0.94 && < 0.95,
+                        text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
     ghc-options:        -Wall
@@ -275,12 +276,12 @@ executable export
 
     build-depends:      bdcs,
                         base >= 4.9 && < 5.0,
-                        cond,
-                        conduit >= 1.2.8,
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
                         content-store >= 0.2.0 && < 0.3.0,
-                        directory,
-                        mtl >= 2.2.1,
-                        text
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
 
@@ -292,7 +293,7 @@ executable bdcs-tmpfiles
 
     build-depends:      bdcs,
                         base >= 4.9 && < 5.0,
-                        directory
+                        directory >= 1.3.0.0 && < 1.4.0.0
 
     default-language:   Haskell2010
 
@@ -304,8 +305,8 @@ executable depsolve
 
     build-depends:      bdcs,
                         base >= 4.9 && < 5.0,
-                        mtl >= 2.2.1,
-                        text
+                        mtl >= 2.2.1 && < 2.3,
+                        text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
 
@@ -316,31 +317,31 @@ Test-Suite test-bdcs
     hs-source-dirs:     ., tests
     main-is:            Spec.hs
 
-    build-depends:      hspec,
-                        HUnit,
-                        aeson,
+    build-depends:      hspec == 2.*,
+                        HUnit >= 1.5.0.0 && < 1.7.0.0,
+                        aeson >= 1.0.0.0 && < 1.3.0.0,
                         base >= 4.8 && < 5.0,
-                        bytestring,
+                        bytestring >= 0.10 && < 0.11,
                         codec-rpm >= 0.2.0 && < 0.3,
-                        cond,
-                        conduit >= 1.2.8,
-                        containers,
-                        directory,
-                        esqueleto >= 2.5.3,
-                        filepath,
-                        gi-gio,
-                        gi-glib,
-                        monad-logger,
-                        mtl >= 2.2.1,
-                        parsec,
-                        parsec-numbers,
-                        persistent,
-                        persistent-sqlite,
-                        persistent-template,
-                        resourcet,
-                        text,
-                        time,
-                        unix
+                        cond >= 0.4.1.1 && < 0.5.0.0,
+                        conduit >= 1.2.8 && < 1.3,
+                        containers >= 0.5.7.1 && < 0.6,
+                        directory >= 1.3.0.0 && < 1.4.0.0,
+                        esqueleto >= 2.5.3 && < 2.6.0,
+                        filepath >= 1.4.1.1 && < 1.5.0.0,
+                        gi-gio >= 2.0.14 && < 2.1.0,
+                        gi-glib >= 2.0.14 && < 2.1.0,
+                        monad-logger >= 0.3.20.2 && < 0.4.0,
+                        mtl >= 2.2.1 && < 2.3,
+                        parsec >= 3.1.10 && < 3.2.0,
+                        parsec-numbers >= 0.1.0 && < 0.2.0,
+                        persistent >= 2.7.0 && < 2.8.0,
+                        persistent-sqlite >= 2.6.0 && < 2.7.0,
+                        persistent-template >= 2.5.0 && < 2.6.0,
+                        resourcet >= 1.1.9 && < 1.2,
+                        text >= 1.2.2.0 && < 1.3,
+                        time >= 1.6.0.1 && < 2.0,
+                        unix >= 2.7.2.1 && < 2.8.0.0
 
     ghc-options:        -Wall
     cpp-options:        -DTEST
