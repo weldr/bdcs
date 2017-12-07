@@ -17,11 +17,10 @@
 {-# LANGUAGE RecordWildCards #-}
 
 module Import.Conduit(getFromURI,
-                      identityC,
                       ungzipIfCompressed)
  where
 
-import           Conduit(Conduit, Producer, (.|), leftover, mapC, sourceFile)
+import           Conduit(Conduit, Producer, (.|), leftover, sourceFile)
 import           Control.Monad.Trans.Resource(MonadResource)
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.Lazy as BSL
@@ -32,16 +31,13 @@ import           Network.HTTP.Simple(getResponseBody, httpSource, parseRequest)
 import           Network.URI(URI(..))
 
 import           Import.URI(showURI, uriToPath)
+import           Utils.Conduit(identityC)
 
 -- Load data from a given file: or http: URL
 getFromURI :: MonadResource m => URI -> Producer m BS.ByteString
 getFromURI uri@URI{..} | uriScheme == "file:" = sourceFile $ uriToPath uri
                        | otherwise            = do request <- parseRequest $ showURI uri
                                                    httpSource request getResponseBody
-
--- A conduit that takes its input and returns that as its output.
-identityC :: Monad m => Conduit a m a
-identityC = mapC id
 
 -- If a conduit is compressed, pass it through ungzip to uncompress it.  Otherwise, pass it
 -- through without doing anything. Determine whether a stream is compressed by looking for
