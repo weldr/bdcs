@@ -180,10 +180,7 @@ executable inspect
     main-is:            inspect.hs
     hs-source-dirs:     tools/inspect
 
-    other-modules:      Commands.Groups,
-                        Commands.Ls,
-                        Commands.Nevras,
-                        Utils.GetOpt,
+    other-modules:      Utils.GetOpt,
                         Utils.IO
 
     build-depends:      bdcs,
@@ -200,8 +197,8 @@ executable inspect
     ghc-options:        -Wall
 
 executable inspect-groups
-    main-is:            Groups.hs
-    hs-source-dirs:     tools/inspect/Commands,
+    main-is:            groups.hs
+    hs-source-dirs:     tools/inspect/subcommands,
                         tools/inspect
 
     other-modules:      Utils.GetOpt,
@@ -225,8 +222,8 @@ executable inspect-groups
     ghc-options:        -Wall
 
 executable inspect-ls
-    main-is:            Ls.hs
-    hs-source-dirs:     tools/inspect/Commands,
+    main-is:            ls.hs
+    hs-source-dirs:     tools/inspect/subcommands,
                         tools/inspect
 
     other-modules:      Utils.Exceptions,
@@ -251,8 +248,8 @@ executable inspect-ls
     ghc-options:        -Wall
 
 executable inspect-nevras
-    main-is:            Nevras.hs
-    hs-source-dirs:     tools/inspect/Commands,
+    main-is:            nevras.hs
+    hs-source-dirs:     tools/inspect/subcommands,
                         tools/inspect
 
     other-modules:      Utils.GetOpt,
