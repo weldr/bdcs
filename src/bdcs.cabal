@@ -178,7 +178,8 @@ executable import
 
 executable inspect
     main-is:            inspect.hs
-    hs-source-dirs:     tools/inspect
+    hs-source-dirs:     tools/inspect,
+                        tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO
@@ -199,7 +200,8 @@ executable inspect
 executable inspect-groups
     main-is:            groups.hs
     hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect
+                        tools/inspect,
+                        tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO,
@@ -224,7 +226,8 @@ executable inspect-groups
 executable inspect-ls
     main-is:            ls.hs
     hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect
+                        tools/inspect,
+                        tools
 
     other-modules:      Utils.Exceptions,
                         Utils.GetOpt,
@@ -250,7 +253,8 @@ executable inspect-ls
 executable inspect-nevras
     main-is:            nevras.hs
     hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect
+                        tools/inspect,
+                        tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO
