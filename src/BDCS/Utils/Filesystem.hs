@@ -1,4 +1,4 @@
-module Utils.Filesystem(doesPathExist)
+module BDCS.Utils.Filesystem(doesPathExist)
  where
 
 import Control.Exception(catchJust)

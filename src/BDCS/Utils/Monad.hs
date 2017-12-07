@@ -1,10 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 
-module Utils.Monad(concatForM,
-                   concatMapM,
-                   foldMaybeM,
-                   mapMaybeM,
-                   (>>?))
+module BDCS.Utils.Monad(concatForM,
+                        concatMapM,
+                        foldMaybeM,
+                        mapMaybeM,
+                        (>>?))
  where
 
 import Data.Maybe(catMaybes)

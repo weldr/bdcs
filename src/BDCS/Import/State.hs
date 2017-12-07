@@ -1,4 +1,4 @@
-module Import.State(ImportState(..))
+module BDCS.Import.State(ImportState(..))
  where
 
 import Data.ContentStore(ContentStore)

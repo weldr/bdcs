@@ -26,7 +26,7 @@ import BDCS.DB(checkAndRunSqlite)
 import BDCS.Depclose(depclose)
 import BDCS.Depsolve(formulaToCNF, solveCNF)
 import BDCS.Groups(groupIdToNevra)
-import Utils.Monad(mapMaybeM)
+import BDCS.Utils.Monad(mapMaybeM)
 
 usage :: IO ()
 usage = do

@@ -33,13 +33,13 @@ import System.Exit(exitFailure)
 import System.IO(hPutStrLn, stderr)
 
 import           BDCS.Exceptions(DBException)
+import qualified BDCS.Import.Comps as Comps
+import qualified BDCS.Import.NPM as NPM
+import qualified BDCS.Import.RPM as RPM
+import qualified BDCS.Import.Repodata as Repodata
+import           BDCS.Import.URI(isCompsFile, isPrimaryXMLFile)
+import           BDCS.Import.State(ImportState(..))
 import           BDCS.Version
-import qualified Import.Comps as Comps
-import qualified Import.NPM as NPM
-import qualified Import.RPM as RPM
-import qualified Import.Repodata as Repodata
-import           Import.URI(isCompsFile, isPrimaryXMLFile)
-import           Import.State(ImportState(..))
 
 processThing :: String -> ReaderT ImportState IO ()
 processThing url = case parseURI url of

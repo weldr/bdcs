@@ -20,10 +20,10 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 
-module Import.RPM(consume,
-                  loadIntoMDDB,
-                  loadFromURI,
-                  rpmExistsInMDDB)
+module BDCS.Import.RPM(consume,
+                       loadIntoMDDB,
+                       loadFromURI,
+                       rpmExistsInMDDB)
  where
 
 import           Codec.RPM.Conduit(parseRPMC, payloadContentsC)
@@ -56,24 +56,24 @@ import BDCS.Builds(associateBuildWithPackage, insertBuild)
 import BDCS.DB
 import BDCS.Exceptions(DBException(..), isMissingRPMTagException, throwIfNothing)
 import BDCS.Files(associateFilesWithBuild, associateFilesWithPackage, insertFiles)
+import BDCS.Import.Conduit(getFromURI)
+import BDCS.Import.State(ImportState(..))
 import BDCS.Label.FileLabels(apply)
 import BDCS.Packages(insertPackageName)
 import BDCS.Projects(insertProject)
-import BDCS.Signatures(insertBuildSignatures)
-import BDCS.Sources(insertSource)
 import BDCS.RPM.Builds(mkBuild)
 import BDCS.RPM.Files(mkFiles)
 import BDCS.RPM.Groups(createGroup)
 import BDCS.RPM.Projects(mkProject)
 import BDCS.RPM.Signatures(mkRSASignature, mkSHASignature)
 import BDCS.RPM.Sources(mkSource)
-import Import.Conduit(getFromURI)
-import Import.State(ImportState(..))
-import Utils.Error(mapError)
+import BDCS.Signatures(insertBuildSignatures)
+import BDCS.Sources(insertSource)
+import BDCS.Utils.Error(mapError)
 
 #ifdef SCRIPTS
-import BDCS.Scripts(insertScript)
 import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
+import BDCS.Scripts(insertScript)
 #endif
 
 buildImported :: MonadResource m => [Tag] ->  SqlPersistT m Bool

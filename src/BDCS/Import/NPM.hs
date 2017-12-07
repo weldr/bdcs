@@ -18,7 +18,7 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Import.NPM(loadFromURI)
+module BDCS.Import.NPM(loadFromURI)
  where
 
 import           Control.Monad(void)
@@ -54,16 +54,16 @@ import           System.FilePath((</>), makeRelative, normalise, takeDirectory, 
 import           System.Posix.Files(blockSpecialMode, characterSpecialMode, directoryMode, namedPipeMode, regularFileMode, symbolicLinkMode)
 import           Text.Regex.PCRE((=~))
 
+import BDCS.Build.NPM(rebuildNPM)
 import BDCS.DB
 import BDCS.Files(associateFilesWithSource, insertFiles)
+import BDCS.Import.Conduit(getFromURI, ungzipIfCompressed)
+import BDCS.Import.State(ImportState(..))
 import BDCS.KeyType
 import BDCS.Projects(insertProject)
 import BDCS.Sources(insertSource, insertSourceKeyValue)
-import Build.NPM(rebuildNPM)
-import Import.Conduit(getFromURI, ungzipIfCompressed)
-import Import.State(ImportState(..))
-import Utils.Either(whenLeft)
-import Utils.Monad((>>?))
+import BDCS.Utils.Either(whenLeft)
+import BDCS.Utils.Monad((>>?))
 
 -- base URI for the package.json information
 npmRegistry :: URI

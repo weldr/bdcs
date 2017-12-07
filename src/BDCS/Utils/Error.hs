@@ -1,6 +1,6 @@
-module Utils.Error(errorToEither,
-                   errorToMaybe,
-                   mapError)
+module BDCS.Utils.Error(errorToEither,
+                        errorToMaybe,
+                        mapError)
 
  where
 

@@ -13,13 +13,13 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-import           Control.Monad(when)
-import           System.Directory(createDirectoryIfMissing)
-import           System.Environment(getArgs)
-import           System.Exit(exitFailure)
+import Control.Monad(when)
+import System.Directory(createDirectoryIfMissing)
+import System.Environment(getArgs)
+import System.Exit(exitFailure)
 
-import           BDCS.Version
-import           Export.TmpFiles(setupFilesystem)
+import BDCS.Export.TmpFiles(setupFilesystem)
+import BDCS.Version
 
 usage :: IO ()
 usage = do

@@ -24,9 +24,9 @@ import BDCS.DB(Groups(..), KeyVal(..), checkAndRunSqlite)
 import BDCS.GroupKeyValue(getKeyValuesForGroup)
 import BDCS.Groups(groupsC)
 import BDCS.KeyValue(keyValueListToJSON)
+import BDCS.Utils.Either(whenLeft)
 import BDCS.Version
 
-import Utils.Either(whenLeft)
 import Utils.Exceptions(InspectErrors(..))
 import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)

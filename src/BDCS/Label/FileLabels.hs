@@ -31,8 +31,7 @@ import qualified BDCS.Label.Service as Service
 import qualified BDCS.Label.Translation as Xlat
 import           BDCS.Label.Types(Label(..))
 import           BDCS.Label.Utils(addLabelKey)
-
-import Utils.Monad(concatForM)
+import           BDCS.Utils.Monad(concatForM)
 
 checks :: [(Files -> Bool, Files -> Maybe Label)]
 checks = [(Docs.matches,    Docs.mkLabel),

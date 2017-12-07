@@ -16,7 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Export.Qcow2(qcow2Sink)
+module BDCS.Export.Qcow2(qcow2Sink)
  where
 
 import Control.Monad.Except(MonadError)
@@ -30,8 +30,8 @@ import System.Process(callProcess)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
-import           Export.Directory(directorySink)
-import           Export.Utils(runHacks, runTmpfiles)
+import           BDCS.Export.Directory(directorySink)
+import           BDCS.Export.Utils(runHacks, runTmpfiles)
 
 qcow2Sink :: (MonadResource m, MonadIO m, MonadError String m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =

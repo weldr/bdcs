@@ -16,7 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 
-module Export.Tar(tarSink)
+module BDCS.Export.Tar(tarSink)
  where
 
 import qualified Codec.Archive.Tar as Tar

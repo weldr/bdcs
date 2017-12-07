@@ -15,10 +15,10 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Export.TmpFilesSpec(spec)
+module BDCS.Export.TmpFilesSpec(spec)
   where
 
-import Export.TmpFiles
+import BDCS.Export.TmpFiles
 
 import Test.Hspec
 
