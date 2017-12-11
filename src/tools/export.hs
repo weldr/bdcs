@@ -58,7 +58,7 @@ expandFileThings = concatMapM isThingFile
 
 usage :: IO ()
 usage = do
-    printVersion "bdcs-export"
+    printVersion "export"
     putStrLn "Usage: export metadata.db repo dest thing [thing ...]"
     putStrLn "dest can be:"
     putStrLn "\t* A directory (which may or may not already exist)"

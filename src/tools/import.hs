@@ -67,8 +67,8 @@ runCommand db repo things = do
 
 usage :: IO ()
 usage = do
-    printVersion "bdcs-import"
-    putStrLn "Usage: bdcs-import output.db repo thing [thing ...]"
+    printVersion "import"
+    putStrLn "Usage: import output.db repo thing [thing ...]"
     putStrLn "- repo is the path to an already existing content store repo or "
     putStrLn "  the path to a repo to be created"
     putStrLn "- thing can be:"
