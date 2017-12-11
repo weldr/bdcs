@@ -21,13 +21,25 @@ data-files:             sysusers-default.conf,
                         tmpfiles-ostree.conf,
                         nsswitch-altfiles.conf
 
-extra-source-files:     Makefile,
+extra-source-files:     Dockerfile,
+                        Dockerfile.build,
+                        Dockerfile.integration-test,
+                        entrypoint-integration-test.sh,
+                        entrypoint.sh,
                         cabal.config,
-                        tests/*.hs,
-                        tests/*.sh,
-                        tests/BDCS/*.hs,
-                        tests/BDCS/Export/*.hs,
-                        tests/BDCS/RPM/*.hs
+                        Makefile,
+                        queries,
+                        README.md
+                        s3reposync.sh,
+                        schema.sql,
+                        src/Makefile,
+                        src/tests/*.hs,
+                        src/tests/*.sh,
+                        src/tests/BDCS/*.hs,
+                        src/tests/BDCS/Export/*.hs,
+                        src/tests/BDCS/RPM/*.hs,
+                        tests/is_import_busted.py,
+                        tests/requirements.txt
 
 custom-setup
     setup-depends:      base,
@@ -43,6 +55,8 @@ flag scripts
     default:            False
 
 library
+    hs-source-dirs:     src
+
     exposed-modules:    BDCS.Build.NPM,
                         BDCS.Builds,
                         BDCS.CS,
@@ -162,7 +176,7 @@ library
 
 executable bdcs
     main-is:            bdcs.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt,
                         Utils.Subcommands
@@ -182,7 +196,7 @@ executable bdcs
 
 executable bdcs-import
     main-is:            import.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
 
@@ -201,8 +215,8 @@ executable bdcs-import
 
 executable bdcs-inspect
     main-is:            inspect.hs
-    hs-source-dirs:     tools/inspect,
-                        tools
+    hs-source-dirs:     src/tools/inspect,
+                        src/tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO,
@@ -223,9 +237,9 @@ executable bdcs-inspect
 
 executable inspect-groups
     main-is:            groups.hs
-    hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect,
-                        tools
+    hs-source-dirs:     src/tools/inspect/subcommands,
+                        src/tools/inspect,
+                        src/tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO,
@@ -249,9 +263,9 @@ executable inspect-groups
 
 executable inspect-ls
     main-is:            ls.hs
-    hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect,
-                        tools
+    hs-source-dirs:     src/tools/inspect/subcommands,
+                        src/tools/inspect,
+                        src/tools
 
     other-modules:      Utils.Exceptions,
                         Utils.GetOpt,
@@ -276,9 +290,9 @@ executable inspect-ls
 
 executable inspect-nevras
     main-is:            nevras.hs
-    hs-source-dirs:     tools/inspect/subcommands,
-                        tools/inspect,
-                        tools
+    hs-source-dirs:     src/tools/inspect/subcommands,
+                        src/tools/inspect,
+                        src/tools
 
     other-modules:      Utils.GetOpt,
                         Utils.IO
@@ -297,7 +311,7 @@ executable inspect-nevras
 
 executable bdcs-export
     main-is:            export.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
 
@@ -316,7 +330,7 @@ executable bdcs-export
 
 executable bdcs-tmpfiles
     main-is:            bdcs-tmpfiles.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     src/tools
 
     build-depends:      bdcs,
                         base >= 4.9 && < 5.0,
@@ -328,7 +342,7 @@ executable bdcs-tmpfiles
 
 executable bdcs-depsolve
     main-is:            depsolve.hs
-    hs-source-dirs:     tools
+    hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
 
@@ -343,7 +357,8 @@ executable bdcs-depsolve
 
 Test-Suite test-bdcs
     type:               exitcode-stdio-1.0
-    hs-source-dirs:     ., tests
+    hs-source-dirs:     src,
+                        src/tests
     main-is:            Spec.hs
 
     build-depends:      hspec == 2.*,
