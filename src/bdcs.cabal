@@ -164,7 +164,8 @@ executable bdcs
     main-is:            bdcs.hs
     hs-source-dirs:     tools
 
-    other-modules:      Utils.GetOpt
+    other-modules:      Utils.GetOpt,
+                        Utils.Subcommands
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
@@ -204,7 +205,8 @@ executable bdcs-inspect
                         tools
 
     other-modules:      Utils.GetOpt,
-                        Utils.IO
+                        Utils.IO,
+                        Utils.Subcommands
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
