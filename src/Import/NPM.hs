@@ -112,11 +112,12 @@ data PackageJSON = PackageJSON {
     -- The package.json documentation implies that it is an error to have both bin and
     -- directories.bin in package.json. And then npm itself does exactly that. So, what
     -- this actually means:
-    -- * If bin is present, in any form (even if it is empty), it takes
-    --   precedence and directories.bin is ignored for our purposes
-    -- * If bin is not present and directories.bin is present, every path in this directory
-    --   gets symlinked to /usr/bin. Subdirectories gets symlinked too and are not traversed,
-    --   so if you have <bindir>/subdir, that gets symlinked as /usr/bin/subdir.
+    --
+    --   * If bin is present, in any form (even if it is empty), it takes
+    --     precedence and directories.bin is ignored for our purposes
+    --   * If bin is not present and directories.bin is present, every path in this directory
+    --     gets symlinked to /usr/bin. Subdirectories gets symlinked too and are not traversed,
+    --     so if you have <bindir>/subdir, that gets symlinked as /usr/bin/subdir.
     binDirectory :: Maybe T.Text,
 
     -- Similar to bin, if man is present (even as an empty list), then this is ignored.
