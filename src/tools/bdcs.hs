@@ -30,24 +30,21 @@ import System.Process(callProcess)
 
 import BDCS.Version
 
-import Utils.GetOpt(commandLineArgs)
-
 import Paths_bdcs(getLibexecDir)
 
 -- A mapping from a subcommand name to a brief description of what it does.
 knownSubcommands :: [(String, String)]
 knownSubcommands = [
-    ("groups",  "List groups (RPM packages, etc.) in the content store"),
-    ("ls",      "List files in the content store"),
-    ("nevras",  "List NEVRAs of RPM packages in the content store")
+    ("depsolve", "print a list of all the dependencies of some object"),
+    ("export",   "extract objects from the content store and build an image"),
+    ("import",   "load packages into the content store"),
+    ("inspect",  "inspect the contents of the content store in various ways")
  ]
 
 usage :: IO ()
 usage = do
-    printVersion "bdcs-inspect"
-    putStrLn "Usage: inspect output.db repo subcommand [args ...]"
-    putStrLn "- output.db is the path to a metadata database"
-    putStrLn "- repo is the path to a content store repo"
+    printVersion "bdcs"
+    putStrLn "Usage: bdcs subcommand [args ...]"
     putStrLn "- subcommands:"
     forM_ knownSubcommands $ \(cmd, help) ->
         putStrLn $ "      " ++ cmd ++ " - " ++ help
@@ -56,7 +53,7 @@ usage = do
 getBasePath :: IO FilePath
 getBasePath = do
     dir <- getLibexecDir
-    return $ dir </> "inspect-"
+    return $ dir </> "bdcs-"
 
 findInPath :: FilePath -> IO (Maybe FilePath)
 findInPath sought = lookupEnv "PATH" >>= \case
@@ -68,15 +65,18 @@ findInPath sought = lookupEnv "PATH" >>= \case
 existsInPath :: FilePath -> IO Bool
 existsInPath sought = fmap (/= Nothing) (findInPath sought)
 
-runCommand :: FilePath -> FilePath -> [String] -> IO ()
-runCommand db repo args = do
-    let subcmd = head args
-    let subcmdArgs = [db, repo] ++ tail args
+main :: IO ()
+main = do
+    argv <- getArgs
+
+    when (length argv < 1) usage
+    let subcmd = head argv
+    let subcmdArgs = tail argv
 
     basePath <- getBasePath
 
     let cmd1 = basePath ++ subcmd
-    let cmd2 = "inspect-" ++ subcmd
+    let cmd2 = "bdcs-" ++ subcmd
 
     case subcmd `lookup` knownSubcommands of
         -- This is a subcommand we have built-in knowledge of.  For ease of development, it
@@ -100,18 +100,10 @@ runCommand db repo args = do
                        (tryCallProcess cmd1 subcmdArgs)
                        (putStrLn ("subcommand " ++ subcmd ++ " does not exist\n") >> usage)
  where
-     tryCallProcess cmd opts = catch (callProcess cmd opts)
+     tryCallProcess cmd args = catch (callProcess cmd args)
                                      -- We handled the case where an unknown subcommand was
                                      -- given on the command line.  For now, the only other
                                      -- errors possible are when the subcommand ran, but
                                      -- failed for some reason.  Those are handled inside
                                      -- the subcommand.  Just quit.
                                      (\(_ :: SomeException) -> exitFailure)
-
-main :: IO ()
-main = commandLineArgs <$> getArgs >>= \case
-    Just (db, repo, args) -> do
-        when (null args) usage
-
-        runCommand db repo args
-    _                     -> usage

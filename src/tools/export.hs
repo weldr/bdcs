@@ -44,6 +44,8 @@ import           BDCS.Utils.Either(whenLeft)
 import           BDCS.Utils.Monad(concatMapM)
 import           BDCS.Version
 
+import Utils.GetOpt(commandLineArgs)
+
 -- | Check a list of strings to see if any of them are files
 -- If it is, read it and insert its contents in its place
 expandFileThings :: [String] -> IO [String]
@@ -56,7 +58,7 @@ expandFileThings = concatMapM isThingFile
 
 usage :: IO ()
 usage = do
-    printVersion "export"
+    printVersion "bdcs-export"
     putStrLn "Usage: export metadata.db repo dest thing [thing ...]"
     putStrLn "dest can be:"
     putStrLn "\t* A directory (which may or may not already exist)"
@@ -81,24 +83,18 @@ needKernel = do
     putStrLn "ERROR: ostree exports need a kernel package included"
     exitFailure
 
-{-# ANN main ("HLint: ignore Use head" :: String) #-}
-main :: IO ()
-main = do
-    argv <- getArgs
+runCommand :: FilePath -> FilePath -> [String] -> IO ()
+runCommand db repo args = do
+    let out_path = head args
+    allThings <- expandFileThings $ tail args
 
-    when (length argv < 4) usage
-
-    let db_path = T.pack (argv !! 0)
-    let out_path = argv !! 2
-    allThings <- expandFileThings $ drop 3 argv
-
-    repo <- runCsMonad (openContentStore (argv !! 1)) >>= \case
+    cs <- runCsMonad (openContentStore repo) >>= \case
         Left e  -> print e >> exitFailure
         Right r -> return r
 
     let (match, otherThings) = partition (isPrefixOf "filesystem-") allThings
     when (length match < 1) needFilesystem
-    let things = map T.pack $ match !! 0 : otherThings
+    let things = map T.pack $ head match : otherThings
 
     when (".repo" `isSuffixOf` out_path) $
         unless (any ("kernel-" `T.isPrefixOf`) things) needKernel
@@ -108,10 +104,10 @@ main = do
                                       (".repo" `isSuffixOf` out_path,  (cleanupHandler out_path, Ostree.ostreeSink out_path)),
                                       (otherwise,                      (print, directoryOutput out_path))]
 
-    result <- runExceptT $ checkAndRunSqlite db_path $ runConduit $ CL.sourceList things
+    result <- runExceptT $ checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
         .| getGroupIdC
         .| groupIdToFilesC
-        .| CS.filesToObjectsC repo
+        .| CS.filesToObjectsC cs
         .| objectSink
 
     whenLeft result (\e -> handler e >> exitFailure)
@@ -126,3 +122,10 @@ main = do
 
     cleanupHandler :: Show a => FilePath -> a -> IO ()
     cleanupHandler path e = print e >> removePathForcibly path
+
+main :: IO ()
+main = commandLineArgs <$> getArgs >>= \case
+    Nothing               -> usage
+    Just (db, repo, args) -> do
+        when (length args < 2) usage
+        runCommand db repo args

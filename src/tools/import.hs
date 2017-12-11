@@ -14,6 +14,7 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
@@ -21,16 +22,16 @@
 
 import Control.Conditional(unlessM)
 import Control.Exception(catch)
-import Control.Monad(void, when)
-import Control.Monad.IO.Class(liftIO)
+import Control.Monad(forM_)
+import Control.Monad.Except(MonadError, runExceptT, throwError)
+import Control.Monad.IO.Class(MonadIO, liftIO)
 import Control.Monad.Reader(ReaderT, runReaderT)
-import Data.ContentStore(mkContentStore, runCsMonad)
+import Data.ContentStore(CsError(..), mkContentStore)
 import Data.List(isSuffixOf)
 import Network.URI(URI(..), parseURI)
 import System.Directory(doesFileExist)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
-import System.IO(hPutStrLn, stderr)
 
 import           BDCS.Exceptions(DBException)
 import qualified BDCS.Import.Comps as Comps
@@ -39,7 +40,10 @@ import qualified BDCS.Import.RPM as RPM
 import qualified BDCS.Import.Repodata as Repodata
 import           BDCS.Import.URI(isCompsFile, isPrimaryXMLFile)
 import           BDCS.Import.State(ImportState(..))
+import           BDCS.Utils.Either(whenLeft)
 import           BDCS.Version
+
+import Utils.GetOpt(commandLineArgs)
 
 processThing :: String -> ReaderT ImportState IO ()
 processThing url = case parseURI url of
@@ -50,10 +54,21 @@ processThing url = case parseURI url of
                            | otherwise                      -> Repodata.loadRepoFromURI uri
     _ -> liftIO usage
 
+runCommand :: (MonadError CsError m, MonadIO m) => FilePath -> FilePath -> [String] -> m ()
+runCommand db repo things = do
+    cs <- mkContentStore repo
+    let st = ImportState { stDB=db, stRepo=cs }
+
+    unlessM (liftIO $ doesFileExist db) $
+         throwError $ CsError "Database must already exist - create with sqlite3 schema.sql"
+
+    forM_ things $ \path ->
+        liftIO $ runReaderT (processThing path) st
+
 usage :: IO ()
 usage = do
-    printVersion "import"
-    putStrLn "Usage: import output.db repo thing [thing ...]"
+    printVersion "bdcs-import"
+    putStrLn "Usage: bdcs-import output.db repo thing [thing ...]"
     putStrLn "- repo is the path to an already existing content store repo or "
     putStrLn "  the path to a repo to be created"
     putStrLn "- thing can be:"
@@ -62,30 +77,10 @@ usage = do
     putStrLn "\t* A URL to a yum repo comps.xml.gz file"
     exitFailure
 
-{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
-main = do
-    -- Read the list of objects to import from the command line arguments
-    argv <- getArgs
-
-    when (length argv < 3) usage
-
-    let db     = argv !! 0
-    let things = drop 2 argv
-
-    result <- runCsMonad $ mkContentStore (argv !! 1)
-    repo   <- case result of
-                   Left e  -> print e >> exitFailure
-                   Right r -> return r
-
-    unlessM (doesFileExist db) $ do
-        putStrLn "Database must already exist - create with sqlite3 schema.sql"
-        exitFailure
-
-    let st = ImportState { stDB=db,
-                           stRepo=repo }
-
-    mapM_ (processOne st) things
- where
-    processOne st path = catch (runReaderT (processThing path) st)
-                               (\(e :: DBException) -> void $ hPutStrLn stderr ("*** Error importing " ++ path ++ ": " ++ show e))
+main = commandLineArgs <$> getArgs >>= \case
+    Nothing               -> usage
+    Just (db, repo, args) -> do
+        result <- catch (runExceptT $ runCommand db repo args)
+                        (\(e :: DBException) -> return $ Left $ CsError $ show e)
+        whenLeft result (\e -> putStrLn $ "error: " ++ show e)

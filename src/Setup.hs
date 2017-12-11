@@ -56,7 +56,7 @@ bdcsCopy pkg lbi _ flags = do
     install subPkg subLbi flags
 
 isSubcommand :: String -> Bool
-isSubcommand s = "inspect-" `isPrefixOf` s
+isSubcommand s = "inspect-" `isPrefixOf` s || "bdcs-" `isPrefixOf` s
 
 extractMainComponents :: PackageDescription -> LocalBuildInfo -> (PackageDescription, LocalBuildInfo)
 extractMainComponents pkg lbi = let
