@@ -32,7 +32,6 @@ extra-source-files:     Dockerfile,
                         README.md
                         s3reposync.sh,
                         schema.sql,
-                        src/Makefile,
                         src/tests/*.hs,
                         src/tests/*.sh,
                         src/tests/BDCS/*.hs,
