@@ -44,6 +44,11 @@ after_success:
         s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/export/export s3://weldr/$TARGET_DIR/export
         s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./schema.sql s3://weldr/$TARGET_DIR/schema.sql
 
+        # kick off other tests which depend on the artifacts above
+        if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
+            ./kick_dependent_tests.sh
+        fi
+
 notifications:
   email:
     on_failure: change
