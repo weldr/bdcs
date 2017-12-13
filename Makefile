@@ -20,8 +20,9 @@ build: Dockerfile.build
 	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
 	fi;
 	sudo docker create --name build-cont $(ORG_NAME)/bdcs-build-img
-	sudo docker cp build-cont:/root/.cabal/bin/import ./import
-	sudo docker cp build-cont:/root/.cabal/bin/export ./export
+	sudo docker cp build-cont:/usr/local/bin/bdcs ./bdcs
+	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-import ./bdcs-import
+	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-export ./bdcs-export
 	sudo docker rm build-cont
 
 importer: build
@@ -113,7 +114,7 @@ ci_after_success:
 
 	sudo chown travis:travis -R ./bdcs/dist
 	[ -x ~/.cabal/bin/hpc-coveralls ] || cabal update && cabal install hpc-coveralls
-	cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs import export bdcs-tmpfiles depsolve && cd ..
+	cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs bdcs bdcs-import bdcs-inspect inspect-groups inspect-ls inspect-nevras bdcs-export bdcs-tmpfiles bdcs-depsolve && cd ..
 
 sandbox:
 	[ -d .cabal-sandbox ] || cabal sandbox init
