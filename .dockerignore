@@ -1,5 +1,4 @@
 .git
-**/.cabal
 **/.cabal-sandbox
 **/cabal.sandbox.config
 mddb/
@@ -10,4 +9,4 @@ welder-deployment/
 *.repo/
 *.db
 **.tix
-src/dist
+dist

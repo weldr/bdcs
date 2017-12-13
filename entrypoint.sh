@@ -16,10 +16,10 @@ if [ ! -f "$MDDB" ]; then
 fi
 
 for f in /rpms/*rpm; do
-    /usr/local/bin/import "$MDDB" "$STORE" file://${f}
+    /usr/local/bin/bdcs import "$MDDB" "$STORE" file://${f}
 done
 
 # if URL was passed try to import from there
 if [ -n "$IMPORT_URL" ]; then
-    /usr/local/bin/import "$MDDB" "$STORE" $IMPORT_URL
+    /usr/local/bin/bdcs import "$MDDB" "$STORE" $IMPORT_URL
 fi
