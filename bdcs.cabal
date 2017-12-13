@@ -33,10 +33,10 @@ extra-source-files:     Dockerfile,
                         s3reposync.sh,
                         schema.sql,
                         src/tests/*.hs,
-                        src/tests/*.sh,
                         src/tests/BDCS/*.hs,
                         src/tests/BDCS/Export/*.hs,
                         src/tests/BDCS/RPM/*.hs,
+                        tests/*.sh,
                         tests/is_import_busted.py,
                         tests/requirements.txt
 
