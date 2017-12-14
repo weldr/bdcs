@@ -16,7 +16,7 @@ CENTOS_REPO="centos.repo"
 
 ### test that we can import a single RPM from local disk
 wget http://mirror.centos.org/centos/7/os/x86_64/Packages/setup-2.8.71-7.el7.noarch.rpm && \
-    $IMPORT $METADATA_DB $CENTOS_REPO file://`pwd`/setup-2.8.71-7.el7.noarch.rpm
+    $BDCS import $METADATA_DB $CENTOS_REPO file://`pwd`/setup-2.8.71-7.el7.noarch.rpm
 if [ $? -ne 0 ]; then
     echo "ERROR: importing from local disk failed"
     exit 1
