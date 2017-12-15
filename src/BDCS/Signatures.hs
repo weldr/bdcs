@@ -1,17 +1,15 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
+-- |
+-- Module: BDCS.Signatures
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
 --
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
 --
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
+-- Manage 'BuildSignatures' records in the database.  These are used for keeping track
+-- of the signatures given to a build at build time.  Multiple signatures can be associated
+-- with a single 'Builds' record.
 
 module BDCS.Signatures(insertBuildSignatures)
  where
@@ -21,5 +19,7 @@ import Database.Esqueleto
 
 import BDCS.DB
 
+-- | Loop over a list of provided 'BuildSignatures' and add them to the database, returning
+-- their keys in the same order as the original list.
 insertBuildSignatures :: MonadIO m => [BuildSignatures] -> SqlPersistT m [Key BuildSignatures]
 insertBuildSignatures = mapM insert

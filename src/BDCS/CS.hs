@@ -6,6 +6,17 @@
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
+-- |
+-- Module: BDCS.CS
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Conduit-based interface between BDCS and its underlying content store.
+
 module BDCS.CS(Object(..),
                filesToObjectsC,
                objectToTarEntry)
@@ -27,11 +38,16 @@ import           System.Posix.Types(CMode(..), FileMode)
 import BDCS.DB
 import BDCS.Utils.Either(maybeToEither)
 
--- A content object is either a regular file with corresponding data,
--- or something else (directory, symlink) described by the Files metadata
-data Object = SpecialObject
-            | FileObject BS.ByteString
+-- | An object in the content store is either a regular file or something else
+-- (directory, symlink, etc.) described by the 'Files' metadata.
+data Object = SpecialObject                 -- ^ Some non-file object that should be accompanied
+                                            -- by a 'Files' record so its metadata can be tracked
+            | FileObject BS.ByteString      -- ^ A file object with its contents
 
+-- | Read 'Files' records from a 'Conduit', find the object in the content store, and return the
+-- matching 'Object' if found.  An error is thrown if the object does not exist, or if there is
+-- any other error interacting with the content store.  In addition, the 'Files' object is also
+-- returned as part of the result tuple so its metadata can be used by downstream consumers.
 filesToObjectsC :: (MonadError String m, MonadIO m) => ContentStore -> Conduit Files m (Files, Object)
 filesToObjectsC repo = awaitForever $ \f@Files{..} ->
     let isRegular = fromIntegral filesMode `intersectFileModes` fileTypeModes == regularFileMode
@@ -46,6 +62,10 @@ filesToObjectsC repo = awaitForever $ \f@Files{..} ->
                 Left e    -> throwError (show e)
                 Right obj -> yield (f, FileObject obj)
 
+-- | Read tuples from a 'Conduit' and convert each into a 'Codec.Archive.Tar.Entry' suitable for
+-- streaming into an archive.  Metadata such as permissions and ownerships will be set correctly.
+-- Symlinks and other special non-file things will be handled correctly.  This function is suitable
+-- as a downstream consumer of 'filesToObjectsC'.
 objectToTarEntry :: (MonadError String m, MonadIO m) => Conduit (Files, Object) m Tar.Entry
 objectToTarEntry = awaitForever $ \(f@Files{..}, obj) -> do
     result <- case obj of

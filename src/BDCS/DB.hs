@@ -1,18 +1,3 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs  #-}
@@ -24,6 +9,17 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+
+-- |
+-- Module: BDCS.DB
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- The metadata database schema and miscellaneous database helper functions
 
 module BDCS.DB where
 
@@ -52,22 +48,28 @@ import BDCS.ReqType
 -- we'll just compare things directly to Nothing.
 {-# ANN module ("HLint: ignore Use isNothing" :: String) #-}
 
--- This must match the PRAGMA user_version value in schema.sql
+-- | The database schema version as implemented by this module.  This must match the
+-- PRAGMA user_version value in schema.sql, shipped elsewhere in the source.
 schemaVersion :: Int64
 schemaVersion = 4
 
+-- | Return the version number stored in the database.
 getDbVersion :: MonadIO m => SqlPersistT m Int64
 getDbVersion = unSingle <$> head <$> rawSql "pragma user_version" []
 
--- The change from version 3 to version 4 involves changing the content store, so there
--- is no automatic upgrade path.
+-- | Verify that the version number stored in the database matches the schema version number
+-- implemented by this module.  If there is a version mismatch, throw an error.
 checkDbVersion :: (MonadError String m, MonadIO m) => SqlPersistT m ()
 checkDbVersion = do
+    -- The change from version 3 to version 4 involves changing the content store, so there
+    -- is no automatic upgrade path.
     userVersion <- getDbVersion
     unless (userVersion == schemaVersion) $ throwError $
         "Database version " ++ show userVersion ++ " does not match expected version " ++ show schemaVersion ++
             ", please re-import your data"
 
+-- | Like 'Database.Persist.Sqlite.runSqlite', but first checks that the database's schema version
+-- matches what is expected.  This prevents running against incompatible database versions.
 checkAndRunSqlite :: (MonadError String m, MonadBaseControl IO m, MonadIO m) =>
     T.Text -> SqlPersistT (NoLoggingT (ResourceT m)) a -> m a
 checkAndRunSqlite db action = runSqlite db (checkDbVersion >> action)
@@ -192,51 +194,54 @@ instance Aeson.ToJSON KeyVal where
            | v == e || e == Nothing -> fromJust v
            | otherwise              -> fromJust e
 
--- Rus a sql query, returning the first entity as a Maybe.  Use this when you
--- want a row out of the database.
+-- | Run an SQL query, returning the first 'Entity' as a Maybe.  Use this when you
+-- want a single row out of the database.
 firstEntityResult :: Monad m => m [Entity a] -> m (Maybe a)
 firstEntityResult query =
     listToMaybe . map entityVal <$> query
 
--- Run a sql query, returning the first key as a Maybe.  Use this when you want
--- an index out of the database.
+-- | Run an SQL query, returning the first key as a Maybe.  Use this when you want
+-- a single index out of the database.
 firstKeyResult :: Monad m => m [Value a] -> m (Maybe a)
 firstKeyResult query =
     listToMaybe . map unValue <$> query
 
--- Like maybe, but for keys - take a default value, a function, potentially the key given
--- by some other database query.  If the key is Nothing, return the default value.  Otherwise,
+-- | Like 'maybe', but for keys.  If the key is nothing, return the default value.  Otherwise,
 -- run the function on the key and return that value.
-maybeKey :: MonadIO m => m b -> (t -> m b) -> m (Maybe t) -> m b
+maybeKey :: MonadIO m =>
+            m b             -- ^ Default value
+         -> (t -> m b)      -- ^ A function to run on the key
+         -> m (Maybe t)     -- ^ A 'Maybe' key
+         -> m b
 maybeKey def fn value = value >>= \case
     Nothing -> def
     Just v  -> fn v
 
--- Return a query fragment to match a Maybe value.
+-- | Return a query fragment to match a Maybe value.
 -- If the value is Nothing, this is equivalent to (column is NULL)
 -- If the value is Just x, this is (value == column)
 -- Unlike the other Esqueleto operators, the right-hand value is not boxed in a Value,
 -- since we need to examine it in order to generate the correct SQL.
 --
 -- e.g., with a table like:
---    create table example (
---      id integer primary key,
---      value text );
+-- >   create table example (
+-- >     id integer primary key,
+-- >     value text );
 -- you could use an esqueleto query like:
---    select $ from $ \example -> do
---    where_ $ maybeVal ==? (example ?. ExampleValue)
+-- >   select $ from $ \example -> do
+-- >   where_ $ maybeVal ==? (example ?. ExampleValue)
 infix 4 ==?
 (==?) :: (PersistField typ, Esqueleto query expr backend) => expr (Value (Maybe typ)) -> Maybe typ -> expr (Value Bool)
 (==?) column Nothing = isNothing column
 (==?) column value@(Just _) = column ==. val value
 
--- Attempt to find a record in some table of the database.  If it exists, return its key.
+-- | Attempt to find a record in some table of the database.  If it exists, return its key.
 -- If it doesn't exist, perform some other action and return the key given by that action.
 orDo :: MonadIO m => m (Maybe b) -> m b -> m b
 orDo findFn doFn =
     findFn >>= maybe doFn return
 
--- Attempt to find a record in some table of the database.  If it exists, return its key.
+-- | Attempt to find a record in some table of the database.  If it exists, return its key.
 -- If it doesn't exist, insert the given object and return its key.
 orInsert :: (MonadIO m, PersistEntity a, ToBackendKey SqlBackend a) => SqlPersistT m (Maybe (Key a)) -> a -> SqlPersistT m (Key a)
 orInsert findFn obj =
