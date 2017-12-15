@@ -1,19 +1,17 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE RecordWildCards #-}
+
+-- |
+-- Module: BDCS.Sources
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Manage 'Sources' records in the database.  This record keeps track of a single
+-- software release of a single project.  A single project can make many releases,
+-- each of which will require a separate 'Sources' record.
 
 module BDCS.Sources(findSource,
                     getSource,
@@ -29,6 +27,8 @@ import BDCS.DB
 import BDCS.KeyType
 import BDCS.KeyValue(findKeyValue)
 
+-- | Given a version number and a key to a 'Projects' record, find a matching software
+-- source in the database.  If it exists, the database key is returned.
 findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))
 findSource version projectId = firstKeyResult $
     -- FIXME:  Is (project_id, version) unique in Sources?
@@ -38,6 +38,8 @@ findSource version projectId = firstKeyResult $
     limit 1
     return $ src ^. SourcesId
 
+-- | Given a key to a 'Sources' record in the database, return that record.  This function
+-- is suitable for using on the result of 'findSource'.
 getSource :: MonadIO m => Key Sources -> SqlPersistT m (Maybe Sources)
 getSource key = firstEntityResult $
     select $ from $ \source -> do
@@ -45,11 +47,24 @@ getSource key = firstEntityResult $
     limit 1
     return source
 
+-- | Conditionally add a new 'Sources' record to the database.  If the record already exists,
+-- return its key.  Otherwise, insert the record and return the new key.
 insertSource :: MonadIO m => Sources -> SqlPersistT m (Key Sources)
 insertSource source@Sources{..} =
     findSource sourcesVersion sourcesProject_id `orInsert` source
 
-insertSourceKeyValue :: MonadIO m => KeyType -> T.Text -> Maybe T.Text -> Key Sources -> SqlPersistT m (Key SourceKeyValues)
+-- | Conditionally add a new 'KeyVal' record to the database and associate a 'Sources'
+-- record with it.  If the 'KeyVal' record already exists, it is reused in creating the
+-- association.  They database key of the association is returned.
+--
+-- A single source can potentially have zero or more 'KeyVal' paris associated with it.
+-- On the other hand, a single 'KeyVal' pair can apply to many sources.
+insertSourceKeyValue :: MonadIO m =>
+                        KeyType                             -- ^ Type of the 'KeyVal'
+                     -> T.Text                              -- ^ Value of the 'KeyVal'
+                     -> Maybe T.Text                        -- ^ Extended value of the 'KeyVal'
+                     -> Key Sources                         -- ^ Source to be associated with the 'KeyVal'
+                     -> SqlPersistT m (Key SourceKeyValues)
 insertSourceKeyValue k v e sourceId = do
     kvId <- findKeyValue k (Just v) e `orInsert` KeyVal k (Just v) e
     insert $ SourceKeyValues sourceId kvId
