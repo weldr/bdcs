@@ -1,5 +1,16 @@
 {-# LANGUAGE MultiWayIf #-}
 
+-- |
+-- Module: BDCS.Utils.Mode
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Utility functions for Unix filesystem modes
+
 module BDCS.Utils.Mode(modeAsText)
  where
 
@@ -7,6 +18,10 @@ import           Data.Bits(testBit)
 import qualified Data.Text as T
 import           Data.Word(Word32)
 
+-- | Convert a mode value into a Text file mode string
+--
+-- > modeAsText 0o755
+-- > "rwxr-xr-x"
 modeAsText :: Word32 -> T.Text
 modeAsText x = T.pack [
     if x `testBit` 8 then 'r' else '-',

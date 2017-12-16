@@ -1,3 +1,14 @@
+-- |
+-- Module: BDCS.Utils.Filesystem
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Filesystem related utility functions
+
 module BDCS.Utils.Filesystem(doesPathExist)
  where
 
