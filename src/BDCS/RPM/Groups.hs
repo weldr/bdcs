@@ -1,20 +1,16 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+-- |
+-- Module: BDCS.RPM.Groups
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- 'Groups' record support for RPM packages.
 
 module BDCS.RPM.Groups(createGroup)
  where
@@ -37,6 +33,7 @@ import           BDCS.Requirements(insertGroupRequirement, insertRequirement)
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Requirements(mkGroupRequirement, mkRequirement)
 
+-- | XXX
 addPRCO :: MonadIO m => [Tag] -> Key Groups -> T.Text -> T.Text -> SqlPersistT m ()
 addPRCO tags groupId tagBase keyName =
     withPRCO tagBase tags $ \(_, expr) -> let
@@ -45,6 +42,7 @@ addPRCO tags groupId tagBase keyName =
       in
         insertGroupKeyValue (TextKey keyName) exprBase (Just expr) groupId
 
+-- | XXX
 prcoExpressions :: T.Text -> [Tag] -> [(Word32, T.Text)]
 prcoExpressions ty tags = let
     ty'   = T.toTitle ty
@@ -56,6 +54,7 @@ prcoExpressions ty tags = let
     zip flags $ map (\(n, f, v) -> T.stripEnd $ T.concat [n, " ", rpmFlagsToOperator f, " ", v])
         (zip3 names flags vers)
 
+-- | Convert the RPM flags value to a comparison operator Text string
 rpmFlagsToOperator :: Word32 -> T.Text
 rpmFlagsToOperator f =
     if | f `testBit` 1 && f `testBit` 3 -> "<="
@@ -65,7 +64,7 @@ rpmFlagsToOperator f =
        | f `testBit` 3                  -> "="
        | otherwise                      -> ""
 
--- Return the list of contexts to which this requirement applies
+-- | Return the list of contexts to which this requirement applies
 -- RPM interprets a combination of RPMSENSE_SCRIPT_* flags as meaning that the requirement is needed for
 -- each of those script types. If the requirement is *also* needed for Runtime, it will appear
 -- again in the requirements without any SCRIPT_* flags.
@@ -106,6 +105,7 @@ rpmFlagsToContexts tags flags =
         -- If nothing else set, return Runtime
         whenM (null <$> get) (modify (RT.Runtime:))
 
+-- | XXX
 withPRCO :: Monad m => T.Text -> [Tag] -> ((Word32, T.Text) -> m a) -> m ()
 withPRCO ty tags fn =
     mapM_ fn (prcoExpressions ty tags)
@@ -113,6 +113,8 @@ withPRCO ty tags fn =
 -- Ignore the suggestion to not use lambda for creating GroupFiles rows, since
 -- the lambda makes it more clear what's actually happening
 {-# ANN createGroup ("HLint: ignore Avoid lambda" :: String) #-}
+-- | XXX
+--   XXX Should this be mkGroup for consistency?
 createGroup :: MonadIO m => [Key Files] -> [Tag] -> SqlPersistT m (Key Groups)
 createGroup fileIds rpm = do
     -- Get the NEVRA so it can be saved as attributes
