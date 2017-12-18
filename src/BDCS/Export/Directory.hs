@@ -1,23 +1,19 @@
--- Copyright (C) 2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+
+-- |
+-- Module: BDCS.Export.Directory
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for exporting objects from the BDCS into a directory.
 
 module BDCS.Export.Directory(directorySink)
  where
@@ -38,6 +34,12 @@ import qualified BDCS.CS as CS
 import           BDCS.DB
 import           BDCS.Utils.Filesystem(doesPathExist)
 
+-- | A 'Consumer' that writes objects into a provided directory.  Symlinks and other file-like
+-- objects will be handled properly.  Only some metadata is currently handled.  Various errors
+-- can be thrown depending on problems encountered when interacting with the filesystem.
+--
+-- It is expected that the caller will decide whether the destination directory should be empty
+-- or not.  This function does nothing to enforce that.
 directorySink :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
 directorySink outPath = awaitForever $ \case
     (f, CS.SpecialObject) -> checkoutSpecial f

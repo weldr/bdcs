@@ -1,17 +1,13 @@
--- Copyright (C) 2017 Red Hat, Inc.
+-- |
+-- Module: BDCS.Export.Utils
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
 --
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
 --
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
+-- Miscellaneous utilities useful in exporting objects.
 
 module BDCS.Export.Utils(runHacks,
                          runTmpfiles)
@@ -31,7 +27,9 @@ import BDCS.Export.TmpFiles(setupFilesystem)
 
 import Paths_bdcs(getDataFileName)
 
--- | Run filesystem hacks needed to make a directory tree bootable
+-- | Run filesystem hacks needed to make a directory tree bootable.  Any exporter that produces a
+-- finished image should call this function.  Otherwise, it is not generally useful and should be
+-- avoided.  The exact hacks required is likely to change over time.
 runHacks :: FilePath -> IO ()
 runHacks exportPath = do
     -- set a root password
@@ -70,7 +68,8 @@ runHacks exportPath = do
     whenM (doesFileExist sslConf)
           (renameFile sslConf (sslConf ++ ".off"))
 
--- | Run tmpfiles.d snippet on the new directory
+-- | Run tmpfiles.d snippet on the new directory.  Most exporters should call this function.  Otherwise,
+-- it is not generally useful and should be avoided.
 runTmpfiles :: FilePath -> IO ()
 runTmpfiles exportPath = do
     configPath <- getDataFileName "tmpfiles-default.conf"
