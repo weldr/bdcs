@@ -53,5 +53,8 @@ usage = do
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
-    Just (db, _, args) -> runCommand db args
-    _                  -> usage
+    -- The depsolve command doesn't need a content store argument, but that's what commandLineArgs
+    -- returns.  Thus, "repo" here is really the first nevra being passed to depsolve.  It's
+    -- easiest to just continue to use that function and reassemble a correct args list here.
+    Just (db, repo, args) -> runCommand db (repo : args)
+    _                     -> usage
