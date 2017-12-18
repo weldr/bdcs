@@ -1,20 +1,16 @@
--- Copyright (C) 2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+
+-- |
+-- Module: BDCS.Export.Qcow2
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for exporting objects from the BDCS into a qcow2 image.
 
 module BDCS.Export.Qcow2(qcow2Sink)
  where
@@ -33,6 +29,8 @@ import           BDCS.DB(Files)
 import           BDCS.Export.Directory(directorySink)
 import           BDCS.Export.Utils(runHacks, runTmpfiles)
 
+-- | A 'Consumer' that writes objects into a temporary directory, and then converts that directory into
+-- a qcow2 image with virt-make-fs.
 qcow2Sink :: (MonadResource m, MonadIO m, MonadError String m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =
     -- Writing and importing a tar file probably will not work, because some rpms contain paths

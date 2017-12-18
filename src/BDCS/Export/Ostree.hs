@@ -1,23 +1,19 @@
--- Copyright (C) 2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+-- |
+-- Module: BDCS.Export.Ostree
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for exporting objects from the BDCS into an ostree repo.
 
 module BDCS.Export.Ostree(ostreeSink)
  where
@@ -55,6 +51,10 @@ import           Paths_bdcs(getDataFileName)
 -- Disable a hint in replaceDirs that just makes thing look confusing
 {-# ANN ostreeSink ("HLint: ignore Use ." :: String) #-}
 
+-- | A 'Consumer' that writes objects into a provided ostree repo.  A very large amount of work
+-- required to make the destination a valid ostree repo is also done by this function - setting up
+-- symlinks and directories, pruning unneeded directories, installing an initrd, building an
+-- RPM database, and so forth.
 ostreeSink :: (MonadError String m, MonadIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
 ostreeSink outPath = do
     -- While it's possible to copy objects from one OstreeRepo to another, we can't create our own objects, meaning
