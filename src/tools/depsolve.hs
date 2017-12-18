@@ -42,7 +42,7 @@ runCommand db things = do
         mapMaybeM groupIdToNevra $ map fst $ filter snd solution
 
     case result of
-        Left e            -> print ("error: " ++ e) >> exitFailure
+        Left e            -> putStrLn ("error: " ++ e) >> exitFailure
         -- Print the NEVRAs one per line
         Right assignments -> mapM_ TIO.putStrLn assignments
 
