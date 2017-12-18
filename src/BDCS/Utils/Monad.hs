@@ -20,21 +20,22 @@ module BDCS.Utils.Monad(concatForM,
 
 import Data.Maybe(catMaybes)
 
--- | XXX
+-- | Like 'Data.List.concatMap', but with its arguments reversed (the list comes
+-- first and the function comes second) and operates in a monad.
 concatForM :: (Monad m, Traversable t) => t a -> (a -> m [b]) -> m [b]
 concatForM lst fn = fmap concat (mapM fn lst)
 
--- | XXX
+-- | Like 'Data.List.concatMap' but operates in a monad.
 concatMapM :: (Monad m, Traversable t) => (a -> m [b]) -> t a -> m [b]
 concatMapM fn lst = fmap concat (mapM fn lst)
 
--- | XXX
-mapMaybeM :: (Monad m) => (a -> m (Maybe b)) -> [a] -> m [b]
+-- | Like 'Data.Maybe.mapMaybe' but operates in a monad.
+mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM fn = fmap catMaybes . mapM fn
 
 -- | XXX
 -- foldM, but skip Nothing results
-foldMaybeM :: (Monad m) => (b -> a -> m (Maybe b)) -> b -> [a] -> m b
+foldMaybeM :: Monad m => (b -> a -> m (Maybe b)) -> b -> [a] -> m b
 foldMaybeM _ acc [] = return acc
 foldMaybeM action acc (x:xs) = do
     result <- action acc x
@@ -44,8 +45,8 @@ foldMaybeM action acc (x:xs) = do
         -- Keep this one
         Just r  -> foldMaybeM action r xs
 
--- | XXX
--- compose a monadic action and Maybe
+-- | Apply a function to a monadic action.  If the action is 'm Nothing', do nothing.  Otherwise, apply the
+-- function and return the result as 'm (Just a)'.
 infixl 1 >>?
 (>>?) :: Monad m => m (Maybe a) -> (a -> m b) -> m (Maybe b)
 (>>?) input action = input >>= \case
