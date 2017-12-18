@@ -18,7 +18,7 @@ module BDCS.Utils.Error(errorToEither,
 import Control.Monad.Except(ExceptT(..), MonadError, catchError, runExceptT, throwError)
 
 -- | Convert an error action into an Either
--- This is essentially runExceptT generalized to MonadError
+-- This is essentially 'runExceptT' generalized to 'MonadError'
 errorToEither :: MonadError e m => m a -> m (Either e a)
 errorToEither action = (Right <$> action) `catchError` (return . Left)
 
@@ -26,6 +26,8 @@ errorToEither action = (Right <$> action) `catchError` (return . Left)
 errorToMaybe :: MonadError e m => m a -> m (Maybe a)
 errorToMaybe action = (Just <$> action) `catchError` (const . return) Nothing
 
--- | XXX
+-- | Run an 'ExceptT' action.  On error, run a supplied function to convert the error into
+-- some type that can be thrown with 'throwError' in 'MonadError'.  On success, simply
+-- return the value of the action.
 mapError :: MonadError e' m => (e -> e') -> ExceptT e m a -> m a
 mapError f action = runExceptT action >>= either (throwError . f) return

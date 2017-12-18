@@ -38,7 +38,7 @@ awaitWith fn = await >>= \case
 identityC :: Monad m => Conduit a m a
 identityC = mapC id
 
--- | Convert a GInputStream to a conduit source
+-- | Convert a 'GI.Gio.IsInputStream' to a conduit source
 sourceInputStream :: (MonadResource m, IsInputStream i) => i -> Producer m ByteString
 sourceInputStream input = do
     let buf_size = 8096
