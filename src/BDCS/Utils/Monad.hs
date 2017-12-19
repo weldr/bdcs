@@ -33,8 +33,7 @@ concatMapM fn lst = fmap concat (mapM fn lst)
 mapMaybeM :: Monad m => (a -> m (Maybe b)) -> [a] -> m [b]
 mapMaybeM fn = fmap catMaybes . mapM fn
 
--- | XXX
--- foldM, but skip Nothing results
+-- Like 'Control.Monad.foldM', but skip Nothing results.
 foldMaybeM :: Monad m => (b -> a -> m (Maybe b)) -> b -> [a] -> m b
 foldMaybeM _ acc [] = return acc
 foldMaybeM action acc (x:xs) = do
