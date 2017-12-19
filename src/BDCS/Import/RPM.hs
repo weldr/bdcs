@@ -1,24 +1,20 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
+
+-- |
+-- Module: BDCS.Import.RPM
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for importing individual RPM packages into the database
 
 module BDCS.Import.RPM(consume,
                        loadIntoMDDB,
@@ -86,9 +82,10 @@ buildImported sigs =
                        return $ not $ null ndx
         Nothing  -> return False
 
--- A conduit consumer that takes in RPM data and stores its payload into the content store and its header
+-- | A conduit consumer that takes in RPM data and stores its payload into the content store and its header
 -- information into the mddb.  The return value is whether or not an import occurred.  This is not the
--- same as success vs. failure, as the import will be skipped if the package already exists in the mddb.
+-- same as success vs. failure.  On failures, a 'CsError' will be thrown.  If the package already exists
+-- in the database, this function will return False.
 consume :: (MonadBaseControl IO m, MonadIO m, MonadThrow m, MonadError CsError m) => ContentStore -> FilePath -> Consumer RPM m Bool
 consume repo db = await >>= \case
     Just rpm ->
@@ -137,9 +134,9 @@ unsafeConsume repo db rpm = do
         else
             yield Nothing
 
--- Load the headers from a parsed RPM into the mddb.  The return value is whether or not an import
--- occurred.  This is not the same as success vs. failure, as the import will be skipped if the
--- package already exists in the mddb.
+-- | Load the headers from a parsed RPM into the MDDB.  The return value is whether or not an import
+-- occurred.  This is not the same as success vs. failure.  If the package already exists in the
+-- database, this function will return False.
 loadIntoMDDB :: (MonadBaseControl IO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
 loadIntoMDDB rpm checksums =
     ifM (rpmExistsInMDDB rpm)
@@ -190,6 +187,10 @@ unsafeLoadIntoMDDB RPM{..} checksums = do
 
     return True
 
+-- | Fetch an RPM from a given 'URI' and load it into the MDDB.  This function must be
+-- run within the 'ReaderT' monad, which should be given an 'ImportState' record.  This
+-- is how importing knows where to store the results.  Errors will be printed to the
+-- screen.
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do
     db <- stDB <$> ask
@@ -209,8 +210,8 @@ loadFromURI uri = do
     showParseError e = "Error fetching " ++ uriPath uri ++ ": " ++ show e
     showCsError    e = "Error importing " ++ uriPath uri ++ ": " ++ show e
 
--- Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
--- from being added to the content store a second time.  Note that loadIntoMDDB also performs this
+-- | Query the MDDB to see if the package has already been imported.  If so, quit now to prevent it
+-- from being added to the content store a second time.  Note that 'loadIntoMDDB' also performs this
 -- check, but both of these functions are public and therefore both need to prevent duplicate imports.
 rpmExistsInMDDB :: MonadResource m => RPM -> SqlPersistT m Bool
 rpmExistsInMDDB RPM{..} = do

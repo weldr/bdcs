@@ -1,17 +1,13 @@
--- Copyright (C) 2017 Red Hat, Inc.
+-- |
+-- Module: BDCS.Import.URI
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
 --
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
 --
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
+-- Utilities for manipulating 'URI's during import.
 
 module BDCS.Import.URI(appendURI,
                        baseURI,
@@ -26,17 +22,20 @@ import Data.Maybe(fromJust)
 import Network.URI(URI(..), escapeURIString, isUnescapedInURI,
                    parseURIReference, pathSegments, relativeTo, unEscapeString, uriToString)
 
--- convert a file:// URI to a FilePath
+-- | Convert a file:// 'URI' to a 'FilePath'.
 -- This does not check that the URI is a file:// URI, assumes posix-style paths
 uriToPath :: URI -> FilePath
 uriToPath uri = unEscapeString $ uriPath uri
 
--- the path is, e.g., /path/to/repo/repodata/primary.xml. Go up one directory.
+-- | Go up one directory in the 'URI'.  For instance:
+-- > ghci> let uri = parseURI "file:///path/to/repo/repodata/primary.xml"
+-- > ghci> baseURI (fromJust uri)
+-- > file:///path/to/repo/
 baseURI :: URI -> URI
 baseURI uri = let upOne = fromJust $ parseURIReference ".." in
     relativeTo upOne uri
 
--- append a path to a URI
+-- | Append a path to a 'URI'.
 appendURI :: URI -> String -> Maybe URI
 appendURI base path = let
     -- Escape the path characters and create a URI reference
@@ -45,13 +44,17 @@ appendURI base path = let
  in
     fmap appendToBase relativeURI
 
--- Convert a URI to string with no obfuscation
+-- | Convert a URI to string with no obfuscation
 showURI :: URI -> String
 showURI uri = uriToString id uri ""
 
+-- | Does a 'URI' point to a comps.xml file?  This is only really useful when importing RPMs from
+-- a comps file, as shipped by RPM-based distributions.
 isCompsFile :: URI -> Bool
 isCompsFile uri = let path = last (pathSegments uri) in
     "-comps" `isInfixOf` path && (".xml" `isSuffixOf` path || ".xml.gz" `isSuffixOf` path)
 
+-- | Does a 'URI' point to a primary.xml file?  This is only really useful when importing RPMs from
+-- a repo in an RPM-based distribution.
 isPrimaryXMLFile :: URI -> Bool
 isPrimaryXMLFile uri = "primary.xml" `isInfixOf` last (pathSegments uri)

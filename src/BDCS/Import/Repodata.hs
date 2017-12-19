@@ -1,22 +1,18 @@
--- Copyright (C) 2016-2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+-- |
+-- Module: BDCS.Import.Repodata
+-- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for importing RPM packages from a repo into the database
 
 module BDCS.Import.Repodata(RepoException,
                             loadFromURI,
@@ -44,6 +40,8 @@ import qualified BDCS.Import.RPM as RPM
 import           BDCS.Import.State(ImportState(..))
 import           BDCS.Import.URI(appendURI, baseURI)
 
+-- | An exception type that is thrown when there is a problem accessing a package
+-- repository or processing its metadata.
 data RepoException = RepoException
  deriving(Show, Typeable)
 
@@ -83,6 +81,11 @@ addSlash u = let
       else
         u
 
+-- | Given the 'URI' to the base of some package repository, fetch its repo metadata and load
+-- all its RPMs into the MDDB.  This function must be run within the 'ReaderT' monad, which
+-- should be given an 'ImportState' record.  This is how importing knows where to store the
+-- results.  If the repo metadata data is invalid, a 'RepoException' will be thrown.  Other
+-- errors will be printed to the screen.
 loadRepoFromURI :: URI -> ReaderT ImportState IO ()
 loadRepoFromURI uri = do
     -- Fetch and parse repomd.xml
@@ -104,6 +107,11 @@ loadRepoFromURI uri = do
     appendOrThrow :: T.Text -> URI
     appendOrThrow path = appendURI (addSlash uri) (T.unpack path) `throwIfNothing` RepoException
 
+-- | Given the 'URI' to a primary.xml file in some package repository, load all its RPMs
+-- into the MDDB.  This function must be run within the 'ReaderT' monad, which should be
+-- given an 'ImportState' record.  This is how importing knows where to store the results.
+-- If the repo metadata data is invalid, a 'RepoException' will be thrown.  Other errors
+-- will be printed to the screen.
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI metadataURI = do
     document <- fetchAndParse metadataURI
