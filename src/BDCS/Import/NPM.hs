@@ -1,22 +1,18 @@
--- Copyright (C) 2017 Red Hat, Inc.
---
--- This library is free software; you can redistribute it and/or
--- modify it under the terms of the GNU Lesser General Public
--- License as published by the Free Software Foundation; either
--- version 2.1 of the License, or (at your option) any later version.
---
--- This library is distributed in the hope that it will be useful,
--- but WITHOUT ANY WARRANTY; without even the implied warranty of
--- MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
--- Lesser General Public License for more details.
---
--- You should have received a copy of the GNU Lesser General Public
--- License along with this library; if not, see <http://www.gnu.org/licenses/>.
-
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE RankNTypes #-}
+
+-- |
+-- Module: BDCS.Import.NPM
+-- Copyright: (c) 2017 Red Hat, Inc.
+-- License: LGPL
+--
+-- Maintainer: https://github.com/weldr
+-- Stability: alpha
+-- Portability: portable
+--
+-- Functions for importing NPM packages into the database
 
 module BDCS.Import.NPM(loadFromURI)
  where
@@ -251,6 +247,10 @@ loadIntoMDDB PackageJSON{..} files = do
      in
         mapM_ (\p -> insertSourceKeyValue (TextKey "man") (T.pack p) Nothing sourceId) manFiles
 
+-- | Fetch an NPM from a given 'URI' and load it into the MDDB.  This function must be
+-- run within the 'ReaderT' monad, which should be given an 'ImportState' record.  This
+-- is how importing knows where to store the results.  Errors will be printed to the
+-- screen.
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri@URI{..} = do
     db <- stDB <$> ask
