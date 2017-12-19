@@ -1,5 +1,6 @@
 FROM juhp/fedora-haskell-ghc:8.0.2
-RUN dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel sqlite-devel libcurl-devel sudo \
+RUN dnf -y update dnf fedora-release fedora-repos --releasever=26 --nogpgcheck && \
+    dnf -y install xz-devel zlib-devel glib2-devel gobject-introspection-devel sqlite-devel libcurl-devel sudo \
                    https://kojipkgs.fedoraproject.org/packages/ostree/2017.8/2.fc25/x86_64/ostree{,-devel,-libs}-2017.8-2.fc25.x86_64.rpm && \
     dnf clean all
 
