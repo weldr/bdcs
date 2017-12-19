@@ -30,15 +30,12 @@ extra-source-files:     Dockerfile,
                         Makefile,
                         queries,
                         README.md
-                        s3reposync.sh,
                         schema.sql,
                         src/tests/*.hs,
                         src/tests/BDCS/*.hs,
                         src/tests/BDCS/Export/*.hs,
                         src/tests/BDCS/RPM/*.hs,
-                        tests/*.sh,
-                        tests/is_import_busted.py,
-                        tests/requirements.txt
+                        tests/*.sh
 
 custom-setup
     setup-depends:      base,

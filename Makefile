@@ -73,7 +73,6 @@ import-centos7:
 	make weld-f25
 	make importer
 	mkdir rpms/
-	pip install -r tests/requirements.txt
 
 	if [ ! -e ${d}/mddb ]; then \
 	    mkdir ${d}/mddb;        \
@@ -102,7 +101,6 @@ import-centos7:
 	    export STORE="$$STORE"; \
 	    export KEEP_MDDB=1; \
 	    make mddb; \
-	    python ./tests/is_import_busted.py -v $$REPO; \
 	done
 
 ci: integration-test
