@@ -19,7 +19,7 @@ build: Dockerfile.build
 	else \
 	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
 	fi;
-	sudo docker create --name build-cont $(ORG_NAME)/bdcs-build-img
+	sudo docker create --name build-cont $(ORG_NAME)/bdcs-build-img /bin/bash
 	sudo docker cp build-cont:/usr/local/bin/bdcs ./bdcs
 	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-import ./bdcs-import
 	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-export ./bdcs-export
