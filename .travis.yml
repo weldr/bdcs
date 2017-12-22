@@ -40,8 +40,8 @@ after_success:
         fi
 
         # upload artifacts on which other test activities depend
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/import/import s3://weldr/$TARGET_DIR/import
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/export/export s3://weldr/$TARGET_DIR/export
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/bdcs-import/bdcs-import s3://weldr/$TARGET_DIR/bdcs-import
+        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/bdcs-export/bdcs-export s3://weldr/$TARGET_DIR/bdcs-export
         s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./schema.sql s3://weldr/$TARGET_DIR/schema.sql
 
 notifications:
