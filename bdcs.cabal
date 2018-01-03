@@ -21,7 +21,8 @@ data-files:             sysusers-default.conf,
                         tmpfiles-ostree.conf,
                         nsswitch-altfiles.conf
 
-extra-source-files:     Dockerfile,
+extra-source-files:     ChangeLog.md,
+                        Dockerfile,
                         Dockerfile.build,
                         Dockerfile.integration-test,
                         entrypoint-integration-test.sh,
