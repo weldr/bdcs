@@ -24,7 +24,7 @@ script:
 
 after_success:
   - |
-        # NOTE: will also copy compiled binaries to TARGET_DIR
+        # NOTE: will also copy compiled binaries to S3
         make ci_after_success
 
         if [ "$TRAVIS_BRANCH" == "master" ] && [ "$TRAVIS_PULL_REQUEST" == "false" ]; then
@@ -33,16 +33,6 @@ after_success:
             docker login -u atodorov -p $DOCKER_PASSWORD
             docker push welder/bdcs-build-img
         fi
-
-        TARGET_DIR="artifacts/bdcs"
-        if [ "$TRAVIS_PULL_REQUEST" != "false" ]; then
-            TARGET_DIR="$TARGET_DIR/$TRAVIS_PULL_REQUEST"
-        fi
-
-        # upload artifacts on which other test activities depend
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/bdcs-import/bdcs-import s3://weldr/$TARGET_DIR/bdcs-import
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./bdcs/dist/build/bdcs-export/bdcs-export s3://weldr/$TARGET_DIR/bdcs-export
-        s3cmd sync --access_key="$ARTIFACTS_KEY" --secret_key="$ARTIFACTS_SECRET" -v -P ./schema.sql s3://weldr/$TARGET_DIR/schema.sql
 
 notifications:
   email:

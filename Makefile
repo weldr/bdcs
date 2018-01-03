@@ -114,6 +114,10 @@ ci_after_success:
 	[ -x ~/.cabal/bin/hpc-coveralls ] || cabal update && cabal install hpc-coveralls
 	cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs bdcs bdcs-import bdcs-inspect inspect-groups inspect-ls inspect-nevras bdcs-export bdcs-tmpfiles bdcs-depsolve && cd ..
 
+	# upload artifacts on which other test activities depend
+	s3cmd sync -v -P ./bdcs/dist/build/bdcs-import/bdcs-import s3://weldr/bdcs-import
+	s3cmd sync -v -P ./bdcs/dist/build/bdcs-export/bdcs-export s3://weldr/bdcs-export
+
 sandbox:
 	[ -d .cabal-sandbox ] || cabal sandbox init
 
