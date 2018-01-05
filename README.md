@@ -20,12 +20,11 @@ You will first need a directory full of RPMs somewhere.  Here, I assume that
 is the $PWD/Packages directory.  Then run:
 
 ```
-$ cd src
 $ cabal sandbox init
 $ cabal install --dependencies-only --enable-tests
 $ cabal build
-$ sqlite3 metadata.db < ../schema.sql
-$ for f in ${PWD}/Packages/*rpm; do dist/build/import/import metadata.db cs.repo file://${f}; done
+$ sqlite3 metadata.db < schema.sql
+$ for f in ${PWD}/Packages/*rpm; do dist/build/bdcs-import/bdcs-import metadata.db cs.repo file://${f}; done
 ```
 
 Running with docker
@@ -85,7 +84,6 @@ $ cd src/ && cabal sandbox init && cabal install
 Executing unit tests
 ====================
 
-    $ cd src/
     $ cabal sandbox init
     $ cabal install --dependencies-only --enable-tests
     $ cabal test
@@ -98,7 +96,6 @@ Executing unit tests
 Produce code coverage report
 ============================
 
-    $ cd src/
     $ cabal sandbox init
     $ cabal install --enable-tests --enable-coverage
     $ cabal test
