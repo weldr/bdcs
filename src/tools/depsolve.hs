@@ -23,7 +23,7 @@ import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
 import BDCS.DB(checkAndRunSqlite)
-import BDCS.Depclose(depclose)
+import BDCS.Depclose(depcloseNEVRAs)
 import BDCS.Depsolve(formulaToCNF, solveCNF)
 import BDCS.Groups(groupIdToNevra)
 import BDCS.Utils.Monad(mapMaybeM)
@@ -34,7 +34,7 @@ runCommand :: FilePath -> [String] -> IO ()
 runCommand db things = do
     let things' = map T.pack things
     result <- runExceptT $ checkAndRunSqlite (T.pack db) $ do
-        formula <- depclose ["x86_64"] things'
+        formula <- depcloseNEVRAs ["x86_64"] things'
         solution <- solveCNF (formulaToCNF formula)
 
         -- solveCNF returns a list of (groupId, bool) assignments. Discard the False ones,

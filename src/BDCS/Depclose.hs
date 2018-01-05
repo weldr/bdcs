@@ -16,7 +16,9 @@
 -- Collect all the dependencies for a package, but do not solve them.
 
 module BDCS.Depclose(DepFormula,
-                     depclose)
+                     depcloseGroupIds,
+                     depcloseNEVRAs,
+                     depcloseNames)
  where
 
 import           Codec.RPM.Version(DepRequirement(..), EVR(..), parseDepRequirement, satisfies)
@@ -34,7 +36,7 @@ import           Database.Persist.Sql(SqlPersistT)
 import           BDCS.Depsolve(Formula(..))
 import           BDCS.DB
 import           BDCS.Files(pathToGroupId)
-import           BDCS.Groups(getGroupId, getRequirementsForGroup)
+import           BDCS.Groups(getGroupId, getRequirementsForGroup, nameToGroupIds)
 import           BDCS.GroupKeyValue(getGroupsByKeyVal, getKeyValuesForGroup, getValueForGroup)
 import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
@@ -59,6 +61,22 @@ type DepParents = Set.Set ParentItem
 type DepFormula = Formula (Key Groups)
 
 -- | Given a path to a mddb, a list of architectures, and a list of RPMS, return a formula describing the dependencies
+-- See depcloseGroupIds for further details
+depcloseNEVRAs :: (MonadError String m, MonadIO m) => [T.Text] -> [T.Text] -> SqlPersistT m DepFormula
+depcloseNEVRAs arches nevras = do
+    -- Convert each NEVRA into a group ID.
+    groupIds <- mapM getGroupId nevras
+    depcloseGroupIds arches groupIds
+
+-- | Given a path to a mddb, a list of architectures, and a list of package names, return a formula describing the dependencies
+-- See depcloseGroupIds for further details
+depcloseNames :: (MonadError String m, MonadIO m) => [T.Text] -> [T.Text] -> SqlPersistT m DepFormula
+depcloseNames arches names = do
+    -- Convert each package name into a group ID.
+    groupIds <- concatMapM nameToGroupIds names
+    depcloseGroupIds arches groupIds
+
+-- | Given a path to a mddb, a list of architectures, and a list of Group Ids, return a formula describing the dependencies
 -- The general idea is, given a list of packages to depclose, convert each to a group id, and for each id:
 --    - gather the conflict and obsolete information, find matching group ids, express as Not conflict/obsolete-id
 --    - gather the requirement expressions, for each:
@@ -71,11 +89,8 @@ type DepFormula = Formula (Key Groups)
 -- Everything is run in a state with two components: a Map from groupid to expression to act as a cache,
 -- and a Set containing the group ids that are part of the current branch of the dependency tree in order
 -- to detect and ignore loops.
-depclose :: (MonadError String m, MonadIO m) => [T.Text] -> [T.Text] -> SqlPersistT m DepFormula
-depclose arches nevras = do
-    -- Convert each NEVRA into a group ID.
-    groupIds <- mapM getGroupId nevras
-
+depcloseGroupIds :: (MonadError String m, MonadIO m) => [T.Text] -> [Key Groups] -> SqlPersistT m DepFormula
+depcloseGroupIds arches groupIds = do
     -- resolve each group id into a DepFormula
     -- Use foldM to pass the parents set from resolving one group into the next group, so we
     -- don't depclose things already depclosed from a previous group ID.
