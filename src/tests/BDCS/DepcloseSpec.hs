@@ -31,7 +31,7 @@ import           Database.Persist.Sql(Key, SqlPersistT, insertKey, toSqlKey)
 import           Test.Hspec
 
 import           BDCS.DB(Files(..), GroupFiles(..), Groups(..))
-import           BDCS.Depclose(depcloseNEVRAs)
+import           BDCS.Depclose(depcloseNEVRAs, depcloseNames)
 import           BDCS.Depsolve(Formula(..))
 import           BDCS.GroupKeyValue(insertGroupKeyValue)
 import           BDCS.KeyType(KeyType(..))
@@ -51,8 +51,11 @@ spec = describe "BDCS.Depclose Tests" $ do
 
     let simple_req = And [Atom (toSqlKey 2), Or [singleton_req]]
     let solution_2 = Right $ And [simple_req]
-    it "depclose, simple" $
+    it "depclose, simple NEVRA" $
         withDeps (depcloseNEVRAs arches ["simple-1.0-1.x86_64"]) >>= (`shouldBe` solution_2)
+
+    it "depclose, simple name" $
+        withDeps (depcloseNames arches ["simple"]) >>= (`shouldBe` solution_2)
 
     let simple_chain_req = And [Atom (toSqlKey 3), Or [simple_req]]
     let solution_3 = Right $ And [simple_chain_req]
@@ -99,8 +102,11 @@ spec = describe "BDCS.Depclose Tests" $ do
         withDeps (depcloseNEVRAs arches ["choices-1.0-1.x86_64"]) >>= (`shouldBe` solution_16)
 
     let solution_double = Right $ And [needs_file_req, singleton_req]
-    it "depclose, two things" $
+    it "depclose, two things NEVRAs" $
         withDeps (depcloseNEVRAs arches ["singleton-1.0-1.x86_64", "needs-file-1.0-1.x86_64"]) >>= (`shouldBe` solution_double)
+
+    it "depclose, two things names" $
+        withDeps (depcloseNames arches ["singleton", "needs-file"]) >>= (`shouldBe` solution_double)
 
     it "depclose, no such requirement" $
         withDeps (depcloseNEVRAs arches ["no-such-requirement-1.0-1.x86_64"]) >>= (`shouldBe` Left "Unable to resolve requirement: DepRequirement \"does-not-exist\" Nothing")
@@ -166,8 +172,11 @@ spec = describe "BDCS.Depclose Tests" $ do
                         Or [ncurses_req],
                         Or [glibc_req]]
     let bash_solution = Right $ And [bash_req]
-    it "depclose bash" $
+    it "depclose bash NEVRA" $
         withRealDeps (depcloseNEVRAs arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution)
+
+    it "depclose bash name" $
+        withRealDeps (depcloseNames arches ["bash"]) >>= (`shouldBe` bash_solution)
 
     let glibc_req_2 = And [Atom (toSqlKey 1000),
                            Or [nss_softokn_freebl_req],
@@ -186,8 +195,11 @@ spec = describe "BDCS.Depclose Tests" $ do
     let tar_with_bash_req = And [Atom (toSqlKey 14),
                                  Or [libacl_req]]
     let tar_with_bash_solution = Right $ And [tar_with_bash_req, bash_req]
-    it "depclose bash and tar at the same time" $
+    it "depclose bash and tar NEVRAs at the same time" $
         withRealDeps (depcloseNEVRAs arches ["bash-4.2.46-12.el7.x86_64", "tar-2:1.26-29.el7.x86_64"]) >>= (`shouldBe` tar_with_bash_solution)
+
+    it "depclose bash and tar names at the same time" $
+        withRealDeps (depcloseNames arches ["bash", "tar"]) >>= (`shouldBe` tar_with_bash_solution)
  where
     arches :: [T.Text]
     arches = ["x86_64"]
