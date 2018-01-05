@@ -31,7 +31,7 @@ import           Database.Persist.Sql(Key, SqlPersistT, insertKey, toSqlKey)
 import           Test.Hspec
 
 import           BDCS.DB(Files(..), GroupFiles(..), Groups(..))
-import           BDCS.Depclose(depclose)
+import           BDCS.Depclose(depcloseNEVRAs)
 import           BDCS.Depsolve(Formula(..))
 import           BDCS.GroupKeyValue(insertGroupKeyValue)
 import           BDCS.KeyType(KeyType(..))
@@ -47,69 +47,69 @@ spec = describe "BDCS.Depclose Tests" $ do
     let singleton_req = And [Atom (toSqlKey 1)]
     let solution_1 = Right $ And [singleton_req]
     it "depclose, singleton" $
-        withDeps (depclose arches ["singleton-1.0-1.x86_64"]) >>= (`shouldBe` solution_1)
+        withDeps (depcloseNEVRAs arches ["singleton-1.0-1.x86_64"]) >>= (`shouldBe` solution_1)
 
     let simple_req = And [Atom (toSqlKey 2), Or [singleton_req]]
     let solution_2 = Right $ And [simple_req]
     it "depclose, simple" $
-        withDeps (depclose arches ["simple-1.0-1.x86_64"]) >>= (`shouldBe` solution_2)
+        withDeps (depcloseNEVRAs arches ["simple-1.0-1.x86_64"]) >>= (`shouldBe` solution_2)
 
     let simple_chain_req = And [Atom (toSqlKey 3), Or [simple_req]]
     let solution_3 = Right $ And [simple_chain_req]
     it "depclose, simple-chain" $
-        withDeps (depclose arches ["simple-chain-1.0-1.x86_64"]) >>= (`shouldBe` solution_3)
+        withDeps (depcloseNEVRAs arches ["simple-chain-1.0-1.x86_64"]) >>= (`shouldBe` solution_3)
 
     let provides_file_req = And [Atom (toSqlKey 4)]
     let needs_file_req = And [Atom (toSqlKey 5), Or [provides_file_req]]
     let solution_5 = Right $ And [needs_file_req]
     it "depclose, needs-file" $
-        withDeps (depclose arches ["needs-file-1.0-1.x86_64"]) >>= (`shouldBe` solution_5)
+        withDeps (depcloseNEVRAs arches ["needs-file-1.0-1.x86_64"]) >>= (`shouldBe` solution_5)
 
     let conflicts_req = And [Atom (toSqlKey 6), Not (toSqlKey 1)]
     let solution_6 = Right $ And [conflicts_req]
     it "depclose, conflicts" $
-        withDeps (depclose arches ["conflicts-1.0-1.x86_64"]) >>= (`shouldBe` solution_6)
+        withDeps (depcloseNEVRAs arches ["conflicts-1.0-1.x86_64"]) >>= (`shouldBe` solution_6)
 
     let obsolete_req = And [Atom (toSqlKey 7), Not (toSqlKey 1)]
     let solution_7 = Right $ And [obsolete_req]
     it "depclose, obsoletes" $
-        withDeps (depclose arches ["obsoletes-1.0-1.x86_64"]) >>= (`shouldBe` solution_7)
+        withDeps (depcloseNEVRAs arches ["obsoletes-1.0-1.x86_64"]) >>= (`shouldBe` solution_7)
 
     let high_version_req = And [Atom (toSqlKey 10)]
     let need_version_req = And [Atom (toSqlKey 11), Or [high_version_req]]
     let solution_11 = Right $ And [need_version_req]
     it "depclose, versioned requirement" $
-        withDeps (depclose arches ["needs-version-1.0-1.x86_64"]) >>= (`shouldBe` solution_11)
+        withDeps (depcloseNEVRAs arches ["needs-version-1.0-1.x86_64"]) >>= (`shouldBe` solution_11)
 
     let obsolete_version_req = And [Atom (toSqlKey 12), Not (toSqlKey 9)]
     let solution_12 = Right $ And [obsolete_version_req]
     it "depclose, versioned obsolete" $
-        withDeps (depclose arches ["obsoletes-version-1.0-1.x86_64"]) >>= (`shouldBe` solution_12)
+        withDeps (depcloseNEVRAs arches ["obsoletes-version-1.0-1.x86_64"]) >>= (`shouldBe` solution_12)
 
     let loop_1_req = And [Atom (toSqlKey 14), Or [And [Atom (toSqlKey 15)]]]
     let solution_15 = Right $ And [loop_1_req]
     it "depclose, dependency cycle" $
-        withDeps (depclose arches ["loop-1-1.0-1.x86_64"]) >>= (`shouldBe` solution_15)
+        withDeps (depcloseNEVRAs arches ["loop-1-1.0-1.x86_64"]) >>= (`shouldBe` solution_15)
 
     let choice_1_req = And [Atom (toSqlKey 17)]
     let choice_2_req = And [Atom (toSqlKey 18)]
     let choices_req  = And [Atom (toSqlKey 16), Or [choice_1_req, choice_2_req]]
     let solution_16  = Right $ And [choices_req]
     it "depclose, multiple providers" $
-        withDeps (depclose arches ["choices-1.0-1.x86_64"]) >>= (`shouldBe` solution_16)
+        withDeps (depcloseNEVRAs arches ["choices-1.0-1.x86_64"]) >>= (`shouldBe` solution_16)
 
     let solution_double = Right $ And [needs_file_req, singleton_req]
     it "depclose, two things" $
-        withDeps (depclose arches ["singleton-1.0-1.x86_64", "needs-file-1.0-1.x86_64"]) >>= (`shouldBe` solution_double)
+        withDeps (depcloseNEVRAs arches ["singleton-1.0-1.x86_64", "needs-file-1.0-1.x86_64"]) >>= (`shouldBe` solution_double)
 
     it "depclose, no such requirement" $
-        withDeps (depclose arches ["no-such-requirement-1.0-1.x86_64"]) >>= (`shouldBe` Left "Unable to resolve requirement: DepRequirement \"does-not-exist\" Nothing")
+        withDeps (depcloseNEVRAs arches ["no-such-requirement-1.0-1.x86_64"]) >>= (`shouldBe` Left "Unable to resolve requirement: DepRequirement \"does-not-exist\" Nothing")
 
     it "depclose, missing provides data" $
-        withDeps (depclose arches ["broken-conflicts-1.0-1.x86_64"]) >>= (`shouldBe` Left "Invalid key/val data")
+        withDeps (depcloseNEVRAs arches ["broken-conflicts-1.0-1.x86_64"]) >>= (`shouldBe` Left "Invalid key/val data")
 
     it "depclose, no such package" $
-        withDeps (depclose arches ["does-not-exist-1.0-1.x86_64"]) >>= (`shouldBe` Left "No such group does-not-exist-1.0-1.x86_64")
+        withDeps (depcloseNEVRAs arches ["does-not-exist-1.0-1.x86_64"]) >>= (`shouldBe` Left "No such group does-not-exist-1.0-1.x86_64")
 
     -- run tests with (mostly) real data
     -- this is more a demonstration of what's wrong with depclose than anything
@@ -167,7 +167,7 @@ spec = describe "BDCS.Depclose Tests" $ do
                         Or [glibc_req]]
     let bash_solution = Right $ And [bash_req]
     it "depclose bash" $
-        withRealDeps (depclose arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution)
+        withRealDeps (depcloseNEVRAs arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution)
 
     let glibc_req_2 = And [Atom (toSqlKey 1000),
                            Or [nss_softokn_freebl_req],
@@ -177,7 +177,7 @@ spec = describe "BDCS.Depclose Tests" $ do
                           Or [glibc_req, glibc_req_2]]
     let bash_solution_2 = Right $ And [bash_req_2]
     it "depclose bash, two glibcs" $
-        withGlibcUpgrade (depclose arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution_2)
+        withGlibcUpgrade (depcloseNEVRAs arches ["bash-4.2.46-12.el7.x86_64"]) >>= (`shouldBe` bash_solution_2)
 
     -- tar requirements, minus requirements already pulled in by bash (glibc, libselinux)
     let libattr_req = And [Atom (toSqlKey 16)]
@@ -187,7 +187,7 @@ spec = describe "BDCS.Depclose Tests" $ do
                                  Or [libacl_req]]
     let tar_with_bash_solution = Right $ And [tar_with_bash_req, bash_req]
     it "depclose bash and tar at the same time" $
-        withRealDeps (depclose arches ["bash-4.2.46-12.el7.x86_64", "tar-2:1.26-29.el7.x86_64"]) >>= (`shouldBe` tar_with_bash_solution)
+        withRealDeps (depcloseNEVRAs arches ["bash-4.2.46-12.el7.x86_64", "tar-2:1.26-29.el7.x86_64"]) >>= (`shouldBe` tar_with_bash_solution)
  where
     arches :: [T.Text]
     arches = ["x86_64"]
