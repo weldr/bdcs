@@ -20,7 +20,7 @@ module BDCS.GroupsSpec(spec)
  where
 
 import BDCS.DB(Groups(..))
-import BDCS.Groups(nevraToGroupId)
+import BDCS.Groups(groupIdToNevra, nevraToGroupId)
 import BDCS.GroupKeyValue(insertGroupKeyValue)
 import BDCS.KeyType(KeyType(..))
 
@@ -63,6 +63,12 @@ spec = describe "BDCS.Groups Tests" $ do
 
     it "nevraToGroupId, wrong arch" $
         withNevras (nevraToGroupId ("hasEpoch", Just "7", "1.0", "1.el7", "i686")) >>= (`shouldBe` Nothing)
+
+    it "groupIdToNevra, has epoch" $
+      withNevras (groupIdToNevra $ toSqlKey 1) >>= (`shouldBe` Just "hasEpoch-7:1.0-1.el7.x86_64")
+
+    it "groupIdToNevra, no epoch" $
+      withNevras (groupIdToNevra $ toSqlKey 2) >>= (`shouldBe` Just "noEpoch-1.0-1.el7.x86_64")
 
  where
     addNevras :: MonadIO m => SqlPersistT m ()

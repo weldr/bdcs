@@ -38,7 +38,7 @@ import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Bifunctor(bimap)
 import           Data.Conduit((.|), Conduit, Source)
 import qualified Data.Conduit.List as CL
-import           Data.Maybe(isNothing, fromJust, fromMaybe)
+import           Data.Maybe(isNothing, fromJust)
 import qualified Data.Text as T
 import           Database.Esqueleto hiding (isNothing)
 
@@ -120,7 +120,11 @@ groupIdToNevra groupId = do
 
     if isNothing n || isNothing v || isNothing r || isNothing a
     then return Nothing
-    else return $ Just $ T.concat [fromMaybe "" e, fromJust n, "-", fromJust v, "-", fromJust r, ".", fromJust a]
+    else return $ Just $ T.concat [fromJust n, "-", epoch e, fromJust v, "-", fromJust r, ".", fromJust a]
+  where
+    epoch :: Maybe T.Text -> T.Text
+    epoch (Just e) = e `T.append` ":"
+    epoch Nothing  = ""
 
 getRequirementsForGroup :: MonadIO m => Key Groups -> RT.ReqContext -> SqlPersistT m [Requirements]
 getRequirementsForGroup groupId context = do
