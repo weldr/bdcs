@@ -1,7 +1,7 @@
 FROM welder/bdcs-build-img:latest
 MAINTAINER Alexander Todorov <atodorov@redhat.com>
 
-RUN dnf -y install wget diffutils && dnf clean all
+RUN dnf -y install wget diffutils beakerlib
 
 COPY schema.sql /
 COPY entrypoint-integration-test.sh /usr/local/bin/entrypoint-integration-test.sh
