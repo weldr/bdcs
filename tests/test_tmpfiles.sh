@@ -1,21 +1,22 @@
 #!/bin/bash
 # Note: execute from the project root directory
 
-set -x
+. /usr/share/beakerlib/beakerlib.sh || exit 1
 
 CMD="./dist/build/bdcs-tmpfiles/bdcs-tmpfiles"
 CFG="./data/tmpfiles-default.conf"
 TMPDIR="./test-tmpfiles-$$"
 
-err_cleanup() {
-    rm -rf "$TMPDIR"
-    exit 1
-}
+rlJournalStart
+    rlPhaseStartTest
+        rlRun -t -c "$CMD $CFG $TMPDIR"
 
-$CMD $CFG $TMPDIR || err_cleanup
+        rlAssertExists "$TMPDIR"
+        rlAssertExists "$TMPDIR/var/run"
+        rlAssertExists "$TMPDIR/usr/lib/debug/usr/lib64"
+    rlPhaseEnd
 
-[ -d "$TMPDIR" ] || err_cleanup
-[ -e "$TMPDIR/var/run" ] || err_cleanup
-[ -d "$TMPDIR/usr/lib/debug/usr/lib64" ] || err_cleanup
-
-rm -rf "$TMPDIR"
+    rlPhaseStartCleanup
+        rm -rf $TMPDIR
+    rlPhaseEnd
+rlJournalEnd
