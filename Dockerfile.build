@@ -26,7 +26,7 @@ COPY tests/ /bdcs/tests/
 
 WORKDIR /bdcs/
 RUN hlint .
-RUN cabal configure --enable-tests --enable-coverage --prefix=/usr/local
-RUN cabal build
-RUN cabal test --show-details=always
-RUN cabal install --prefix=/usr/local
+RUN cabal configure --enable-tests --enable-coverage --prefix=/usr/local && \
+    cabal build && \
+    cabal test --show-details=always && \
+    cabal install --prefix=/usr/local
