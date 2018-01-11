@@ -17,7 +17,8 @@
 
 module BDCS.Projects(findProject,
                      getProject,
-                     insertProject)
+                     insertProject,
+                     projects)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
@@ -25,6 +26,13 @@ import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
+
+projects :: MonadIO m => SqlPersistT m [Projects]
+projects = do
+    vals <- select $ from $ \project -> do
+            orderBy [asc (project ^. ProjectsName)]
+            return project
+    return $ map entityVal vals
 
 findProject :: MonadIO m => T.Text -> SqlPersistT m (Maybe (Key Projects))
 findProject name = firstKeyResult $
