@@ -7,6 +7,7 @@
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -29,9 +30,10 @@ import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Logger(NoLoggingT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
 import qualified Data.Aeson as Aeson
+import           Data.Aeson((.:), (.=))
 import           Data.ByteString(ByteString)
 import           Data.Int(Int64)
-import           Data.Maybe(fromJust, listToMaybe)
+import           Data.Maybe(fromJust, fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
 import           Database.Esqueleto(Esqueleto, Entity, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
@@ -184,6 +186,24 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     script_id ScriptsId
     deriving Eq Show
  |]
+
+-- Implement JSON functions for Projects
+instance Aeson.ToJSON Projects where
+  toJSON Projects{..} = Aeson.object [
+      "name"         .= projectsName
+    , "summary"      .= projectsSummary
+    , "description"  .= projectsDescription
+    , "homepage"     .= fromMaybe "" projectsHomepage
+    , "upstream_vcs" .= projectsUpstream_vcs ]
+
+instance Aeson.FromJSON Projects where
+  parseJSON = Aeson.withObject "Projects" $ \o -> do
+    projectsName         <- o .: "name"
+    projectsSummary      <- o .: "summary"
+    projectsDescription  <- o .: "description"
+    projectsHomepage     <- o .: "homepage"
+    projectsUpstream_vcs <- o .: "upstream_vcs"
+    return Projects{..}
 
 instance Aeson.ToJSON KeyVal where
     toJSON kv = let
