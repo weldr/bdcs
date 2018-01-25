@@ -22,10 +22,10 @@ import           Control.Conditional(cond, ifM)
 import           Control.Monad(unless, when)
 import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Data.Conduit(Consumer, (.|), runConduit)
+import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import qualified Data.Conduit.List as CL
 import           Data.ContentStore(openContentStore, runCsMonad)
-import           Data.List(isSuffixOf, isPrefixOf, partition)
+import           Data.List(isSuffixOf)
 import qualified Data.Text as T
 import           System.Directory(doesFileExist, removePathForcibly)
 import           System.Environment(getArgs)
@@ -34,6 +34,7 @@ import           System.Exit(exitFailure)
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files, checkAndRunSqlite)
 import qualified BDCS.Export.Directory as Directory
+import           BDCS.Export.FSTree(filesToTree, fstreeSource)
 import qualified BDCS.Export.Qcow2 as Qcow2
 import qualified BDCS.Export.Ostree as Ostree
 import qualified BDCS.Export.Tar as Tar
@@ -71,12 +72,6 @@ usage = do
     -- TODO group id?
     exitFailure
 
-needFilesystem :: IO ()
-needFilesystem = do
-    printVersion "export"
-    putStrLn "ERROR: The tar needs to have the filesystem package included"
-    exitFailure
-
 needKernel :: IO ()
 needKernel = do
     printVersion "export"
@@ -85,15 +80,11 @@ needKernel = do
 
 runCommand :: FilePath -> FilePath -> FilePath -> [String] -> IO ()
 runCommand db repo out_path fileThings = do
-    allThings <- expandFileThings fileThings
+    things <- map T.pack <$> expandFileThings fileThings
 
     cs <- runCsMonad (openContentStore repo) >>= \case
         Left e  -> print e >> exitFailure
         Right r -> return r
-
-    things <- case partition (isPrefixOf "filesystem-") allThings of
-                  (hd:_, rest) -> return $ map T.pack $ hd : rest
-                  _            -> needFilesystem >> return []
 
     when (".repo" `isSuffixOf` out_path) $
         unless (any ("kernel-" `T.isPrefixOf`) things) needKernel
@@ -103,11 +94,15 @@ runCommand db repo out_path fileThings = do
                                       (".repo" `isSuffixOf` out_path,  (cleanupHandler out_path, Ostree.ostreeSink out_path)),
                                       (otherwise,                      (print, directoryOutput out_path))]
 
-    result <- runExceptT $ checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
-        .| getGroupIdC
-        .| groupIdToFilesC
-        .| CS.filesToObjectsC cs
-        .| objectSink
+    result <- runExceptT $ do
+        -- Build the filesystem tree to export
+        fstree <- checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
+                    .| getGroupIdC
+                    .| groupIdToFilesC
+                    .| filesToTree
+
+        -- Traverse the tree and export the file contents
+        runConduitRes $ fstreeSource fstree .| CS.filesToObjectsC cs .| objectSink
 
     whenLeft result (\e -> handler e >> exitFailure)
  where
