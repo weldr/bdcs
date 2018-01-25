@@ -168,7 +168,7 @@ depcloseGroupIds arches groupIds = do
                 -- The solution to this requirement is an Or of all the possibilities
                 -- The group ids that are definitely required by this formulas is the intersection of all of the individual sets
                 let reqFormula = Or formulaList
-                let reqParents = foldl1 Set.intersection parentList
+                let reqParents = foldr1 Set.intersection parentList
 
                 -- Add the results to the accumulators
                 return $ Just (reqFormula : formulaAcc, Set.union parentAcc reqParents)
