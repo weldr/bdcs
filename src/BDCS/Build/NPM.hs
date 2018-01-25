@@ -116,9 +116,9 @@ rebuildNPM sourceId = do
               limit 1
               return   (projects ^. ProjectsName, sources ^. SourcesVersion)
 
-        when (null nv) $ throwError $ "No such source id " ++ show sourceId
-
-        return $ bimap unValue unValue $ head nv
+        case nv of
+            hd:_ -> return $ bimap unValue unValue hd
+            _    -> throwError $ "No such source id " ++ show sourceId
 
     relink :: (MonadBaseControl IO m, MonadIO m) => [Files] -> (T.Text, T.Text) -> [(T.Text, SemVer)] -> SqlPersistT m (Key Builds)
     relink sourceFiles (name, ver) depList = do

@@ -15,7 +15,7 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad(forM_, when)
+import Control.Monad(forM_)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
 
@@ -45,8 +45,6 @@ main :: IO ()
 main = do
     argv <- getArgs
 
-    when (length argv < 1) usage
-    let subcmd = head argv
-        subcmdArgs = tail argv
-
-    runSubcommand "bdcs-" subcmd subcmdArgs knownSubcommands usage
+    case argv of
+        subcmd:subcmdArgs -> runSubcommand "bdcs-" subcmd subcmdArgs knownSubcommands usage
+        _                 -> usage

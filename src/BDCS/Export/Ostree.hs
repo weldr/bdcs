@@ -21,7 +21,7 @@ module BDCS.Export.Ostree(ostreeSink)
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
 import           Control.Conditional(condM, otherwiseM, whenM)
 import           Control.Exception(SomeException, bracket_, catch)
-import           Control.Monad(void, when)
+import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
@@ -192,9 +192,9 @@ ostreeSink outPath = do
 
         -- Find a vmlinuz- file.
         kernelList <- filter ("vmlinuz-" `isPrefixOf`) <$> listDirectory bootDir
-        when (null kernelList) (error "No kernel found")
-        let kernel = bootDir </> head kernelList
-        let kver = drop (length ("vmlinuz-" :: String)) (head kernelList)
+        let (kernel, kver) = case kernelList of
+                                 hd:_ -> (bootDir </> hd, drop (length ("vmlinuz-" :: String)) hd)
+                                 _    -> error "No kernel found"
 
         -- Create the initramfs
         let initramfs = bootDir </> "initramfs-" ++ kver

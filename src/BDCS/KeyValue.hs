@@ -90,7 +90,10 @@ keyValueListToJSON lst = let
     --
     -- On the other hand, we don't do anything to LabelKeys.  This means labels will always end up
     -- in a list named "labels".
-    pairs = map (\(k, v) -> if length v == 1 then k .= head v else k .= v) (Map.toList otherMap) ++
+    pairs = map (\(k, v) -> case v of
+                                [hd] -> k .= hd
+                                _    -> k .= v)
+                (Map.toList otherMap) ++
             map (uncurry (.=)) (Map.toList labelMap)
  in
     [T.pack "keyvals" .= object pairs]

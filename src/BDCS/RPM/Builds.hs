@@ -46,5 +46,5 @@ mkBuild tags sourceId = let
     getBuildTime = findTag "BuildTime" tags >>= \t -> (tagValue t :: Maybe Word32) >>= Just . posixSecondsToUTCTime . realToFrac
 
     getChangelog = case findStringListTag "ChangeLogText" tags of
-                       []  -> Nothing
-                       lst -> Just $ pack $ head lst
+                       hd:_ -> Just $ pack hd
+                       _    -> Nothing

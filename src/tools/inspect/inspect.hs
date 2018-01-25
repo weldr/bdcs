@@ -16,7 +16,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-import Control.Monad(forM_, when)
+import Control.Monad(forM_)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
 
@@ -46,12 +46,7 @@ usage = do
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
-    Just (db, repo, args) -> do
-        when (null args) usage
+    Just (db, repo, subcmd:_:_:args) ->
+        runSubcommand "inspect-" subcmd ([db, repo] ++ args) knownSubcommands usage
 
-        let subcmd = head args
-            subcmdArgs = [db, repo] ++ tail args
-
-        runSubcommand "inspect-" subcmd subcmdArgs knownSubcommands usage
-
-    _                     -> usage
+    _ -> usage

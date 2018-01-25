@@ -20,14 +20,15 @@ import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 
 import BDCS.DB(Projects(..))
-import BDCS.Exceptions(DBException(..), throwIfNothingOtherwise)
+import BDCS.Exceptions(DBException(..), throwIfNothing, throwIfNothingOtherwise)
 
 -- | Return a 'Projects' record for the RPM package.
 mkProject :: [Tag] -> Projects
 mkProject tags = let
-    projectName = throwIfNothingOtherwise (findStringTag "SourceRPM" tags)
-                                          (MissingRPMTag "SourceRPM")
-                                          (T.pack . srpmToName)
+    srpmTag     = findStringTag "SourceRPM" tags `throwIfNothing` MissingRPMTag "SourceRPM"
+    projectName = throwIfNothingOtherwise (srpmToName srpmTag)
+                                          (BadName srpmTag)
+                                          T.pack
     summary     = throwIfNothingOtherwise (findByteStringTag "Summary" tags)
                                           (MissingRPMTag "Summary")
                                           decodeUtf8
@@ -45,8 +46,8 @@ mkProject tags = let
     -- This is essentially N-V-R.A.rpm. rpm does not allow hyphens in version of release, and epoch is
     -- not included in the SRPM name, so we can just take everything before the second-to-last hyphen
     -- as the name.
-    srpmToName :: String -> String
+    srpmToName :: String -> Maybe String
     srpmToName s =
-        -- Find all the hyphens and take the second to last result
-        let nameHyphenIndex = head $ tail $ reverse $ elemIndices '-' s
-        in fst $ splitAt nameHyphenIndex s
+        case reverse (elemIndices '-' s) of
+            _:ndx:_ -> Just $ fst $ splitAt ndx s
+            _       -> Nothing

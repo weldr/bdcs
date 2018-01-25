@@ -10,6 +10,7 @@
 -- Utilities for working with database-related exceptions.
 
 module BDCS.Exceptions(DBException(..),
+                       isBadNameException,
                        isDBExceptionException,
                        isMissingRPMTagException,
                        throwIfNothing,
@@ -28,11 +29,13 @@ data DBException = DBException String           -- ^ A general purpose exception
                  | MissingRPMTag String         -- ^ A required tag was missing from the
                                                 -- RPM being processed.  The argument should
                                                 -- be the name of the missing tag.
+                 | BadName String               -- ^ The name of the package is not parseable.
  deriving(Eq, Typeable)
 
 instance Exception DBException
 
 instance Show DBException where
+    show (BadName s)       = "Package name is not parseable: " ++ s
     show (DBException s)   = show s
     show (MissingRPMTag s) = "Missing required tag in RPM: " ++ s
 
@@ -47,6 +50,11 @@ throwIfNothing _        exn = throw exn
 throwIfNothingOtherwise :: Exception e => Maybe a -> e -> (a -> b) -> b
 throwIfNothingOtherwise (Just v) _   fn = fn v
 throwIfNothingOtherwise _        exn _  = throw exn
+
+-- | Is a given 'DBException' type a 'BadName'?
+isBadNameException :: DBException -> Bool
+isBadNameException (BadName _) = True
+isBadNameException _           = False
 
 -- | Is a given 'DBException' type the general 'DBException'?
 isDBExceptionException :: DBException -> Bool
