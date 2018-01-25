@@ -25,6 +25,7 @@ module BDCS.Import.Comps(CompsPkg(..),
 
 import           Control.Monad.Reader(ReaderT)
 import           Data.Conduit((.|), runConduitRes)
+import           Data.Maybe(mapMaybe)
 import qualified Data.Text as T
 import           Network.URI(URI(..))
 import           Text.XML(Document, sinkDoc)
@@ -66,19 +67,22 @@ parseCompsPkg cursor = do
     -- Shouldn't happen, but this marks them so we'll know there's something to look into.
     toCompsPkg (_, n, _)              = CPUnknown n
 
-parseCompsGroup :: Cursor -> CompsGroup
-parseCompsGroup cursor = do
-    let groupIds    = cursor $/ laxElement "id"   &/ content
-    let groupNames  = cursor $/ laxElement "name" &/ content
-    let packages    = cursor $// laxElement "packagereq" >=> parseCompsPkg
-    CompsGroup (head groupIds) (head groupNames) packages
+parseCompsGroup :: Cursor -> Maybe CompsGroup
+parseCompsGroup cursor = let
+    groupIds    = cursor $/ laxElement "id"   &/ content
+    groupNames  = cursor $/ laxElement "name" &/ content
+    packages    = cursor $// laxElement "packagereq" >=> parseCompsPkg
+ in
+    case (groupIds, groupNames) of
+        (fstId:_, fstName:_) -> Just $ CompsGroup fstId fstName packages
+        _                    -> Nothing
 
 extractGroups :: Document -> [CompsGroup]
 extractGroups doc = let
     cursor = fromDocument doc
     groupCursors = cursor $// laxElement "group"
  in
-    map parseCompsGroup groupCursors
+    mapMaybe parseCompsGroup groupCursors
 
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do

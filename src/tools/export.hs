@@ -83,18 +83,17 @@ needKernel = do
     putStrLn "ERROR: ostree exports need a kernel package included"
     exitFailure
 
-runCommand :: FilePath -> FilePath -> [String] -> IO ()
-runCommand db repo args = do
-    let out_path = head args
-    allThings <- expandFileThings $ tail args
+runCommand :: FilePath -> FilePath -> FilePath -> [String] -> IO ()
+runCommand db repo out_path fileThings = do
+    allThings <- expandFileThings fileThings
 
     cs <- runCsMonad (openContentStore repo) >>= \case
         Left e  -> print e >> exitFailure
         Right r -> return r
 
-    let (match, otherThings) = partition (isPrefixOf "filesystem-") allThings
-    when (length match < 1) needFilesystem
-    let things = map T.pack $ head match : otherThings
+    things <- case partition (isPrefixOf "filesystem-") allThings of
+                  (hd:_, rest) -> return $ map T.pack $ hd : rest
+                  _            -> needFilesystem >> return []
 
     when (".repo" `isSuffixOf` out_path) $
         unless (any ("kernel-" `T.isPrefixOf`) things) needKernel
@@ -125,7 +124,5 @@ runCommand db repo args = do
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
-    Nothing               -> usage
-    Just (db, repo, args) -> do
-        when (length args < 2) usage
-        runCommand db repo args
+    Just (db, repo, out_path:things) -> runCommand db repo out_path things
+    _                                -> usage

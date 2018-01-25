@@ -147,9 +147,11 @@ loadIntoMDDB rpm checksums =
 -- this could result in a very confused, incorrect mddb.  It is currently for internal use only, but
 -- that might change in the future.
 unsafeLoadIntoMDDB :: (MonadBaseControl IO m, MonadResource m) => RPM -> [(T.Text, Maybe ObjectDigest)] -> SqlPersistT m Bool
-unsafeLoadIntoMDDB RPM{..} checksums = do
-    let sigHeaders = headerTags $ head rpmSignatures
-    let tagHeaders = headerTags $ head rpmHeaders
+unsafeLoadIntoMDDB RPM{rpmSignatures=[], ..} _                                             = return False
+unsafeLoadIntoMDDB RPM{rpmHeaders=[], ..}    _                                             = return False
+unsafeLoadIntoMDDB RPM{rpmSignatures=fstSignature:_, rpmHeaders=fstHeader:_, ..} checksums = do
+    let sigHeaders = headerTags fstSignature
+    let tagHeaders = headerTags fstHeader
 
     projectId <- insertProject $ mkProject tagHeaders
     sourceId  <- insertSource $ mkSource tagHeaders projectId
@@ -214,6 +216,7 @@ loadFromURI uri = do
 -- from being added to the content store a second time.  Note that 'loadIntoMDDB' also performs this
 -- check, but both of these functions are public and therefore both need to prevent duplicate imports.
 rpmExistsInMDDB :: MonadResource m => RPM -> SqlPersistT m Bool
-rpmExistsInMDDB RPM{..} = do
-    let sigHeaders = headerTags $ head rpmSignatures
+rpmExistsInMDDB RPM{rpmSignatures=[], ..}   = return False
+rpmExistsInMDDB RPM{rpmSignatures=hd:_, ..} = do
+    let sigHeaders = headerTags hd
     buildImported sigHeaders

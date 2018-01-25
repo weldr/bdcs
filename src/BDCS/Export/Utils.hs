@@ -35,10 +35,10 @@ runHacks exportPath = do
     -- set a root password
     -- pre-crypted from "redhat"
     shadowRecs <- map (splitOn ":") <$> lines <$> readFile (exportPath </> "etc" </> "shadow")
-    let newRecs = map (\rec -> if head rec == "root" then
-                                ["root", "$6$3VLMX3dyCGRa.JX3$RpveyimtrKjqcbZNTanUkjauuTRwqAVzRK8GZFkEinbjzklo7Yj9Z6FqXNlyajpgCdsLf4FEQQKH6tTza35xs/"] ++ drop 2 rec
-                               else
-                                rec) shadowRecs
+    let newRecs = map (\rec -> case rec of
+                                   "root":_:rest -> ["root", "$6$3VLMX3dyCGRa.JX3$RpveyimtrKjqcbZNTanUkjauuTRwqAVzRK8GZFkEinbjzklo7Yj9Z6FqXNlyajpgCdsLf4FEQQKH6tTza35xs/"] ++ rest
+                                   _             -> rec)
+                      shadowRecs
     writeFile (exportPath </> "etc" </> "shadow.new") (unlines $ map (intercalate ":") newRecs)
     renameFile (exportPath </> "etc" </> "shadow.new") (exportPath </> "etc" </> "shadow")
 

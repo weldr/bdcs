@@ -56,8 +56,10 @@ schemaVersion :: Int64
 schemaVersion = 4
 
 -- | Return the version number stored in the database.
-getDbVersion :: MonadIO m => SqlPersistT m Int64
-getDbVersion = unSingle <$> head <$> rawSql "pragma user_version" []
+getDbVersion :: (MonadError String m, MonadIO m) => SqlPersistT m Int64
+getDbVersion = rawSql "pragma user_version" [] >>= \case
+    [] -> throwError "Database does not contain a user_version"
+    v:_ -> return $ unSingle v
 
 -- | Verify that the version number stored in the database matches the schema version number
 -- implemented by this module.  If there is a version mismatch, throw an error.
