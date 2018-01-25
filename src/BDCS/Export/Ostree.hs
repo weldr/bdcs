@@ -28,7 +28,8 @@ import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
 import qualified Data.Conduit.List as CL
-import           Data.List(isPrefixOf)
+import           Data.List(isPrefixOf, stripPrefix)
+import           Data.Maybe(fromJust)
 import qualified Data.Text as T
 import           System.Directory
 import           System.FilePath((</>), takeDirectory, takeFileName)
@@ -193,7 +194,9 @@ ostreeSink outPath = do
         -- Find a vmlinuz- file.
         kernelList <- filter ("vmlinuz-" `isPrefixOf`) <$> listDirectory bootDir
         let (kernel, kver) = case kernelList of
-                                 hd:_ -> (bootDir </> hd, drop (length ("vmlinuz-" :: String)) hd)
+                                 -- Using fromJust is fine here - we've ensured they all have that
+                                 -- prefix with the filter above.
+                                 hd:_ -> (bootDir </> hd, fromJust $ stripPrefix "vmlinuz-" hd)
                                  _    -> error "No kernel found"
 
         -- Create the initramfs
