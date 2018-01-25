@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 -- Copyright (C) 2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or
@@ -13,7 +15,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-import Control.Monad(when)
 import System.Directory(createDirectoryIfMissing)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
@@ -29,14 +30,8 @@ usage = do
     putStrLn "       dest should be a destination directory."
     exitFailure
 
-{-# ANN main ("HLint: ignore Use head" :: String) #-}
 main :: IO ()
-main = do
-    argv <- getArgs
-
-    when (length argv /= 2) usage
-
-    let cfg = argv !! 0
-    let dir = argv !! 1
-    createDirectoryIfMissing True dir
-    setupFilesystem dir cfg
+main = getArgs >>= \case
+    cfg:dir:_ -> do createDirectoryIfMissing True dir
+                    setupFilesystem dir cfg
+    _         -> usage
