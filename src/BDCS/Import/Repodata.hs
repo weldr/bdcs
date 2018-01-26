@@ -20,7 +20,7 @@ module BDCS.Import.Repodata(RepoException,
  where
 
 import           Control.Applicative((<|>))
-import           Control.Exception(Exception)
+import           Control.Exception(Exception, throw)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Reader(ReaderT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadThrow)
@@ -119,4 +119,6 @@ loadFromURI metadataURI = do
     mapM_ RPM.loadFromURI locations
  where
     appendOrThrow :: T.Text -> URI
-    appendOrThrow path = appendURI (baseURI metadataURI) (T.unpack path) `throwIfNothing` RepoException
+    appendOrThrow path = case baseURI metadataURI of
+        Nothing  -> throw RepoException
+        Just uri -> appendURI uri (T.unpack path) `throwIfNothing` RepoException

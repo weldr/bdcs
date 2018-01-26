@@ -33,7 +33,7 @@ import qualified Data.Aeson as Aeson
 import           Data.Aeson((.:), (.=))
 import           Data.ByteString(ByteString)
 import           Data.Int(Int64)
-import           Data.Maybe(fromJust, fromMaybe, listToMaybe)
+import           Data.Maybe(fromMaybe, listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
 import           Database.Esqueleto(Esqueleto, Entity, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
@@ -209,12 +209,13 @@ instance Aeson.FromJSON Projects where
 
 instance Aeson.ToJSON KeyVal where
     toJSON kv = let
-        v = fmap Aeson.toJSON (keyValVal_value kv)
-        e = fmap Aeson.toJSON (keyValExt_value kv)
+        jsonVal :: Maybe Aeson.Value -> Maybe Aeson.Value -> Aeson.Value
+        jsonVal Nothing  _        = Aeson.Bool True
+        jsonVal (Just v) Nothing  = v
+        jsonVal (Just v) (Just e) = if v == e then v else e
      in
-        if | v == Nothing           -> Aeson.Bool True
-           | v == e || e == Nothing -> fromJust v
-           | otherwise              -> fromJust e
+        jsonVal (Aeson.toJSON <$> keyValVal_value kv)
+                (Aeson.toJSON <$> keyValExt_value kv)
 
 -- | Run an SQL query, returning the first 'Entity' as a Maybe.  Use this when you
 -- want a single row out of the database.

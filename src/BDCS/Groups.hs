@@ -38,9 +38,8 @@ import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Bifunctor(bimap)
 import           Data.Conduit((.|), Conduit, Source)
 import qualified Data.Conduit.List as CL
-import           Data.Maybe(isNothing, fromJust)
 import qualified Data.Text as T
-import           Database.Esqueleto hiding (isNothing)
+import           Database.Esqueleto
 
 import           BDCS.DB
 import           BDCS.GroupKeyValue(getValueForGroup)
@@ -118,9 +117,9 @@ groupIdToNevra groupId = do
     r <- getValueForGroup groupId (TextKey "release")
     a <- getValueForGroup groupId (TextKey "arch")
 
-    if isNothing n || isNothing v || isNothing r || isNothing a
-    then return Nothing
-    else return $ Just $ T.concat [fromJust n, "-", epoch e, fromJust v, "-", fromJust r, ".", fromJust a]
+    case (n, v, r, a) of
+        (Just n', Just v', Just r', Just a') -> return $ Just $ T.concat [n', "-", epoch e, v', "-", r', ".", a']
+        _                                    -> return Nothing
   where
     epoch :: Maybe T.Text -> T.Text
     epoch (Just e) = e `T.append` ":"

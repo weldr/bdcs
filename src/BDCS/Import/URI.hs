@@ -18,7 +18,6 @@ module BDCS.Import.URI(appendURI,
  where
 
 import Data.List(isInfixOf, isSuffixOf)
-import Data.Maybe(fromJust)
 import Network.URI(URI(..), escapeURIString, isUnescapedInURI,
                    parseURIReference, pathSegments, relativeTo, unEscapeString, uriToString)
 
@@ -30,10 +29,10 @@ uriToPath uri = unEscapeString $ uriPath uri
 -- | Go up one directory in the 'URI'.  For instance:
 -- > ghci> let uri = parseURI "file:///path/to/repo/repodata/primary.xml"
 -- > ghci> baseURI (fromJust uri)
--- > file:///path/to/repo/
-baseURI :: URI -> URI
-baseURI uri = let upOne = fromJust $ parseURIReference ".." in
-    relativeTo upOne uri
+-- > Just file:///path/to/repo/
+baseURI :: URI -> Maybe URI
+baseURI uri = let upOne = parseURIReference ".." in
+    fmap (`relativeTo` uri) upOne
 
 -- | Append a path to a 'URI'.
 appendURI :: URI -> String -> Maybe URI
