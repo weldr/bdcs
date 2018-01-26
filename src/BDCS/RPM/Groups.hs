@@ -17,11 +17,11 @@ module BDCS.RPM.Groups(createGroup)
 
 import           Codec.RPM.Tags(Tag, findStringTag, findStringListTag, findTag, findWord32ListTag, tagValue)
 import           Control.Conditional((<&&>), whenM)
-import           Control.Monad(forM_, void, when)
+import           Control.Monad(forM_, when)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.State(State, execState, get, modify)
 import           Data.Bits(testBit)
-import           Data.Maybe(fromJust, isJust)
+import           Data.Maybe(isJust)
 import qualified Data.Text as T
 import           Data.Word(Word32)
 import           Database.Persist.Sql(SqlPersistT, insert)
@@ -135,8 +135,7 @@ createGroup fileIds rpm = do
         uncurry insertGroupKeyValue tup Nothing groupId
 
     -- Add the epoch attribute, when it exists.
-    when (isJust epoch) $ void $
-        insertGroupKeyValue (TextKey "epoch") (fromJust epoch) Nothing groupId
+    forM_ epoch $ \e -> insertGroupKeyValue (TextKey "epoch") e Nothing groupId
 
     forM_ [("Provide", "rpm-provide"), ("Conflict", "rpm-conflict"), ("Obsolete", "rpm-obsolete"), ("Order", "rpm-install-after")] $ \tup ->
         uncurry (addPRCO rpm groupId) tup
