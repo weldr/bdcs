@@ -28,6 +28,7 @@ import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Bifunctor(bimap)
 import           Data.Bits((.|.))
 import           Data.Conduit(sourceToList)
+import           Data.List(scanl')
 import qualified Data.Text as T
 import           Data.Time.Clock(UTCTime, getCurrentTime)
 import           Data.Time.Clock.POSIX(utcTimeToPOSIXSeconds)
@@ -161,7 +162,7 @@ rebuildNPM sourceId = do
             (link,) <$> insert link
 
         mkdirs :: MonadIO m => UTCTime -> FilePath -> SqlPersistT m [(Files, Key Files)]
-        mkdirs buildTime path = mapM mkdir $ scanl1 (</>) $ splitDirectories path
+        mkdirs buildTime path = mapM mkdir $ scanl' (</>) "/" $ splitDirectories path
          where
             mkdir :: MonadIO m => FilePath -> SqlPersistT m (Files, Key Files)
             mkdir subPath = let
