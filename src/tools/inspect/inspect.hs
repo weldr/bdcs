@@ -46,7 +46,7 @@ usage = do
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
-    Just (db, repo, subcmd:_:_:args) ->
+    Just (db, repo, subcmd:args) ->
         runSubcommand "inspect-" subcmd ([db, repo] ++ args) knownSubcommands usage
 
     _ -> usage
