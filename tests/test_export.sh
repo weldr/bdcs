@@ -8,6 +8,9 @@ CS_REPO="./export.repo"
 METADATA_DB="./export_metadata.db"
 EXPORT_DIR="./exported-content.d/"
 
+export PATH="./dist/build/bdcs-import:./dist/build/bdcs-export:$PATH"
+
+
 function compare_with_rpm() {
     # Verify that contents of an exported directory have the same files as if
     # RPMs were installed via rpm.
@@ -74,7 +77,7 @@ function compare_with_rpm() {
 
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "sqlite3 $METADATA_DB < ../schema.sql"
+        rlRun "sqlite3 $METADATA_DB < ./schema.sql"
         # filesystem package is required by the exporter
         rlRun -t -c "wget http://mirror.centos.org/centos/7/os/x86_64/Packages/filesystem-3.2-21.el7.x86_64.rpm"
         rlRun "$BDCS import $METADATA_DB $CS_REPO file://`pwd`/filesystem-3.2-21.el7.x86_64.rpm"
@@ -100,7 +103,7 @@ rlJournalStart
     rlPhaseEnd
 
     rlPhaseStartTest "When exporting a non-existing package returns an error"
-        OUTPUT=`sudo $BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 NON-EXISTING`
+        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 NON-EXISTING`
         rlAssertNotEquals "On error exit code should not be zero" $? 0
         rlAssertEquals "On error output is as expected" "$OUTPUT" '"No such group NON-EXISTING"'
 
@@ -109,13 +112,13 @@ rlJournalStart
 
 
     rlPhaseStartTest "When exporting existing package exported contents match what's inside the RPM"
-        rlRun "sudo $BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
+        rlRun "$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
         compare_with_rpm $EXPORT_DIR filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
         sudo rm -rf $EXPORT_DIR
     rlPhaseEnd
 
     rlPhaseStartTest "When exporting existing package into .tar image untarred contents match the contents of RPM"
-        rlRun "sudo $BDCS export $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
+        rlRun "$BDCS export $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
 
         mkdir tar_contents && pushd tar_contents/ && tar xvf ../exported.tar && popd
         compare_with_rpm tar_contents/ filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
@@ -138,11 +141,15 @@ rlJournalStart
         sudo rm -rf $EXPORT_DIR
 
         # first tog-pegasus-libs, second libcmpiCppImpl0
-        rlRun "sudo $BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch tog-pegasus-libs-2:2.14.1-5.el7.x86_64 libcmpiCppImpl0-2.0.3-5.el7.x86_64"
+        rlRun "$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch tog-pegasus-libs-2:2.14.1-5.el7.x86_64 libcmpiCppImpl0-2.0.3-5.el7.x86_64"
 
         # conflict is in libcmpiCppImpl0 which is the second package in the list
         # make sure tog-pegasus wins
         compare_with_rpm $EXPORT_DIR filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm tog-pegasus-libs-2.14.1-5.el7.x86_64.rpm
         sudo rm -rf $EXPORT_DIR
+    rlPhaseEnd
+
+    rlPhaseStartCleanup
+        rm -rf $CS_REPO $METADATA_DB *.rpm $EXPORT_DIR
     rlPhaseEnd
 rlJournalEnd

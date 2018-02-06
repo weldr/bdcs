@@ -4,7 +4,6 @@ else
 d = ${CURDIR}
 endif
 
-ORG_NAME=welder
 STORE ?= cs.repo
 MDDB ?= metadata.db
 
@@ -14,23 +13,15 @@ weld-f25:
 	-rm -rf ./welder-deployment
 
 build: Dockerfile.build
-	if [ -n "$$TRAVIS" ]; then \
-	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< --cache-from $(ORG_NAME)/bdcs-build-img:latest .; \
-	else \
-	    sudo docker build -t $(ORG_NAME)/bdcs-build-img -f $< .; \
-	fi;
-	sudo docker create --name build-cont $(ORG_NAME)/bdcs-build-img /bin/bash
-	sudo docker cp build-cont:/usr/local/bin/bdcs ./bdcs
-	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-import ./bdcs-import
-	sudo docker cp build-cont:/usr/local/libexec/weldr/bdcs-export ./bdcs-export
-	sudo docker rm build-cont
+	sudo docker build -t welder/bdcs-build-img -f $< .
+	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ welder/bdcs-build-img
 
 importer: build
-	sudo docker build -t $(ORG_NAME)/bdcs-import-img .
+	sudo docker build -t welder/bdcs-import-img .
 
 integration-test: build Dockerfile.integration-test
-	sudo docker build -t $(ORG_NAME)/bdcs-integration-test -f Dockerfile.integration-test .
-	sudo docker run --name tests $(ORG_NAME)/bdcs-integration-test
+	sudo docker build -t welder/bdcs-integration-test -f Dockerfile.integration-test .
+	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ welder/bdcs-integration-test
 
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
@@ -47,7 +38,7 @@ mddb:
 	    -e "STORE=$(STORE)"             \
 	    -e "KEEP_MDDB=$(KEEP_MDDB)"   \
 	    -e "MDDB=$(MDDB)"             \
-	    $(ORG_NAME)/bdcs-import-img
+	    welder/bdcs-import-img
 	sudo docker rm mddb-container
 
 api-mddb:
@@ -64,7 +55,7 @@ api-mddb:
 	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-28.el7.x86_64.rpm \
 	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-29.el7_4.x86_64.rpm
 	sudo docker volume create -d local --name api-test-mddb-volume
-	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" $(ORG_NAME)/bdcs-import-img
+	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" welder/bdcs-import-img
 
 
 .PHONY: importer mddb api-mddb ci
@@ -105,21 +96,21 @@ import-centos7:
 
 ci: integration-test
 
-ci_after_success:
-	# copy coverage data & compiled binaries out of the container
-	sudo docker cp tests:/bdcs/dist ./bdcs/dist
-	sudo docker rm tests
-
-	sudo chown travis:travis -R ./bdcs/dist
-	[ -x ~/.cabal/bin/hpc-coveralls ] || cabal update && cabal install hpc-coveralls
-	cd bdcs/ && ~/.cabal/bin/hpc-coveralls --display-report test-bdcs bdcs bdcs-import bdcs-inspect inspect-groups inspect-ls inspect-nevras bdcs-export bdcs-tmpfiles bdcs-depsolve && cd ..
+ci_after_success: install_hpc_coveralls
+	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ \
+	    --env "TRAVIS=$$TRAVIS" --env "TRAVIS_JOB_ID=$$TRAVIS_JOB_ID" --entrypoint /usr/bin/make welder/bdcs coveralls
 
 	# upload artifacts on which other test activities depend
 	s3cmd sync -v -P ./bdcs/dist/build/bdcs-import/bdcs-import s3://weldr/bdcs-import
 	s3cmd sync -v -P ./bdcs/dist/build/bdcs-export/bdcs-export s3://weldr/bdcs-export
 
+coveralls: sandbox
+	[ -x .cabal-sandbox/bin/hpc-coveralls ] || cabal install hpc-coveralls
+	.cabal-sandbox/bin/hpc-coveralls --display-report test-bdcs bdcs bdcs-import bdcs-inspect inspect-groups inspect-ls inspect-nevras bdcs-export bdcs-tmpfiles bdcs-depsolve
+
 sandbox:
-	[ -d .cabal-sandbox ] || cabal sandbox init
+	cabal update
+	cabal sandbox init
 
 hlint: sandbox
 	[ -x .cabal-sandbox/bin/happy ] || cabal install happy
@@ -127,7 +118,10 @@ hlint: sandbox
 	cabal exec hlint .
 
 tests: sandbox
-	cabal install --dependencies-only --enable-tests
+	cabal install --dependencies-only --enable-tests --force-reinstall
 	cabal configure --enable-tests --enable-coverage
 	cabal build
 	cabal test
+
+install:
+	cabal install

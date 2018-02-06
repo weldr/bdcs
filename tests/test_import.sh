@@ -6,11 +6,11 @@
 BDCS="./dist/build/bdcs/bdcs"
 METADATA_DB="./import_metadata.db"
 CENTOS_REPO="centos.repo"
-
+export PATH="./dist/build/bdcs-import:$PATH"
 
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "sqlite3 $METADATA_DB < ../schema.sql"
+        rlRun "sqlite3 $METADATA_DB < ./schema.sql"
     rlPhaseEnd
 
     rlPhaseStartTest "When executed without parameters shows usage"

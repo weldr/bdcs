@@ -7,9 +7,12 @@ BDCS="./dist/build/bdcs/bdcs"
 METADATA_DB="metadata.db"
 CS_REPO="/tmp/depsolve.repo"
 
+export PATH="./dist/build/bdcs-import:./dist/build/bdcs-depsolve:$PATH"
+
+
 rlJournalStart
     rlPhaseStartSetup
-        rlRun "sqlite3 $METADATA_DB < ../schema.sql"
+        rlRun "sqlite3 $METADATA_DB < ./schema.sql"
         DNF_ROOT=`mktemp -d /tmp/dnf.root.XXXXXX`
         DNF_DOWNLOAD=`mktemp -d /tmp/dnf.download.XXXXXX`
     rlPhaseEnd

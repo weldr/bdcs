@@ -8,25 +8,8 @@ RUN dnf -y install cabal-install \
 
 ENV PATH /root/.cabal/bin:$PATH
 
-RUN cabal update
-RUN cabal install happy
-RUN cabal install hlint
-
-RUN mkdir /bdcs
-
-# install the build dependencies first so we can cache this layer
-COPY bdcs.cabal /bdcs/
-RUN cd /bdcs/ && cabal update && cabal install --dependencies-only --enable-tests --force-reinstall
-
-# copy the rest of the code and build the application
-COPY cabal.config LICENSE Setup.hs .hlint.yaml /bdcs/
-COPY data/ /bdcs/data/
-COPY src/ /bdcs/src/
-COPY tests/ /bdcs/tests/
-
+# source is already bind-mounted here
 WORKDIR /bdcs/
-RUN hlint .
-RUN cabal configure --enable-tests --enable-coverage --prefix=/usr/local && \
-    cabal build && \
-    cabal test --show-details=always && \
-    cabal install --prefix=/usr/local
+
+# build the application
+ENTRYPOINT ["make", "hlint", "tests", "install"]
