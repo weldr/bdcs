@@ -27,11 +27,10 @@ integration-test: build Dockerfile.integration-test
 # NOTE: The mddb and content store under ./mddb/ will be removed
 #       Unless KEEP_STORE=1 and KEEP_MDDB=1 are set.
 mddb:
-	@if [ ! -e ${d}/mddb ]; then \
-	    mkdir ${d}/mddb; \
-	fi;
 	sudo docker rm -f mddb-container || true
-	sudo docker run -v ${d}/mddb/:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label=disable" \
+	sudo docker volume rm bdcs-mddb-volume || true
+	sudo docker volume create -d local --name bdcs-mddb-volume
+	sudo docker run -v bdcs-mddb-volume:/mddb/ -v ${d}/rpms:/rpms:ro --security-opt="label=disable" \
 	    --name mddb-container         \
 	    -e "IMPORT_URL=$(IMPORT_URL)" \
 	    -e "KEEP_STORE=$(KEEP_STORE)"   \

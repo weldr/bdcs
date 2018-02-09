@@ -43,12 +43,10 @@ The Makefile lays out the exact steps and can be used to simplify all this -
 just run `make importer mddb`.  If make is unavailable, just copy the steps
 out of there and run them manually.
 
-You will first need a volume to store the mddb in and a volume containing all
-the RPMs.  The Makefile expects that the mddb will be put into $PWD/mddb, and
-that the RPMs are in $PWD/rpms.
+The Makefile expects that the RPMs are in $PWD/rpms.
 
-After completion, the mddb will be in $PWD/mddb/metadata.db and the content
-store will be in $PWD/mddb/cs.repo/
+After completion, the mddb and content store will be in a bdcs-mddb-volume
+docker volume.
 
 Preparing local development environment for Haskell
 ===================================================
