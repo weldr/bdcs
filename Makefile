@@ -84,9 +84,9 @@ hlint: sandbox
 
 tests: sandbox
 	cabal install --dependencies-only --enable-tests --force-reinstall
-	cabal configure --enable-tests --enable-coverage
+	cabal configure --enable-tests --enable-coverage --prefix=/usr/local
 	cabal build
 	cabal test
 
 install:
-	cabal install
+	cabal install --prefix=/usr/local
