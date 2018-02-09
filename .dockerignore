@@ -9,4 +9,3 @@ welder-deployment/
 *.repo/
 *.db
 **.tix
-dist
