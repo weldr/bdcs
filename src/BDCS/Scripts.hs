@@ -26,6 +26,8 @@ import           Database.Esqueleto
 
 import BDCS.DB
 
+{-# ANN findScript ("HLint: ignore Use ." :: String) #-}
+
 -- | Find a single script in the database, returning the key for that script if it
 -- exists.  It is possible for multiple very similar scripts to exist in the same
 -- database (or even, scripts with identical bodies but that differ in other ways)

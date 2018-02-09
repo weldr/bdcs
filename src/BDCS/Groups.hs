@@ -47,6 +47,12 @@ import           BDCS.KeyType
 import qualified BDCS.ReqType as RT
 import           BDCS.RPM.Utils(splitFilename)
 
+{-# ANN findGroupRequirements ("HLint: ignore Use ." :: String) #-}
+{-# ANN findRequires ("HLint: ignore Use ." :: String) #-}
+{-# ANN getRequirementsForGroup ("HLint: ignore Use ." :: String) #-}
+{-# ANN nameToGroupIds ("HLint: ignore Use ." :: String) #-}
+{-# ANN nevraToGroupId ("HLint: ignore Use ." :: String) #-}
+
 findGroupRequirements :: MonadIO m => Key Groups -> Key Requirements -> SqlPersistT m (Maybe (Key GroupRequirements))
 findGroupRequirements groupId reqId = firstKeyResult $
     select $ from $ \r -> do

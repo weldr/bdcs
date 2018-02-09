@@ -28,6 +28,8 @@ import BDCS.DB
 import BDCS.KeyType
 import BDCS.KeyValue(findKeyValue, insertKeyValue)
 
+{-# ANN findBuild ("HLint: ignore Use ." :: String) #-}
+
 -- | Find a single build of a software package in the database, returning the database key
 -- for that build if it exists.  All arguments are required and must be matched for this
 -- function to return anything.  Note that conceptually, a build is of some software source

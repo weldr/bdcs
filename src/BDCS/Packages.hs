@@ -28,6 +28,9 @@ import BDCS.DB
 import BDCS.KeyValue(insertKeyValue)
 import BDCS.KeyType
 
+{-# ANN filesInPackage ("HLint: ignore Use ." :: String) #-}
+{-# ANN findPackage ("HLint: ignore Use ." :: String) #-}
+
 filesInPackage :: MonadIO m => T.Text -> SqlPersistT m [T.Text]
 filesInPackage name = do
     results <- select $ from $ \(files `InnerJoin` key_val `InnerJoin` file_key_values) -> do

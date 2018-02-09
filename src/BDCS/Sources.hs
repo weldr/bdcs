@@ -27,6 +27,8 @@ import BDCS.DB
 import BDCS.KeyType
 import BDCS.KeyValue(findKeyValue)
 
+{-# ANN findSource ("HLint: ignore Use ." :: String) #-}
+
 -- | Given a version number and a key to a 'Projects' record, find a matching software
 -- source in the database.  If it exists, the database key is returned.
 findSource :: MonadIO m => T.Text -> Key Projects -> SqlPersistT m (Maybe (Key Sources))

@@ -29,6 +29,9 @@ import BDCS.DB
 import BDCS.KeyType
 import BDCS.KeyValue(findKeyValue, insertKeyValue)
 
+{-# ANN getKeyValuesForGroup ("HLint: ignore Use ." :: String) #-}
+{-# ANN getGroupsByKeyVal ("HLint: ignore Use ." :: String) #-}
+
 insertGroupKeyValue :: MonadIO m => KeyType -> T.Text -> Maybe T.Text -> Key Groups -> SqlPersistT m (Key GroupKeyValues)
 insertGroupKeyValue k v e groupId =
     maybeKey (insertKeyValue k (Just v) e >>= \kvId -> insert $ GroupKeyValues groupId kvId)
