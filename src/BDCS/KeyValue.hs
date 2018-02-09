@@ -34,6 +34,8 @@ import           Database.Esqueleto
 import BDCS.DB
 import BDCS.KeyType
 
+{-# ANN findKeyValue ("HLint: ignore Use ." :: String) #-}
+
 findKeyValue :: MonadIO m => KeyType -> Maybe T.Text -> Maybe T.Text -> SqlPersistT m (Maybe (Key KeyVal))
 findKeyValue k v e = firstKeyResult $
     select $ from $ \kv -> do

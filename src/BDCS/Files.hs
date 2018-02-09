@@ -38,6 +38,11 @@ import           Database.Esqueleto
 import BDCS.DB
 import BDCS.Utils.Conduit(awaitWith)
 
+{-# ANN getKeyValuesForFile ("HLint: ignore Use ." :: String) #-}
+{-# ANN groupIdToFiles ("HLint: ignore Use ." :: String) #-}
+{-# ANN sourceIdToFiles ("HLint: ignore Use ." :: String) #-}
+{-# ANN pathToGroupId ("HLint: ignore Use ." :: String) #-}
+
 insertFiles :: MonadIO m => [Files] -> SqlPersistT m [Key Files]
 insertFiles = mapM insert
 

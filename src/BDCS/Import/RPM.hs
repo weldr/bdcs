@@ -72,6 +72,8 @@ import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
 import BDCS.Scripts(insertScript)
 #endif
 
+{-# ANN buildImported ("HLint: ignore Use ." :: String) #-}
+
 buildImported :: MonadResource m => [Tag] ->  SqlPersistT m Bool
 buildImported sigs =
     case findStringTag "SHA1Header" sigs of

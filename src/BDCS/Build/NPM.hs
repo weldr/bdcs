@@ -43,6 +43,8 @@ import BDCS.KeyType
 import BDCS.Label.FileLabels(apply)
 import BDCS.NPM.SemVer(SemVer, SemVerRangeSet, parseSemVer, parseSemVerRangeSet, satisfies, toText)
 
+{-# ANN rebuildNPM ("HLint: ignore Use ." :: String) #-}
+
 rebuildNPM :: (MonadBaseControl IO m, MonadIO m, MonadError String m, MonadResource m) => Key Sources -> SqlPersistT m [Key Builds]
 rebuildNPM sourceId = do
     -- get the name and version for this source
