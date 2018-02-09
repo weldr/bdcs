@@ -60,40 +60,6 @@ api-mddb:
 
 .PHONY: importer mddb api-mddb ci
 
-import-centos7:
-	make weld-f25
-	make importer
-	mkdir rpms/
-
-	if [ ! -e ${d}/mddb ]; then \
-	    mkdir ${d}/mddb;        \
-	fi;                         \
-
-	if [ -n "$$EXISTING_MDDB" ]; then                          \
-	    wget --progress=dot:giga "$$EXISTING_MDDB";            \
-	    gunzip -q `basename "$$EXISTING_MDDB"`;                \
-	    UNZIPPED=`basename "$$EXISTING_MDDB" | sed 's/.gz//'`; \
-	    mv $$UNZIPPED ${d}/mddb/$(MDDB);                       \
-	fi
-
-	if [ -n "$$EXISTING_STORE" ]; then                                          \
-	    STORE=`basename "$$EXISTING_STORE"`;                                    \
-	    ostree --repo=${d}/mddb/$$STORE init --mode=archive;                    \
-	    ostree --repo=${d}/mddb/$$STORE remote add --no-gpg-verify existing "$$EXISTING_STORE"; \
-	    # note: pulls with --depth=0, only the last commit                      \
-	    ostree --repo=${d}/mddb/$$STORE pull --mirror existing;                 \
-	fi                                                                          \
-
-	set -e
-	for REPO in http://mirror.centos.org/centos/7/os/x86_64/ \
-	            http://mirror.centos.org/centos/7/extras/x86_64/; do \
-	    export IMPORT_URL="$$REPO"; \
-	    export KEEP_STORE=1; \
-	    export STORE="$$STORE"; \
-	    export KEEP_MDDB=1; \
-	    make mddb; \
-	done
-
 ci: integration-test
 
 ci_after_success: install_hpc_coveralls
