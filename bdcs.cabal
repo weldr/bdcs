@@ -40,7 +40,7 @@ extra-source-files:     ChangeLog.md,
 
 custom-setup
     setup-depends:      base,
-                        Cabal,
+                        Cabal >= 1.10 && < 2.1,
                         filepath
 
 source-repository       head

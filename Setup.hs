@@ -13,6 +13,8 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+{-# LANGUAGE CPP #-}
+
 module Main(main)
  where
 
@@ -25,6 +27,14 @@ import Distribution.Simple.LocalBuildInfo(LocalBuildInfo(..))
 import Distribution.Simple.UserHooks(UserHooks(..))
 import Distribution.Simple.Setup(ConfigFlags, CopyFlags)
 import System.FilePath((</>))
+
+-- Handle the String to UnqualComponentName switch
+#if defined(MIN_VERSION_Cabal) && MIN_VERSION_Cabal(2, 0, 0)
+import Distribution.Types.UnqualComponentName(UnqualComponentName, unUnqualComponentName)
+#else
+type UnqualComponentName = String
+unUnqualComponentName = id
+#endif
 
 main :: IO ()
 main = defaultMainWithHooks $ simpleUserHooks { confHook = bdcsConf,
@@ -55,8 +65,8 @@ bdcsCopy pkg lbi _ flags = do
     let (subPkg, subLbi) = extractSubComponents pkg lbi
     install subPkg subLbi flags
 
-isSubcommand :: String -> Bool
-isSubcommand s = "inspect-" `isPrefixOf` s || "bdcs-" `isPrefixOf` s
+isSubcommand :: UnqualComponentName -> Bool
+isSubcommand n = let s = unUnqualComponentName n in "inspect-" `isPrefixOf` s || "bdcs-" `isPrefixOf` s
 
 extractMainComponents :: PackageDescription -> LocalBuildInfo -> (PackageDescription, LocalBuildInfo)
 extractMainComponents pkg lbi = let
