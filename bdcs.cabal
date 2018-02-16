@@ -178,7 +178,8 @@ executable bdcs
     hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt,
-                        Utils.Subcommands
+                        Utils.Subcommands,
+                        Paths_bdcs
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
@@ -219,7 +220,8 @@ executable bdcs-inspect
 
     other-modules:      Utils.GetOpt,
                         Utils.IO,
-                        Utils.Subcommands
+                        Utils.Subcommands,
+                        Paths_bdcs
 
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
@@ -240,7 +242,8 @@ executable inspect-groups
                         src/tools/inspect,
                         src/tools
 
-    other-modules:      Utils.GetOpt,
+    other-modules:      Utils.Exceptions,
+                        Utils.GetOpt,
                         Utils.IO,
                         Utils.KeyVal
 
@@ -293,7 +296,8 @@ executable inspect-nevras
                         src/tools/inspect,
                         src/tools
 
-    other-modules:      Utils.GetOpt,
+    other-modules:      Utils.Exceptions,
+                        Utils.GetOpt,
                         Utils.IO
 
     build-depends:      bdcs,
@@ -388,7 +392,10 @@ Test-Suite test-bdcs
                         time >= 1.6.0.1 && < 2.0,
                         unix >= 2.7.2.1 && < 2.8.0.0
 
-    ghc-options:        -Wall
+    -- the modules compiled with -DTEST are automatically pulled in from src/
+    -- based on what the tests import, and that's how we want it. Don't warn
+    -- about unlisted modules.
+    ghc-options:        -Wall -Wno-unrecognised-warning-flags -Wno-missing-home-modules
     cpp-options:        -DTEST
 
     default-language:   Haskell2010
