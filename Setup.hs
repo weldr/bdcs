@@ -19,40 +19,57 @@ module Main(main)
  where
 
 import Data.List(isPrefixOf)
-import Distribution.PackageDescription(Executable(..), GenericPackageDescription, HookedBuildInfo, PackageDescription(..))
+import Distribution.PackageDescription(Executable(..), GenericPackageDescription(..), HookedBuildInfo, PackageDescription(..))
 import Distribution.Simple(defaultMainWithHooks, simpleUserHooks)
-import Distribution.Simple.Install(install)
 import Distribution.Simple.InstallDirs(InstallDirs(..), fromPathTemplate, toPathTemplate)
 import Distribution.Simple.LocalBuildInfo(LocalBuildInfo(..))
 import Distribution.Simple.UserHooks(UserHooks(..))
-import Distribution.Simple.Setup(ConfigFlags, CopyFlags)
 import System.FilePath((</>))
 
--- Handle the String to UnqualComponentName switch
 #if defined(MIN_VERSION_Cabal) && MIN_VERSION_Cabal(2, 0, 0)
-import Distribution.Types.UnqualComponentName(UnqualComponentName, unUnqualComponentName)
+import Distribution.Types.UnqualComponentName(unUnqualComponentName)
+import Distribution.Types.ExecutableScope(ExecutableScope(..))
+import Distribution.Simple.Setup(ConfigFlags)
 #else
-type UnqualComponentName = String
-unUnqualComponentName = id
+import Distribution.Simple.Install(install)
+import Distribution.Simple.Setup(ConfigFlags, CopyFlags)
 #endif
 
 main :: IO ()
-main = defaultMainWithHooks $ simpleUserHooks { confHook = bdcsConf,
-                                                copyHook = bdcsCopy }
+main = defaultMainWithHooks bdcsHooks
 
--- Make sure $libexecdir gets "weldr/" appended to it.  This will affect both the installation location
--- for anything that should go into $libexecdir (like our subcommand programs) as well as the auto
--- generated Paths_bdcs.hs file.
+-- Handle the libexec paths, and differences between Cabal-1.x and Cabal-2.x.
 --
--- This also means if you pass --libexecdir= to "cabal configure" or any other program, you should not
--- add "weldr/" to it.  Otherwise you'll get it in there twice.
+-- On Cabal-2.x, we can specify a scope of "private" on libexec executables.
+-- This can be done directly in the .cabal file when we remove support for Cabal < 2.0.
+#if defined(MIN_VERSION_Cabal) && MIN_VERSION_Cabal(2, 0, 0)
+bdcsHooks :: UserHooks
+bdcsHooks = simpleUserHooks { confHook = bdcsConf }
+
 bdcsConf :: (GenericPackageDescription, HookedBuildInfo) -> ConfigFlags -> IO LocalBuildInfo
 bdcsConf (descr, hbi) flags = do
     lbi <- confHook simpleUserHooks (descr, hbi) flags
-    let dest = mangle $ libexecdir $ installDirTemplates lbi
-    return $ lbi { installDirTemplates = (installDirTemplates lbi) { libexecdir = dest } }
+
+    -- Modify the executable list to change the scope of the libexec executables
+    let localDesc = localPkgDescr lbi
+        scopedLbi = lbi { localPkgDescr = localDesc { executables = map mangleExec (executables localDesc) } }
+
+    -- Add weldr/ to the libexecdir
+    return $ addLibexecWeldr scopedLbi
  where
-    mangle = toPathTemplate . (</> "weldr") . fromPathTemplate
+    mangleExec :: Executable -> Executable
+    mangleExec exe =
+        if isSubcommand (unUnqualComponentName $ exeName exe) then exe{exeScope = ExecutablePrivate}
+        else exe
+
+#else
+-- On Cabal-1.x, change the destination directory of subcomponents during the copy step
+bdcsHooks :: UserHooks
+bdcsHooks = simpleUserHooks { confHook = bdcsConf,
+                              copyHook = bdcsCopy }
+
+bdcsConf :: (GenericPackageDescription, HookedBuildInfo) -> ConfigFlags -> IO LocalBuildInfo
+bdcsConf (descr, hbi) flags = addLibexecWeldr <$> confHook simpleUserHooks (descr, hbi) flags
 
 bdcsCopy :: PackageDescription -> LocalBuildInfo -> UserHooks -> CopyFlags -> IO ()
 bdcsCopy pkg lbi _ flags = do
@@ -64,9 +81,6 @@ bdcsCopy pkg lbi _ flags = do
     -- Second, install only the subcommands into $prefix/libexec/weldr.
     let (subPkg, subLbi) = extractSubComponents pkg lbi
     install subPkg subLbi flags
-
-isSubcommand :: UnqualComponentName -> Bool
-isSubcommand n = let s = unUnqualComponentName n in "inspect-" `isPrefixOf` s || "bdcs-" `isPrefixOf` s
 
 extractMainComponents :: PackageDescription -> LocalBuildInfo -> (PackageDescription, LocalBuildInfo)
 extractMainComponents pkg lbi = let
@@ -84,3 +98,21 @@ extractSubComponents pkg lbi = let
     lbi' = lbi { installDirTemplates = (installDirTemplates lbi) { bindir = dest } }
  in
     (pkg', lbi')
+
+#endif
+
+isSubcommand :: String -> Bool
+isSubcommand s = "inspect-" `isPrefixOf` s || "bdcs-" `isPrefixOf` s
+
+-- Make sure $libexecdir gets "weldr/" appended to it.  This will affect both the installation location
+-- for anything that should go into $libexecdir (like our subcommand programs) as well as the auto
+-- generated Paths_bdcs.hs file.
+--
+-- This also means if you pass --libexecdir= to "cabal configure" or any other program, you should not
+-- add "weldr/" to it.  Otherwise you'll get it in there twice.
+addLibexecWeldr :: LocalBuildInfo -> LocalBuildInfo
+addLibexecWeldr lbi =
+    let dest = mangle $ libexecdir $ installDirTemplates lbi
+    in lbi { installDirTemplates = (installDirTemplates lbi) { libexecdir = dest } }
+ where
+    mangle = toPathTemplate . (</> "weldr") . fromPathTemplate
