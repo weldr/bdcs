@@ -82,7 +82,7 @@ tests: sandbox
 	cabal install --dependencies-only --enable-tests --force-reinstall
 	cabal configure --enable-tests --enable-coverage --prefix=/usr/local
 	cabal build
-	cabal test
+	cabal test --show-details=always
 
 install:
 	cabal install --prefix=/usr/local
