@@ -2,7 +2,8 @@
 
 set -ex
 
-cd /bdcs/
+# first build the application
+make hlint tests install
 
 ./tests/test_tmpfiles.sh
 grep RESULT_STRING /var/tmp/beakerlib-*/TestResults | grep -v PASS && exit 1

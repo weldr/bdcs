@@ -12,16 +12,12 @@ weld-f25:
 	$(MAKE) -C welder-deployment weld-f25
 	-rm -rf ./welder-deployment
 
-build: Dockerfile.build
+build-and-test: Dockerfile.build
 	sudo docker build -t welder/bdcs-build-img -f $< .
 	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ welder/bdcs-build-img
 
-importer: build
+importer: build-and-test
 	sudo docker build -t welder/bdcs-import-img .
-
-integration-test: build Dockerfile.integration-test
-	sudo docker build -t welder/bdcs-integration-test -f Dockerfile.integration-test .
-	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ welder/bdcs-integration-test
 
 
 # NOTE: The mddb and content store under ./mddb/ will be removed
@@ -59,7 +55,7 @@ api-mddb:
 
 .PHONY: importer mddb api-mddb ci
 
-ci: integration-test
+ci: build-and-test
 
 ci_after_success: install_hpc_coveralls
 	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ \
