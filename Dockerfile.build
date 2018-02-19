@@ -1,7 +1,7 @@
 FROM welder/fedora:latest
 
 # workaround for https://github.com/bos/math-functions/issues/52
-RUN dnf -y install cabal-install \
+RUN dnf -y install cabal-install wget diffutils beakerlib \
     https://kojipkgs.fedoraproject.org//packages/ghc-vector-th-unbox/0.2.1.6/1.fc26/x86_64/ghc-vector-th-unbox-0.2.1.6-1.fc26.x86_64.rpm \
     https://kojipkgs.fedoraproject.org//packages/ghc-vector-th-unbox/0.2.1.6/1.fc26/x86_64/ghc-vector-th-unbox-devel-0.2.1.6-1.fc26.x86_64.rpm && \
     dnf clean all
@@ -11,5 +11,6 @@ ENV PATH /root/.cabal/bin:$PATH
 # source is already bind-mounted here
 WORKDIR /bdcs/
 
-# build the application
-ENTRYPOINT ["make", "hlint", "tests", "install"]
+# build the application and execute integration tests
+# when the container is started
+ENTRYPOINT ["/bdcs/entrypoint-integration-test.sh"]
