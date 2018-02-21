@@ -126,26 +126,16 @@ rlJournalStart
     rlPhaseEnd
 
 
-    rlPhaseStartTest "When exporting two conflicting packages on a symlink the first symlink to be exported wins"
+    rlPhaseStartTest "When exporting two conflicting packages bdcs reports error"
         # in libcmpiCppImpl0:
         # libcmpiCppImpl.so and libcmpiCppImpl.so.0 are symlinks to libcmpiCppImpl.so.0.0.0
 
         # in tog-pegasus-libs:
         # libcmpiCppImpl.so is a symlink to libcmpiCppImpl.so.1
+        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64`
+        rlAssertNotEquals "On error exit code should not be zero" $? 0
+        rlAssertEquals "On error output is as expected" "$OUTPUT" '"Unable to resolve path /usr/lib64/libcmpiCppImpl.so, non-directory object exists at /usr/lib64/libcmpiCppImpl.so.0.0.0"'
 
-        # first libcmpiCppImpl0, second tog-pegasus-libs
-        rlRun "$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64 2>&1"
-        # conflict is in tog-pegasus-libs which is the second package in the list
-        # make sure libcmpiCppImpl0 wins
-        compare_with_rpm $EXPORT_DIR filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm libcmpiCppImpl0-2.0.3-5.el7.x86_64.rpm
-        sudo rm -rf $EXPORT_DIR
-
-        # first tog-pegasus-libs, second libcmpiCppImpl0
-        rlRun "$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch tog-pegasus-libs-2:2.14.1-5.el7.x86_64 libcmpiCppImpl0-2.0.3-5.el7.x86_64"
-
-        # conflict is in libcmpiCppImpl0 which is the second package in the list
-        # make sure tog-pegasus wins
-        compare_with_rpm $EXPORT_DIR filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm tog-pegasus-libs-2.14.1-5.el7.x86_64.rpm
         sudo rm -rf $EXPORT_DIR
     rlPhaseEnd
 
