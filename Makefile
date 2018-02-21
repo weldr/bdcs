@@ -57,9 +57,9 @@ api-mddb:
 
 ci: build-and-test
 
-ci_after_success: install_hpc_coveralls
+ci_after_success:
 	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ \
-	    --env "TRAVIS=$$TRAVIS" --env "TRAVIS_JOB_ID=$$TRAVIS_JOB_ID" --entrypoint /usr/bin/make welder/bdcs coveralls
+	    --env "TRAVIS=$$TRAVIS" --env "TRAVIS_JOB_ID=$$TRAVIS_JOB_ID" --entrypoint /usr/bin/make welder/bdcs-build-img coveralls
 
 	# upload artifacts on which other test activities depend
 	s3cmd sync -v -P ./bdcs/dist/build/bdcs-import/bdcs-import s3://weldr/bdcs-import
