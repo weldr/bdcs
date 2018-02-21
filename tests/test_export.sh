@@ -120,7 +120,7 @@ rlJournalStart
     rlPhaseStartTest "When exporting existing package into .tar image untarred contents match the contents of RPM"
         rlRun "$BDCS export $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
 
-        mkdir tar_contents && pushd tar_contents/ && tar xvf ../exported.tar && popd
+        mkdir tar_contents && pushd tar_contents/ && tar xf ../exported.tar && popd
         compare_with_rpm tar_contents/ filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
         sudo rm -rf tar_contents/ exported.tar
     rlPhaseEnd
