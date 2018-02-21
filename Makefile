@@ -67,7 +67,7 @@ ci_after_success: install_hpc_coveralls
 
 coveralls: sandbox
 	[ -x .cabal-sandbox/bin/hpc-coveralls ] || cabal install hpc-coveralls
-	.cabal-sandbox/bin/hpc-coveralls --display-report test-bdcs bdcs bdcs-import bdcs-inspect inspect-groups inspect-ls inspect-nevras bdcs-export bdcs-tmpfiles bdcs-depsolve
+	.cabal-sandbox/bin/hpc-coveralls --display-report test-bdcs bdcs
 
 sandbox:
 	cabal update
