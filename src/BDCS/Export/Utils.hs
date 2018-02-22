@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 -- |
 -- Module: BDCS.Export.Utils
 -- Copyright: (c) 2017 Red Hat, Inc.
@@ -10,18 +12,20 @@
 -- Miscellaneous utilities useful in exporting objects.
 
 module BDCS.Export.Utils(runHacks,
-                         runTmpfiles)
+                         runTmpfiles,
+                         supportedOutputs)
  where
 
-import Control.Conditional(whenM)
-import Control.Exception(tryJust)
-import Control.Monad(guard)
-import Data.List(intercalate)
-import Data.List.Split(splitOn)
-import System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
-import System.FilePath((</>))
-import System.IO.Error(isDoesNotExistError)
-import System.Process(callProcess)
+import           Control.Conditional(whenM)
+import           Control.Exception(tryJust)
+import           Control.Monad(guard)
+import           Data.List(intercalate)
+import           Data.List.Split(splitOn)
+import qualified Data.Text as T
+import           System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
+import           System.FilePath((</>))
+import           System.IO.Error(isDoesNotExistError)
+import           System.Process(callProcess)
 
 import BDCS.Export.TmpFiles(setupFilesystem)
 
@@ -74,3 +78,10 @@ runTmpfiles :: FilePath -> IO ()
 runTmpfiles exportPath = do
     configPath <- getDataFileName "tmpfiles-default.conf"
     setupFilesystem exportPath configPath
+
+-- | List the supported output formats.
+-- Note that any time a new output format file is added in BDCS/Export (and thus to
+-- the runCommand block in tools/export.hs), it should also be added here.  There's
+-- not really any better way to accomplish this.
+supportedOutputs :: [T.Text]
+supportedOutputs = ["directory", "ostree", "qcow2", "tar"]
