@@ -131,12 +131,13 @@ groupIdToNevra groupId = do
     epoch (Just e) = e `T.append` ":"
     epoch Nothing  = ""
 
-getRequirementsForGroup :: MonadIO m => Key Groups -> RT.ReqContext -> SqlPersistT m [Requirements]
-getRequirementsForGroup groupId context = do
+getRequirementsForGroup :: MonadIO m => Key Groups -> RT.ReqContext -> RT.ReqStrength -> SqlPersistT m [Requirements]
+getRequirementsForGroup groupId context strength = do
     vals <- select $ from $ \(reqs `InnerJoin` groupreqs) -> do
             on     $ reqs ^. RequirementsId ==. groupreqs ^. GroupRequirementsReq_id
             where_ $ groupreqs ^. GroupRequirementsGroup_id ==. val groupId &&.
-                     reqs ^. RequirementsReq_context ==. val context
+                     reqs ^. RequirementsReq_context ==. val context &&.
+                     reqs ^. RequirementsReq_strength ==. val strength
             return   reqs
     return $ map entityVal vals
 

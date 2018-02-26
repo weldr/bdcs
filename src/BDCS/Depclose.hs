@@ -137,7 +137,7 @@ depcloseGroupIds arches groupIds = do
         -- Now the recursive part. First, grab everything from the requirements table for this group:
         -- TODO maybe do something with strength, context, etc.
 
-        requirements <- getRequirementsForGroup groupId RT.Runtime >>= mapM reqToDep
+        requirements <- getRequirementsForGroup groupId RT.Runtime RT.Must >>= mapM reqToDep
 
         -- Resolve each requirement to a list of group ids. Each group id is a possibility for satisfying
         -- the requirement. An empty list means the requirement cannot be satisfied.
