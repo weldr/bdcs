@@ -7,9 +7,9 @@ endif
 STORE ?= cs.repo
 MDDB ?= metadata.db
 
-weld-f25:
+weld-fedora:
 	git clone https://github.com/weldr/welder-deployment
-	$(MAKE) -C welder-deployment weld-f25
+	$(MAKE) -C welder-deployment weld-fedora
 	-rm -rf ./welder-deployment
 
 build-and-test: Dockerfile.build

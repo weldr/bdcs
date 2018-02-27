@@ -3,3 +3,4 @@
 welder-deployment/
 *.tix
 *.pyc
+rpms/

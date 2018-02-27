@@ -35,9 +35,9 @@ and Dockerfile.  Dockerfile.build is used to compile the program needed to
 build an mddb and produces an image with that program.  Dockerfile then runs
 that image and produces the mddb.
 
-The Dockerfile depends on a base image, named weld/fedora:25, which needs have
+The Dockerfile depends on a base image, named welder/fedora:latest, which needs have
 been previously built. If it is not available it can be built from the
-welder-deployment repository by running `make weld-f25`.
+welder-deployment repository by running `make weld-fedora`.
 
 The Makefile lays out the exact steps and can be used to simplify all this -
 just run `make importer mddb`.  If make is unavailable, just copy the steps
