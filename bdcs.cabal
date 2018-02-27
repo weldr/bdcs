@@ -61,6 +61,7 @@ library
                         BDCS.Depclose,
                         BDCS.Depsolve,
                         BDCS.Exceptions,
+                        BDCS.Export,
                         BDCS.Export.Directory,
                         BDCS.Export.FSTree,
                         BDCS.Export.Qcow2,
