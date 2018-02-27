@@ -78,10 +78,8 @@ needKernel = do
     putStrLn "ERROR: ostree exports need a kernel package included"
     exitFailure
 
-runCommand :: FilePath -> FilePath -> FilePath -> [String] -> IO ()
-runCommand db repo out_path fileThings = do
-    things <- map T.pack <$> expandFileThings fileThings
-
+runCommand :: FilePath -> FilePath -> FilePath -> [T.Text] -> IO ()
+runCommand db repo out_path things = do
     cs <- runCsMonad (openContentStore repo) >>= \case
         Left e  -> print e >> exitFailure
         Right r -> return r
@@ -119,5 +117,6 @@ runCommand db repo out_path fileThings = do
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
-    Just (db, repo, out_path:things) -> runCommand db repo out_path things
+    Just (db, repo, out_path:things) -> do things' <- map T.pack <$> expandFileThings things
+                                           runCommand db repo out_path things'
     _                                -> usage
