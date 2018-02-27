@@ -19,7 +19,6 @@
 {-# LANGUAGE RankNTypes #-}
 
 import           Control.Conditional(cond, ifM)
-import           Control.Monad(unless, when)
 import           Control.Monad.Except(MonadError, runExceptT)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
@@ -41,7 +40,6 @@ import qualified BDCS.Export.Tar as Tar
 import           BDCS.Export.Utils(runHacks, runTmpfiles)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
-import           BDCS.Utils.Either(whenLeft)
 import           BDCS.Utils.Monad(concatMapM)
 import           BDCS.Version
 
@@ -72,37 +70,29 @@ usage = do
     -- TODO group id?
     exitFailure
 
-needKernel :: IO ()
-needKernel = do
-    printVersion "export"
-    putStrLn "ERROR: ostree exports need a kernel package included"
-    exitFailure
+runCommand :: FilePath -> FilePath -> FilePath -> [T.Text] -> IO (Either String ())
+runCommand db repo out_path things | kernelMissing out_path things = return $ Left "ERROR: ostree exports need a kernel package included"
+                                   | otherwise                     = runCsMonad (openContentStore repo) >>= \case
+    Left e   -> return $ Left $ show e
+    Right cs -> do
+        let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (removePathForcibly out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
+                                          (".qcow2" `isSuffixOf` out_path, (removePathForcibly out_path, Qcow2.qcow2Sink out_path)),
+                                          (".repo" `isSuffixOf` out_path,  (removePathForcibly out_path, Ostree.ostreeSink out_path)),
+                                          (otherwise,                      (return (), directoryOutput out_path))]
 
-runCommand :: FilePath -> FilePath -> FilePath -> [T.Text] -> IO ()
-runCommand db repo out_path things = do
-    cs <- runCsMonad (openContentStore repo) >>= \case
-        Left e  -> print e >> exitFailure
-        Right r -> return r
+        result <- runExceptT $ do
+            -- Build the filesystem tree to export
+            fstree <- checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
+                        .| getGroupIdC
+                        .| groupIdToFilesC
+                        .| filesToTree
 
-    when (".repo" `isSuffixOf` out_path) $
-        unless (any ("kernel-" `T.isPrefixOf`) things) needKernel
+            -- Traverse the tree and export the file contents
+            runConduitRes $ fstreeSource fstree .| CS.filesToObjectsC cs .| objectSink
 
-    let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (cleanupHandler out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
-                                      (".qcow2" `isSuffixOf` out_path, (cleanupHandler out_path, Qcow2.qcow2Sink out_path)),
-                                      (".repo" `isSuffixOf` out_path,  (cleanupHandler out_path, Ostree.ostreeSink out_path)),
-                                      (otherwise,                      (print, directoryOutput out_path))]
-
-    result <- runExceptT $ do
-        -- Build the filesystem tree to export
-        fstree <- checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
-                    .| getGroupIdC
-                    .| groupIdToFilesC
-                    .| filesToTree
-
-        -- Traverse the tree and export the file contents
-        runConduitRes $ fstreeSource fstree .| CS.filesToObjectsC cs .| objectSink
-
-    whenLeft result (\e -> handler e >> exitFailure)
+        case result of
+            Left e  -> handler >> return (Left e)
+            Right _ -> return $ Right ()
  where
     directoryOutput :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
@@ -112,11 +102,13 @@ runCommand db repo out_path things = do
         Directory.directorySink path
         liftIO $ runHacks path
 
-    cleanupHandler :: Show a => FilePath -> a -> IO ()
-    cleanupHandler path e = print e >> removePathForcibly path
+    kernelMissing :: FilePath -> [T.Text] -> Bool
+    kernelMissing out lst = ".repo" `isSuffixOf` out && not (any ("kernel-" `T.isPrefixOf`) lst)
 
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
     Just (db, repo, out_path:things) -> do things' <- map T.pack <$> expandFileThings things
-                                           runCommand db repo out_path things'
+                                           runCommand db repo out_path things' >>= \case
+                                               Left e  -> printVersion "export" >> putStrLn e >> exitFailure
+                                               Right _ -> return ()
     _                                -> usage
