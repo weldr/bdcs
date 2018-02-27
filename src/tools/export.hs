@@ -13,33 +13,15 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RankNTypes #-}
 
-import           Control.Conditional(cond, ifM)
-import           Control.Monad.Except(MonadError, runExceptT)
-import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
-import qualified Data.Conduit.List as CL
-import           Data.ContentStore(openContentStore, runCsMonad)
-import           Data.List(isSuffixOf)
+import           Control.Conditional(ifM)
 import qualified Data.Text as T
-import           System.Directory(doesFileExist, removePathForcibly)
+import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 
-import qualified BDCS.CS as CS
-import           BDCS.DB(Files, checkAndRunSqlite)
-import qualified BDCS.Export.Directory as Directory
-import           BDCS.Export.FSTree(filesToTree, fstreeSource)
-import qualified BDCS.Export.Qcow2 as Qcow2
-import qualified BDCS.Export.Ostree as Ostree
-import qualified BDCS.Export.Tar as Tar
-import           BDCS.Export.Utils(runHacks, runTmpfiles)
-import           BDCS.Files(groupIdToFilesC)
-import           BDCS.Groups(getGroupIdC)
+import           BDCS.Export(export)
 import           BDCS.Utils.Monad(concatMapM)
 import           BDCS.Version
 
@@ -70,45 +52,10 @@ usage = do
     -- TODO group id?
     exitFailure
 
-runCommand :: FilePath -> FilePath -> FilePath -> [T.Text] -> IO (Either String ())
-runCommand db repo out_path things | kernelMissing out_path things = return $ Left "ERROR: ostree exports need a kernel package included"
-                                   | otherwise                     = runCsMonad (openContentStore repo) >>= \case
-    Left e   -> return $ Left $ show e
-    Right cs -> do
-        let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (removePathForcibly out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
-                                          (".qcow2" `isSuffixOf` out_path, (removePathForcibly out_path, Qcow2.qcow2Sink out_path)),
-                                          (".repo" `isSuffixOf` out_path,  (removePathForcibly out_path, Ostree.ostreeSink out_path)),
-                                          (otherwise,                      (return (), directoryOutput out_path))]
-
-        result <- runExceptT $ do
-            -- Build the filesystem tree to export
-            fstree <- checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
-                        .| getGroupIdC
-                        .| groupIdToFilesC
-                        .| filesToTree
-
-            -- Traverse the tree and export the file contents
-            runConduitRes $ fstreeSource fstree .| CS.filesToObjectsC cs .| objectSink
-
-        case result of
-            Left e  -> handler >> return (Left e)
-            Right _ -> return $ Right ()
- where
-    directoryOutput :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
-    directoryOutput path = do
-        -- Apply tmpfiles.d to the directory first
-        liftIO $ runTmpfiles path
-
-        Directory.directorySink path
-        liftIO $ runHacks path
-
-    kernelMissing :: FilePath -> [T.Text] -> Bool
-    kernelMissing out lst = ".repo" `isSuffixOf` out && not (any ("kernel-" `T.isPrefixOf`) lst)
-
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
     Just (db, repo, out_path:things) -> do things' <- map T.pack <$> expandFileThings things
-                                           runCommand db repo out_path things' >>= \case
+                                           export db repo out_path things' >>= \case
                                                Left e  -> printVersion "export" >> putStrLn e >> exitFailure
                                                Right _ -> return ()
     _                                -> usage
