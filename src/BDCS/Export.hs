@@ -18,17 +18,18 @@ module BDCS.Export(export)
  where
 
 import           Control.Conditional(cond)
-import           Control.Monad.Except(MonadError, runExceptT)
+import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import           Data.Conduit.List as CL
-import           Data.ContentStore(openContentStore, runCsMonad)
+import           Data.ContentStore(openContentStore)
 import           Data.List(isSuffixOf)
 import qualified Data.Text as T
-import           System.Directory(removePathForcibly)
+import           Database.Esqueleto(SqlPersistT)
 
 import qualified BDCS.CS as CS
-import           BDCS.DB(Files, checkAndRunSqlite)
+import           BDCS.DB(Files)
 import qualified BDCS.Export.Directory as Directory
 import           BDCS.Export.FSTree(filesToTree, fstreeSource)
 import qualified BDCS.Export.Ostree as Ostree
@@ -38,29 +39,22 @@ import           BDCS.Export.Utils(runHacks, runTmpfiles)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 
-export :: FilePath -> FilePath -> FilePath -> [T.Text] -> IO (Either String ())
-export db repo out_path things | kernelMissing out_path things = return $ Left "ERROR: ostree exports need a kernel package included"
-                               | otherwise                     = runCsMonad (openContentStore repo) >>= \case
-    Left e   -> return $ Left $ show e
-    Right cs -> do
-        let (handler, objectSink) = cond [(".tar" `isSuffixOf` out_path,   (removePathForcibly out_path, CS.objectToTarEntry .| Tar.tarSink out_path)),
-                                          (".qcow2" `isSuffixOf` out_path, (removePathForcibly out_path, Qcow2.qcow2Sink out_path)),
-                                          (".repo" `isSuffixOf` out_path,  (removePathForcibly out_path, Ostree.ostreeSink out_path)),
-                                          (otherwise,                      (return (), directoryOutput out_path))]
+export :: (MonadBaseControl IO m, MonadError String m, MonadIO m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> SqlPersistT m ()
+export repo out_path things | kernelMissing out_path things = throwError "ERROR: ostree exports need a kernel package included"
+                            | otherwise                     = do
+    let objectSink = cond [(".tar" `isSuffixOf` out_path,   CS.objectToTarEntry .| Tar.tarSink out_path),
+                           (".qcow2" `isSuffixOf` out_path, Qcow2.qcow2Sink out_path),
+                           (".repo" `isSuffixOf` out_path,  Ostree.ostreeSink out_path),
+                           (otherwise,                      directoryOutput out_path)]
 
-        result <- runExceptT $ do
-            -- Build the filesystem tree to export
-            fstree <- checkAndRunSqlite (T.pack db) $ runConduit $ CL.sourceList things
-                        .| getGroupIdC
-                        .| groupIdToFilesC
-                        .| filesToTree
-
-            -- Traverse the tree and export the file contents
+    runExceptT (openContentStore repo) >>= \case
+        Left e   -> throwError $ show e
+        Right cs -> do
+            fstree <- runConduit $ CL.sourceList things
+                          .| getGroupIdC
+                          .| groupIdToFilesC
+                          .| filesToTree
             runConduitRes $ fstreeSource fstree .| CS.filesToObjectsC cs .| objectSink
-
-        case result of
-            Left e  -> handler >> return (Left e)
-            Right _ -> return $ Right ()
  where
     directoryOutput :: (MonadError String m, MonadIO m) => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do

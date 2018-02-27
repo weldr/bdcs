@@ -16,14 +16,16 @@
 {-# LANGUAGE LambdaCase #-}
 
 import           Control.Conditional(ifM)
+import           Control.Monad.Except(runExceptT)
 import qualified Data.Text as T
-import           System.Directory(doesFileExist)
+import           System.Directory(doesFileExist, removePathForcibly)
 import           System.Environment(getArgs)
-import           System.Exit(exitFailure)
+import           System.Exit(exitFailure, exitSuccess)
 
-import           BDCS.Export(export)
-import           BDCS.Utils.Monad(concatMapM)
-import           BDCS.Version
+import BDCS.DB(checkAndRunSqlite)
+import BDCS.Export(export)
+import BDCS.Utils.Monad(concatMapM)
+import BDCS.Version
 
 import Utils.GetOpt(commandLineArgs)
 
@@ -55,7 +57,8 @@ usage = do
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
     Just (db, repo, out_path:things) -> do things' <- map T.pack <$> expandFileThings things
-                                           export db repo out_path things' >>= \case
-                                               Left e  -> printVersion "export" >> putStrLn e >> exitFailure
-                                               Right _ -> return ()
+                                           result  <- runExceptT $ checkAndRunSqlite (T.pack db) $ export repo out_path things'
+                                           case result of
+                                               Left err -> removePathForcibly out_path >> print err >> exitFailure
+                                               Right _  -> exitSuccess
     _                                -> usage
