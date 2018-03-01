@@ -1,3 +1,16 @@
+## 0.2.1
+
+* Add BDCS.Export.export, which is the bulk of the "bdcs export" command
+  but in function form.
+* Add BDCS.Exports.Utils.supportedOutputs, which returns a list of supported
+  output formats.
+* Ignore Enhances, Suggests, Recommends, and Supplements weak requirements
+  during dependency solving.
+* Many test-related updates.
+* Allow building with conduit-extra-1.2.
+* Many docker-related build updates.
+* Support building with cabal-2.0.
+
 ## 0.2.0
 
 * Add a module for building virtual filesystem trees.
