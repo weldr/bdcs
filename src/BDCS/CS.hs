@@ -18,6 +18,7 @@
 -- Conduit-based interface between BDCS and its underlying content store.
 
 module BDCS.CS(Object(..),
+               fileToObjectC,
                filesToObjectsC,
                objectToTarEntry)
  where
@@ -44,12 +45,10 @@ data Object = SpecialObject                 -- ^ Some non-file object that shoul
                                             -- by a 'Files' record so its metadata can be tracked
             | FileObject BS.ByteString      -- ^ A file object with its contents
 
--- | Read 'Files' records from a 'Conduit', find the object in the content store, and return the
--- matching 'Object' if found.  An error is thrown if the object does not exist, or if there is
--- any other error interacting with the content store.  In addition, the 'Files' object is also
--- returned as part of the result tuple so its metadata can be used by downstream consumers.
-filesToObjectsC :: (MonadError String m, MonadIO m) => ContentStore -> Conduit Files m (Files, Object)
-filesToObjectsC repo = awaitForever $ \f@Files{..} ->
+-- | For a given 'Files' record, find the object in the content store, and return the corresponding object.
+-- This is a version of 'filesToObjectsC' suitable as an argument for 'awaitForever'.
+fileToObjectC :: (MonadError String m, MonadIO m) => ContentStore -> Files -> Conduit Files m (Files, Object)
+fileToObjectC repo f@Files{..} =
     let isRegular = fromIntegral filesMode `intersectFileModes` fileTypeModes == regularFileMode
     in case (isRegular, filesCs_object) of
         -- Not a regular file
@@ -61,6 +60,13 @@ filesToObjectsC repo = awaitForever $ \f@Files{..} ->
             liftIO (runCsMonad $ fetchByteString repo digest) >>= \case
                 Left e    -> throwError (show e)
                 Right obj -> yield (f, FileObject obj)
+
+-- | Read 'Files' records from a 'Conduit', find the object in the content store, and return the
+-- matching 'Object' if found.  An error is thrown if the object does not exist, or if there is
+-- any other error interacting with the content store.  In addition, the 'Files' object is also
+-- returned as part of the result tuple so its metadata can be used by downstream consumers.
+filesToObjectsC :: (MonadError String m, MonadIO m) => ContentStore -> Conduit Files m (Files, Object)
+filesToObjectsC repo = awaitForever (fileToObjectC repo)
 
 -- | Read tuples from a 'Conduit' and convert each into a 'Codec.Archive.Tar.Entry' suitable for
 -- streaming into an archive.  Metadata such as permissions and ownerships will be set correctly.
