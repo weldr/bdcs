@@ -19,6 +19,7 @@
 
 module BDCS.Export.FSTree(FSEntry,
                           FSTree,
+                          addFileToTree,
                           filesToTree,
                           fstreeSource)
  where
@@ -61,10 +62,16 @@ filesToTree =
     -- Create an empty tree. This tree starts one level above "/"
     rootTree = Node{rootLabel=("", Nothing), subForest=[]}
  in
-    CL.foldM addFileToTree rootTree
+    CL.foldM (addFileToTree False) rootTree
 
-addFileToTree :: MonadError String m => FSTree -> Files -> m FSTree
-addFileToTree root object = do
+-- | Add a 'Files' object to a 'FSTree'. Will optionally replace existing paths, or throw an error.
+-- This function cannot replace a directory with a regular file, or vice versa.
+addFileToTree :: MonadError String m =>
+                 Bool       -- ^ Whether to replace the file if the path already exists
+              -> FSTree     -- ^ The original tree
+              -> Files      -- ^ The file to add
+              -> m FSTree
+addFileToTree replace root object = do
     let rootZipper = (root, [])
     let pathComponents = splitDirectories $ T.unpack $ filesPath object
 
@@ -188,18 +195,23 @@ addFileToTree root object = do
                     targetZipper <- evalStateT (resolveSymlink (goUp newZipper) s) 0
                     addChildren targetZipper self
 
+                -- Attempting to replace a placeholder directory with a regular file, that's an error
                 (Placeholder, _)           -> throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
                                                            ", directory added at path"
 
+                -- existing directory, new placeholder. Leave the directory, but take the placeholder's children
                 (Directory _, Placeholder) -> addChildren existing newEntry
 
-                -- Allow this if the same Files object is being added twice
-                (Directory d1, Directory d2) -> if compareDirs d1 d2 then addChildren existing newEntry
-                                                else throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
-                                                                  ", file already added at this location"
+                -- Replacing a directory with a directory, only valid if the Files objects are the same
+                -- or if "replace" is true.
+                (Directory d1, Directory d2) -> if | compareDirs d1 d2 -> addChildren existing newEntry
+                                                   | replace           -> addChildren (newEntry, crumbs) self
+                                                   | otherwise         -> throwError $ "Unable to add " ++
+                                                                                       T.unpack (filesPath object) ++
+                                                                                       ", directory already added at this location"
 
                 (Directory _, _)           -> throwError $ "Unable to to add " ++ T.unpack (filesPath object) ++
-                                                           ", file already added at this location"
+                                                           ", directory already added at this location"
 
                 -- Allow a symlink to be added twice if it's the same symlink
                 (Symlink s1, Symlink s2)   -> if compareLinks s1 s2 then return existing
@@ -211,10 +223,19 @@ addFileToTree root object = do
                     targetZipper <- evalStateT (resolveSymlink zipper s) 0
                     addChildren targetZipper newEntry
 
-                -- Otherwise, we have two non-directory, non-placeholder files, see if they match
-                _                          -> if self == newEntry then return existing
-                                              else throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
-                                                                ", file already added at this location"
+                -- Replacing a file with a directory, no good
+                (Other _, Directory _)     -> throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
+                                                           ", file already added at this location"
+                (Other _, Placeholder)     -> throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
+                                                           ", file already added at this location"
+
+                -- Otherwise, we have two non-directory, non-placeholder files, see if they match,
+                -- or if we should explicitly replace.
+                _                          -> if | self == newEntry -> return existing
+                                                 | replace          -> return (newEntry, crumbs)
+                                                 | otherwise        -> throwError $ "Unable to add " ++
+                                                                                    T.unpack (filesPath object) ++
+                                                                                    ", file already added at this location"
 
     addChildren :: MonadError String m => FSZipper -> FSTree -> m FSZipper
     addChildren dirZipper newEntry = foldM (\z e -> goUp <$> addEntryToTree z e) dirZipper (subForest newEntry)

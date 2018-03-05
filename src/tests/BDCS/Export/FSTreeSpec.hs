@@ -227,10 +227,88 @@ spec = describe "Export.FSTree Tests" $ do
                 ]
             ])
          )
+
+    it "addFileToTree, replace file with self, replace=False" $
+        runExceptT (addFileToTree False existingFileTree existingFile) >>= (`shouldBe` Right existingFileTree)
+
+    it "addFileToTre, replace file with self, replace=True" $
+        runExceptT (addFileToTree True existingFileTree existingFile) >>= (`shouldBe` Right existingFileTree)
+
+    it "addFileToTree, replace file with directory, replace=False" $
+        runExceptT (addFileToTree False existingFileTree existingDir) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace file with directory, replace=True" $
+        runExceptT (addFileToTree True existingFileTree existingDir) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace file with a different file, replace=False" $
+        runExceptT (addFileToTree False existingFileTree newFile) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace file with a different file, replace=True" $
+        runExceptT (addFileToTree True existingFileTree newFile) >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("existing", Just newFile) []
+                ]
+            ])
+        )
+
+    it "addFileToTree, replace directory with self, replace=False" $
+        runExceptT (addFileToTree False existingDirTree existingDir) >>= (`shouldBe` Right existingDirTree)
+
+    it "addFileToTree, replace directory with self, replace=True" $
+        runExceptT (addFileToTree True existingDirTree existingDir) >>= (`shouldBe` Right existingDirTree)
+
+    it "addFileToTree, replace directory with file, replace=False" $
+        runExceptT (addFileToTree False existingDirTree existingFile) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace directory with file, replace=True" $
+        runExceptT (addFileToTree True existingDirTree existingFile) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace directory with different directory, replace=False" $
+        runExceptT (addFileToTree False existingDirTree newDir) >>= (`shouldSatisfy` isLeft)
+
+    it "addFileToTree, replace directory with different directory, replace=True" $
+        runExceptT (addFileToTree True existingDirTree newDir) >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("existing", Just newDir) [
+                        Node ("file", Just regularTemplate{filesPath="/existing/file"}) []
+                    ]
+                ]
+            ])
+        )
  where
     -- Add a list of files and return the tree
     addFiles :: Monad m => [Files] -> m (Either String FSTree)
     addFiles files = runExceptT $ runConduit $ CL.sourceList files .| filesToTree
+
+    existingDir :: Files
+    existingDir = directoryTemplate{filesPath="/existing"}
+
+    newDir :: Files
+    newDir = existingDir{filesMode = fromIntegral $ directoryMode .|. 0o700}
+
+    existingDirTree :: FSTree
+    existingDirTree = Node ("", Nothing) [
+        Node ("/", Nothing) [
+            Node ("existing", Just existingDir) [
+                Node ("file", Just regularTemplate{filesPath="/existing/file"}) []
+            ]
+        ]
+     ]
+
+    existingFile :: Files
+    existingFile = regularTemplate{filesPath="/existing", filesCs_object=Just "abcd"}
+
+    newFile :: Files
+    newFile = existingFile{filesCs_object=Just "defg"}
+
+    existingFileTree :: FSTree
+    existingFileTree = Node ("", Nothing) [
+        Node ("/", Nothing) [
+            Node ("existing", Just existingFile) []
+        ]
+     ]
 
     -- Just fill in the paths
     regularTemplate :: Files
