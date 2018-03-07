@@ -57,6 +57,7 @@ library
                         BDCS.Depsolve,
                         BDCS.Exceptions,
                         BDCS.Export,
+                        BDCS.Export.Customize,
                         BDCS.Export.Directory,
                         BDCS.Export.FSTree,
                         BDCS.Export.Qcow2,
