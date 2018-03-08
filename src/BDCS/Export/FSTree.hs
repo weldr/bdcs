@@ -26,7 +26,7 @@ module BDCS.Export.FSTree(FSEntry,
 import           Control.Conditional(whenM)
 import           Control.Monad(foldM)
 import           Control.Monad.Except(MonadError, throwError)
-import           Control.Monad.State(StateT, evalStateT, get, modify, withStateT)
+import           Control.Monad.State(StateT, evalStateT, get, withStateT)
 import           Data.Conduit(Sink, Source, yield)
 import qualified Data.Conduit.List as CL
 import           Data.List.Safe(init, last)
@@ -152,8 +152,6 @@ addFileToTree root object = do
         --    - The existing entry is a directory:
         --        * are we adding a placeholder? Add the new placeholder's children to the existing directory.
         --        * otherwise, conflict
-        --    - The existing entry is a symlink:
-        --        * Resolve the symlink target, add the new entry as a child of the target
         --
         -- The scenarios that involve adding new placeholders may seem a little odd, but they can arise
         -- when moving things around due to replacing placeholder directories with symlinks.
@@ -203,16 +201,15 @@ addFileToTree root object = do
                 (Directory _, _)           -> throwError $ "Unable to to add " ++ T.unpack (filesPath object) ++
                                                            ", file already added at this location"
 
-                -- Follow the symlink, and repeat addEntryToTree with the symlink target as the new directory
-                -- to add into.
-                (Symlink s, _)             -> do
-                    -- Check and increment the link count
-                    whenM ((>= maxSymlinks) <$> get) $
-                        throwError $ "Too many levels of symbolic links while resolving " ++ T.unpack (filesPath object)
-                    modify (+1)
+                -- Allow a symlink to be added twice if it's the same symlink
+                (Symlink s1, Symlink s2)   -> if compareLinks s1 s2 then return existing
+                                              else throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
+                                                                ", symlink already added at this location"
 
-                    targetZipper <- resolveSymlink zipper s
-                    addEntryToTree targetZipper newEntry
+                -- Follow the symlink, and move the placeholder's children to the destination directory
+                (Symlink s, Placeholder)   -> do
+                    targetZipper <- withStateT (+1) $ resolveSymlink zipper s
+                    addChildren targetZipper newEntry
 
                 -- Otherwise, we have two non-directory, non-placeholder files, see if they match
                 _                          -> if self == newEntry then return existing
@@ -225,6 +222,10 @@ addFileToTree root object = do
     -- Compare files, ignoring size and mtime, because the data for these is basically made up
     compareDirs :: Files -> Files -> Bool
     compareDirs f1 f2 = f1{filesMtime=0, filesSize=0} == f2{filesMtime=0, filesSize=0}
+
+    -- For symlinks, the only parts that count are the path and the target
+    compareLinks :: Files -> Files -> Bool
+    compareLinks f1 f2 = (filesPath f1 == filesPath f2) && (filesTarget f1 == filesTarget f2)
 
 -- Walk a tree and emit the Files entries in order, modifying the paths as we go
 -- to match the final, symlink-resolved results
