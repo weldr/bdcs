@@ -121,6 +121,50 @@ spec = describe "Export.FSTree Tests" $ do
             ])
         )
 
+    it "Symlinks moving placeholders to symlinks" $
+        let dir_a = directoryTemplate{filesPath="/a/b/c"}
+            dir_b = directoryTemplate{filesPath="/x/b"}
+            link_d = symlinkTemplate{filesPath="/d", filesTarget = Just "/x"}
+            link_a = symlinkTemplate{filesPath="/a", filesTarget = Just "/d"}
+        in addFiles [dir_a, dir_b, link_d, link_a] >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("a", Just link_a) [],
+                    Node ("x", Nothing) [
+                        Node ("b", Just dir_b) [
+                            Node ("c", Just dir_a) []
+                        ]
+                    ],
+                    Node ("d", Just link_d) []
+                ]
+            ])
+        )
+
+    it "Symlinks moving placeholders to replace symlinks" $
+        let dir_a = directoryTemplate{filesPath="/a/b/c"}
+            link_b = symlinkTemplate{filesPath="/x/b", filesTarget = Just "/e"}
+            link_a = symlinkTemplate{filesPath="/a", filesTarget = Just "/x"}
+        in addFiles [dir_a, link_b, link_a] >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("a", Just link_a) [],
+                    Node ("x", Nothing) [
+                        Node ("b", Just link_b) []
+                    ],
+                    Node ("e", Nothing) [
+                        Node ("c", Just dir_a) []
+                    ]
+                ]
+            ])
+        )
+
+    it "Symlinks moving placeholders to replace symlinks, but with another symlink in the way" $
+        let dir_a = directoryTemplate{filesPath="/a/b/c"}
+            link_b = symlinkTemplate{filesPath="/x/b", filesTarget = Just "/e"}
+            link_e = symlinkTemplate{filesPath="/e/c", filesTarget = Just "/y"}
+            link_a = symlinkTemplate{filesPath="/a", filesTarget = Just "/x"}
+        in addFiles [dir_a, link_b, link_e, link_a] >>= (`shouldSatisfy` isLeft)
+
     it "Symlink loop" $
         let link_a = symlinkTemplate{filesPath="/a", filesTarget=Just "b"}
             link_b = symlinkTemplate{filesPath="/b", filesTarget=Just "a"}
@@ -163,6 +207,26 @@ spec = describe "Export.FSTree Tests" $ do
         let link = symlinkTemplate{filesPath="/a", filesTarget=Just "."}
             file = regularTemplate{filesPath="/a"}
         in addFiles [link, file] >>= (`shouldSatisfy` isLeft)
+
+    it "Adding a file twice" $
+        let file = regularTemplate{filesPath="/a"}
+        in addFiles [file, file] >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("a", Just file) []
+                ]
+            ])
+         )
+
+    it "Adding a symlink twice" $
+        let symlink = symlinkTemplate{filesPath="/a", filesTarget=Just "regular"}
+        in addFiles [symlink, symlink] >>= (`shouldBe` Right (
+            Node ("", Nothing) [
+                Node ("/", Nothing) [
+                    Node ("a", Just symlink) []
+                ]
+            ])
+         )
  where
     -- Add a list of files and return the tree
     addFiles :: Monad m => [Files] -> m (Either String FSTree)
