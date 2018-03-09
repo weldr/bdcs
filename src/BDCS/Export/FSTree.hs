@@ -76,7 +76,7 @@ addFileToTree root object = do
 
     -- Wrap the new file in a tree node and add it to the directory
     let newEntry = Node (lastComponent, Just object) []
-    getTree <$> evalStateT (addEntryToTree dirZipper newEntry) 0
+    getTree <$> addEntryToTree dirZipper newEntry
  where
     -- Given a directory path, split into components, return a new zipper focused on this path
     -- If the directory or any parent directories do not exist, create placeholders for them
@@ -136,7 +136,7 @@ addFileToTree root object = do
 
         findDirectory startZipper pathComponents
 
-    addEntryToTree :: MonadError String m => FSZipper -> FSTree -> StateT Int m FSZipper
+    addEntryToTree :: MonadError String m => FSZipper -> FSTree -> m FSZipper
     addEntryToTree zipper newEntry = do
         -- At this point, we have a directory to stick the new entry into, and the first thing to do is see
         -- if the directory already contains an entry with the same name. If it does:
@@ -185,7 +185,7 @@ addFileToTree root object = do
                 -- The context for relative links is the directory, so one level above the new symlink
                 (Placeholder, Symlink s)   -> do
                     let newZipper = (newEntry, crumbs)
-                    targetZipper <- withStateT (+1) $ resolveSymlink (goUp newZipper) s
+                    targetZipper <- evalStateT (resolveSymlink (goUp newZipper) s) 0
                     addChildren targetZipper self
 
                 (Placeholder, _)           -> throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
@@ -208,7 +208,7 @@ addFileToTree root object = do
 
                 -- Follow the symlink, and move the placeholder's children to the destination directory
                 (Symlink s, Placeholder)   -> do
-                    targetZipper <- withStateT (+1) $ resolveSymlink zipper s
+                    targetZipper <- evalStateT (resolveSymlink zipper s) 0
                     addChildren targetZipper newEntry
 
                 -- Otherwise, we have two non-directory, non-placeholder files, see if they match
@@ -216,7 +216,7 @@ addFileToTree root object = do
                                               else throwError $ "Unable to add " ++ T.unpack (filesPath object) ++
                                                                 ", file already added at this location"
 
-    addChildren :: MonadError String m => FSZipper -> FSTree -> StateT Int m FSZipper
+    addChildren :: MonadError String m => FSZipper -> FSTree -> m FSZipper
     addChildren dirZipper newEntry = foldM (\z e -> goUp <$> addEntryToTree z e) dirZipper (subForest newEntry)
 
     -- Compare files, ignoring size and mtime, because the data for these is basically made up
