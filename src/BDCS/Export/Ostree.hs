@@ -85,7 +85,7 @@ ostreeSink outPath = do
                 installKernelInitrd tmpDir
 
                 -- Replace /etc/nsswitch.conf with the altfiles version
-                getDataFileName "nsswitch-altfiles.conf" >>= readFile >>= writeFile (tmpDir </> "etc" </> "nsswitch.conf")
+                getDataFileName "data/nsswitch-altfiles.conf" >>= readFile >>= writeFile (tmpDir </> "etc" </> "nsswitch.conf")
 
                 -- Remove the fstab stub
                 removeFile $ tmpDir </> "etc" </> "fstab"
@@ -101,7 +101,7 @@ ostreeSink outPath = do
 
                 -- Add more tmpfiles entries
                 let tmpfilesDir = tmpDir </> "usr" </> "lib" </> "tmpfiles.d"
-                getDataFileName "tmpfiles-ostree.conf" >>= readFile >>= writeFile (tmpfilesDir </> "weldr-ostree.conf")
+                getDataFileName "data/tmpfiles-ostree.conf" >>= readFile >>= writeFile (tmpfilesDir </> "weldr-ostree.conf")
 
                 -- Replace a bunch of top-level directories with symlinks
                 replaceDirs tmpDir

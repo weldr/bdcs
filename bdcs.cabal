@@ -15,11 +15,8 @@ license-file:           LICENSE
 build-type:             Custom
 cabal-version:          >= 1.10
 
-data-dir:               data
-data-files:             sysusers-default.conf,
-                        tmpfiles-default.conf,
-                        tmpfiles-ostree.conf,
-                        nsswitch-altfiles.conf
+data-files:             schema.sql,
+                        data/*.conf
 
 extra-source-files:     ChangeLog.md,
                         Dockerfile,
@@ -30,7 +27,6 @@ extra-source-files:     ChangeLog.md,
                         Makefile,
                         queries,
                         README.md
-                        schema.sql,
                         src/tests/*.hs,
                         src/tests/BDCS/*.hs,
                         src/tests/BDCS/Export/*.hs,
