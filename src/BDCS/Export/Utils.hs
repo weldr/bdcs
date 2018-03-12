@@ -52,7 +52,7 @@ runHacks exportPath = do
     -- Install a sysusers.d config file, and run systemd-sysusers to implement it
     let sysusersDir = exportPath </> "usr" </> "lib" </> "sysusers.d"
     createDirectoryIfMissing True sysusersDir
-    getDataFileName "sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
+    getDataFileName "data/sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
     callProcess "systemd-sysusers" ["--root", exportPath]
 
     -- Run depmod on any kernel modules that might be present
@@ -76,7 +76,7 @@ runHacks exportPath = do
 -- it is not generally useful and should be avoided.
 runTmpfiles :: FilePath -> IO ()
 runTmpfiles exportPath = do
-    configPath <- getDataFileName "tmpfiles-default.conf"
+    configPath <- getDataFileName "data/tmpfiles-default.conf"
     setupFilesystem exportPath configPath
 
 -- | List the supported output formats.
