@@ -134,7 +134,7 @@ rlJournalStart
         # libcmpiCppImpl.so is a symlink to libcmpiCppImpl.so.1
         OUTPUT=`$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64`
         rlAssertNotEquals "On error exit code should not be zero" $? 0
-        rlAssertEquals "On error output is as expected" "$OUTPUT" '"Unable to resolve path /usr/lib64/libcmpiCppImpl.so, non-directory object exists at /usr/lib64/libcmpiCppImpl.so.0.0.0"'
+        rlAssertEquals "On error output is as expected" "$OUTPUT" '"Unable to add /usr/lib64/libcmpiCppImpl.so, symlink already added at this location"'
 
         sudo rm -rf $EXPORT_DIR
     rlPhaseEnd
