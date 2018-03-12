@@ -1,3 +1,14 @@
+## 0.2.2
+
+* Add BDCS.CS.fileToObjectC, which, when used as part of a conduit, fetches
+  the data for a single file from a ContentStore.
+* Add BDCS.Export.Customize, which provides types and functions for modifying
+  the data exported from a ContentStore.
+* Add BDCS.Export.exportAndCustomize, which includes Customization data in an
+  export.
+* Include schema.sql in the data-files.
+* Bug fixes related to FSTree and symlinks.
+
 ## 0.2.1
 
 * Add BDCS.Export.export, which is the bulk of the "bdcs export" command

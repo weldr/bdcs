@@ -1,5 +1,5 @@
 name:                   bdcs
-version:                0.2.1
+version:                0.2.2
 synopsis:               Tools for managing a content store of software packages
 description:            This module provides a library and various tools for managing a content store and
                         metadata database.  These store the contents of software packages that make up a
