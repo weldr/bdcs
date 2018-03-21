@@ -10,7 +10,7 @@ homepage:               https://github.com/weldr/bdcs
 category:               Distribution
 author:                 Chris Lumens
 maintainer:             clumens@redhat.com
-license:                LGPL
+license:                LGPL-2.1
 license-file:           LICENSE
 build-type:             Custom
 cabal-version:          >= 1.10
