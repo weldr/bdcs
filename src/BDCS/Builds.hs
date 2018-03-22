@@ -15,6 +15,7 @@
 
 module BDCS.Builds(associateBuildWithPackage,
                    findBuild,
+                   findBuilds,
                    getBuild,
                    insertBuild,
                    insertBuildKeyValue)
@@ -49,6 +50,15 @@ findBuild epoch release arch sourceId = firstKeyResult $
              build ^. BuildsArch ==. val arch
     limit 1
     return $ build ^. BuildsId
+
+-- | Given the key to a 'Sources' record, find all builds for that source in the database,
+-- across all versions, arches, etc.  The key for each result is returned.
+findBuilds :: MonadIO m => Key Sources -> SqlPersistT m [Key Builds]
+findBuilds sourceId = do
+    vals <- select $ from $ \build -> do
+            where_ $ build ^. BuildsSource_id ==. val sourceId
+            return $ build ^. BuildsId
+    return $ map unValue vals
 
 -- | Given a key to a 'Builds' record in the database, return that record.  This function is
 -- suitable for using on the result of 'findBuild'.
