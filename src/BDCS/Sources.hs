@@ -2,7 +2,7 @@
 
 -- |
 -- Module: BDCS.Sources
--- Copyright: (c) 2016-2017 Red Hat, Inc.
+-- Copyright: (c) 2016-2018 Red Hat, Inc.
 -- License: LGPL
 --
 -- Maintainer: https://github.com/weldr
@@ -14,6 +14,7 @@
 -- each of which will require a separate 'Sources' record.
 
 module BDCS.Sources(findSource,
+                    findSources,
                     getSource,
                     insertSource,
                     insertSourceKeyValue)
@@ -39,6 +40,15 @@ findSource version projectId = firstKeyResult $
              src ^. SourcesVersion    ==. val version
     limit 1
     return $ src ^. SourcesId
+
+-- | Given a key to a 'Projects' record, find all software sources for that project in
+-- the database.  The key for each result is returned.
+findSources :: MonadIO m => Key Projects -> SqlPersistT m [Key Sources]
+findSources projectId = do
+    vals <- select $ from $ \src -> do
+            where_ $ src ^. SourcesProject_id ==. val projectId
+            return $ src ^. SourcesId
+    return $ map unValue vals
 
 -- | Given a key to a 'Sources' record in the database, return that record.  This function
 -- is suitable for using on the result of 'findSource'.
