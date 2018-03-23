@@ -1,3 +1,7 @@
+## 0.2.4
+
+* Allow building with aeson-1.3 and unordered-containers-0.2.9.
+
 ## 0.2.3
 
 * Add BDCS.Builds.findBuilds.
