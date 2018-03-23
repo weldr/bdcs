@@ -113,7 +113,7 @@ library
                         BDCS.Utils.Monad
                         BDCS.Version
 
-    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
+    build-depends:      aeson >= 1.0.0.0 && < 1.4.0.0,
                         base >= 4.9 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
                         codec-rpm >= 0.2.1 && < 0.3,
@@ -155,7 +155,7 @@ library
                         text >= 1.2.2.0 && < 1.3,
                         time >= 1.6.0.1 && < 2.0,
                         unix >= 2.7.2.1 && < 2.8.0.0,
-                        unordered-containers >= 0.2.7.2 && < 0.2.9.0,
+                        unordered-containers >= 0.2.7.2 && < 0.2.10.0,
                         xml-conduit >= 1.4.0.4 && < 1.8.0
 
     pkgconfig-depends:  ostree-1 >= 2017.8
@@ -200,10 +200,10 @@ executable bdcs-import
     build-depends:      bdcs,
                         base >= 4.7 && < 5.0,
                         cond >= 0.4.1.1 && < 0.5.0.0,
-                        content-store >= 0.2.0 && < 0.3.0,
+                        content-store >= 0.2.1 && < 0.3.0,
                         directory >= 1.3.0.0 && < 1.4.0.0,
-                        mtl >= 2.2.1,
-                        network-uri,
+                        mtl >= 2.2.1 && < 2.3,
+                        network-uri >= 2.6.0 && < 2.7.0,
                         text >= 1.2.2.0 && < 1.3
 
     default-language:   Haskell2010
@@ -244,7 +244,7 @@ executable inspect-groups
                         Utils.IO,
                         Utils.KeyVal
 
-    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
+    build-depends:      aeson >= 1.0.0.0 && < 1.4.0.0,
                         aeson-pretty,
                         base >= 4.7 && < 5.0,
                         bdcs,
@@ -271,7 +271,7 @@ executable inspect-ls
                         Utils.IO,
                         Utils.KeyVal
 
-    build-depends:      aeson >= 1.0.0.0 && < 1.3.0.0,
+    build-depends:      aeson >= 1.0.0.0 && < 1.4.0.0,
                         aeson-pretty,
                         base >= 4.7 && < 5.0,
                         bdcs,
@@ -319,7 +319,7 @@ executable bdcs-export
                         base >= 4.9 && < 5.0,
                         cond >= 0.4.1.1 && < 0.5.0.0,
                         conduit >= 1.2.8 && < 1.3,
-                        content-store >= 0.2.0 && < 0.3.0,
+                        content-store >= 0.2.1 && < 0.3.0,
                         directory >= 1.3.0.0 && < 1.4.0.0,
                         mtl >= 2.2.1 && < 2.3,
                         text >= 1.2.2.0 && < 1.3
@@ -363,7 +363,7 @@ Test-Suite test-bdcs
 
     build-depends:      hspec == 2.*,
                         HUnit >= 1.5.0.0 && < 1.7.0.0,
-                        aeson >= 1.0.0.0 && < 1.3.0.0,
+                        aeson >= 1.0.0.0 && < 1.4.0.0,
                         base >= 4.8 && < 5.0,
                         bytestring >= 0.10 && < 0.11,
                         codec-rpm >= 0.2.1 && < 0.3,
