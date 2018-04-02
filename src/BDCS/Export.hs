@@ -21,6 +21,7 @@ module BDCS.Export(export,
 import           Control.Conditional(cond)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Logger(MonadLogger)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import qualified Data.Conduit.List as CL
@@ -42,10 +43,10 @@ import           BDCS.Export.Utils(runHacks, runTmpfiles)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 
-export :: (MonadBaseControl IO m, MonadError String m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> SqlPersistT m ()
+export :: (MonadBaseControl IO m, MonadError String m, MonadLogger m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> SqlPersistT m ()
 export repo out_path things = exportAndCustomize repo out_path things []
 
-exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> [Customization] -> SqlPersistT m ()
+exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadLogger m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> [Customization] -> SqlPersistT m ()
 exportAndCustomize repo out_path things custom | kernelMissing out_path things = throwError "ERROR: ostree exports need a kernel package included"
                                                | otherwise                     = do
     let objectSink = cond [(".tar" `isSuffixOf` out_path,   CS.objectToTarEntry .| Tar.tarSink out_path),
