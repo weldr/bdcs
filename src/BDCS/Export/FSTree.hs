@@ -27,7 +27,7 @@ module BDCS.Export.FSTree(FSEntry,
 import           Control.Conditional(whenM)
 import           Control.Monad(foldM)
 import           Control.Monad.Except(MonadError, throwError)
-import           Control.Monad.State(StateT, evalStateT, get, withStateT)
+import           Control.Monad.State(StateT, evalStateT, gets, withStateT)
 import           Data.Conduit(Sink, Source, yield)
 import qualified Data.Conduit.List as CL
 import           Data.List.Safe(init, last)
@@ -123,7 +123,7 @@ addFileToTree replace root object = do
                 -- symlink. Follow it, recurse on the symlink target
                 -- check and increment the symlink level so we don't get stuck in a loop
                 Symlink link -> do
-                    whenM ((>= maxSymlinks) <$> get) $
+                    whenM (gets (>= maxSymlinks)) $
                         throwError $ "Too many levels of symbolic links while resolving " ++ T.unpack (filesPath object)
                     linkZipper <- withStateT (+1) $ resolveSymlink zipper link
                     findDirectory linkZipper xs
