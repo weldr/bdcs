@@ -21,8 +21,8 @@ import           Control.Monad(void)
 import           Control.Monad.Catch(MonadThrow)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.Reader(ReaderT, ask)
-import           Control.Monad.State(MonadState, get, modify)
+import           Control.Monad.Reader(ReaderT, asks)
+import           Control.Monad.State(MonadState, gets, modify)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Aeson(FromJSON(..), Object, Value(..), (.:), (.:?), (.!=), eitherDecode, withObject, withText)
 import           Data.Aeson.Types(Parser, typeMismatch)
@@ -253,8 +253,8 @@ loadIntoMDDB PackageJSON{..} files = do
 -- screen.
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri@URI{..} = do
-    db <- stDB <$> ask
-    repo <- stRepo <$> ask
+    db <- asks stDB
+    repo <- asks stRepo
 
     result <- runExceptT $ do
         -- Fetch the JSON describing the package
@@ -356,7 +356,7 @@ loadFromURI uri@URI{..} = do
         handleHardLink baseFile = do
             -- Use the same ByteString -> FilePath unpacking that headerFilePath uses
             target <- S8.unpack <$> CC.fold
-            (HM.lookup target <$> get) >>=
+            gets (HM.lookup target) >>=
                 maybe (throwError $ "Broken hard link to " ++ target)
                       (\(digest, size) -> return $ baseFile {filesSize      = fromIntegral size,
                                                              filesCs_object = Just $ convert digest})

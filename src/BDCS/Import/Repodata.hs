@@ -21,6 +21,7 @@ module BDCS.Import.Repodata(RepoException,
 
 import           Control.Applicative((<|>))
 import           Control.Exception(Exception, throw)
+import           Control.Monad(forM_)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Reader(ReaderT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadThrow)
@@ -99,9 +100,7 @@ loadRepoFromURI uri = do
     -- Try group_gz, then group. If neither exists group will be Nothing, which is fine, just skip it
     let group = extractType repomd "group_gz" <|> extractType repomd "group"
     let groupURI = fmap appendOrThrow group
-    case groupURI of
-        Just u -> Comps.loadFromURI u
-        Nothing -> return ()
+    forM_ groupURI Comps.loadFromURI
 
  where
     appendOrThrow :: T.Text -> URI

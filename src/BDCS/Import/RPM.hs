@@ -30,7 +30,7 @@ import           Control.Exception(evaluate, tryJust)
 import           Control.Monad(guard, void)
 import           Control.Monad.Except
 import           Control.Monad.IO.Class(liftIO)
-import           Control.Monad.Reader(ReaderT, ask)
+import           Control.Monad.Reader(ReaderT, asks)
 import           Control.Monad.Trans(lift)
 import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Control.Monad.Trans.Resource(MonadResource, MonadThrow)
@@ -197,8 +197,8 @@ unsafeLoadIntoMDDB RPM{rpmSignatures=fstSignature:_, rpmHeaders=fstHeader:_, ..}
 -- screen.
 loadFromURI :: URI -> ReaderT ImportState IO ()
 loadFromURI uri = do
-    db <- stDB <$> ask
-    repo <- stRepo <$> ask
+    db <- asks stDB
+    repo <- asks stRepo
 
     result <- runExceptT $ runConduitRes $
            getFromURI uri
