@@ -23,6 +23,7 @@ module BDCS.Groups(findGroupRequirements,
                    getGroupId,
                    getGroupIdC,
                    getGroup,
+                   getGroupsLike,
                    getGroupRequirements,
                    getRequirementsForGroup,
                    groups,
@@ -100,6 +101,14 @@ getGroup key = firstEntityResult $
     where_ $ group ^. GroupsId ==. val key
     limit 1
     return group
+
+getGroupsLike :: MonadIO m => T.Text -> SqlPersistT m [(Key Groups, T.Text)]
+getGroupsLike name = do
+    results <- select $ from $ \group -> do
+               where_ $ group ^. GroupsName `like` val name
+               orderBy [asc (group ^. GroupsName)]
+               return  (group ^. GroupsId, group ^. GroupsName)
+    return $ map (bimap unValue unValue) results
 
 groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
 groups = do
