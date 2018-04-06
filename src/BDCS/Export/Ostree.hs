@@ -24,7 +24,7 @@ import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
-import           Control.Monad.Logger(MonadLoggerIO)
+import           Control.Monad.Logger(MonadLoggerIO, logDebugN, logInfoN)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
@@ -71,20 +71,24 @@ ostreeSink outPath = do
         removePathForcibly
         (\tmpDir -> do
             -- Run the sink to export to a directory
+            logDebugN "Exporting to directory"
             directorySink tmpDir
 
             -- Add the standard hacks
+            logDebugN "Running standard hacks"
             runHacks tmpDir
 
             -- Compile the locale-archive file
             let localeDir = tmpDir </> "usr" </> "lib" </> "locale"
-            liftIO $ whenM (doesFileExist $ localeDir </> "locale-archive.tmpl")
-                           (callProcess "chroot" [tmpDir, "/usr/sbin/build-locale-archive"])
+            whenM (liftIO $ doesFileExist $ localeDir </> "locale-archive.tmpl") $ do
+                logDebugN "Calling build-locale-archive"
+                liftIO $ callProcess "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
 
             -- Add the kernel and initramfs
             installKernelInitrd tmpDir
 
             -- Replace /etc/nsswitch.conf with the altfiles version
+            logDebugN "Modifying /etc files"
             liftIO $ getDataFileName "data/nsswitch-altfiles.conf" >>= readFile >>= writeFile (tmpDir </> "etc" </> "nsswitch.conf")
 
             -- Remove the fstab stub
@@ -94,9 +98,11 @@ ostreeSink outPath = do
             liftIO $ renameDirs tmpDir
 
             -- Enable some systemd service
+            logDebugN "Enabling systemd services"
             doSystemd tmpDir
 
             -- Convert /var to a tmpfiles entry
+            logDebugN "Running tmpfiles and creating symlinks"
             liftIO $ convertVar tmpDir
 
             -- Add more tmpfiles entries
@@ -117,12 +123,14 @@ ostreeSink outPath = do
             -- rpm-ostree moves /var/lib/rpm to /usr/share/rpm. We don't have a rpmdb to begin
             -- with, so create an empty one at /usr/share/rpm.
             -- rpmdb treats every path as absolute
+            logDebugN "Creating rpm database"
             liftIO $ do
                 rpmdbDir <- makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
                 createDirectoryIfMissing True rpmdbDir
                 callProcess "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
 
             -- import the directory as a new commit
+            logDebugN "Storing results as a new commit"
             liftIO $ withTransaction dst_repo $ \r -> do
                 f <- storeDirectory r tmpDir
                 commit r f "Export commit" Nothing)
@@ -203,6 +211,9 @@ ostreeSink outPath = do
 
         -- Create the initramfs
         let initramfs = bootDir </> "initramfs-" ++ kver
+        logInfoN $ "Installing kernel " `T.append` T.pack kernel
+        logInfoN $ "Installing initrd " `T.append` T.pack initramfs
+
         liftIO $ withTempDirectory exportDir "dracut"
             (\tmpDir -> callProcess "chroot"
                 [exportDir,
