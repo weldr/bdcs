@@ -110,7 +110,8 @@ library
                         BDCS.Utils.Error,
                         BDCS.Utils.Filesystem,
                         BDCS.Utils.Mode,
-                        BDCS.Utils.Monad
+                        BDCS.Utils.Monad,
+                        BDCS.Utils.Process,
                         BDCS.Version
 
     build-depends:      aeson >= 1.0.0.0 && < 1.4.0.0,

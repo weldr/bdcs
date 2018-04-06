@@ -27,9 +27,9 @@ import qualified Data.Text as T
 import           System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
 import           System.FilePath((</>))
 import           System.IO.Error(isDoesNotExistError)
-import           System.Process(callProcess)
 
 import BDCS.Export.TmpFiles(setupFilesystem)
+import BDCS.Utils.Process(callProcessLogged)
 
 import Paths_bdcs(getDataFileName)
 
@@ -55,19 +55,17 @@ runHacks exportPath = do
     liftIO $ writeFile (exportPath </> "etc" </> "machine-id") ""
 
     -- Install a sysusers.d config file, and run systemd-sysusers to implement it
-    logDebugN "Running systemd-sysusers"
+    let sysusersDir = exportPath </> "usr" </> "lib" </> "sysusers.d"
     liftIO $ do
-        let sysusersDir = exportPath </> "usr" </> "lib" </> "sysusers.d"
         createDirectoryIfMissing True sysusersDir
         getDataFileName "data/sysusers-default.conf" >>= readFile >>= writeFile (sysusersDir </> "weldr.conf")
-        callProcess "systemd-sysusers" ["--root", exportPath]
+
+    callProcessLogged "systemd-sysusers" ["--root", exportPath]
 
     -- Run depmod on any kernel modules that might be present
-    logDebugN "Running depmod for kernel modules"
-    liftIO $ do
-        let modDir = exportPath </> "usr" </> "lib" </> "modules"
-        modVers <- tryJust (guard . isDoesNotExistError) (listDirectory modDir)
-        mapM_ (\ver -> callProcess "depmod" ["-b", exportPath, "-a", ver]) $ either (const []) id modVers
+    let modDir = exportPath </> "usr" </> "lib" </> "modules"
+    modVers <- liftIO $ tryJust (guard . isDoesNotExistError) (listDirectory modDir)
+    mapM_ (\ver -> callProcessLogged "depmod" ["-b", exportPath, "-a", ver]) $ either (const []) id modVers
 
     -- Create a fstab stub
     logDebugN "Creating stub /etc/fstab"
