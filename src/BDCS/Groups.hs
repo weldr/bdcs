@@ -16,6 +16,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BDCS.Groups(findGroupRequirements,
                    findRequires,
@@ -24,6 +25,7 @@ module BDCS.Groups(findGroupRequirements,
                    getGroupIdC,
                    getGroup,
                    getGroupsLike,
+                   getGroupsTotal,
                    getGroupRequirements,
                    getRequirementsForGroup,
                    groups,
@@ -39,6 +41,7 @@ import           Control.Monad.Trans.Resource(MonadResource)
 import           Data.Bifunctor(bimap)
 import           Data.Conduit((.|), Conduit, Source)
 import qualified Data.Conduit.List as CL
+import           Data.Int(Int64)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
@@ -102,13 +105,30 @@ getGroup key = firstEntityResult $
     limit 1
     return group
 
-getGroupsLike :: MonadIO m => T.Text -> SqlPersistT m [(Key Groups, T.Text)]
-getGroupsLike name = do
+-- | Get the groups matching a name
+-- Optionally limit the results with limit and offset
+getGroupsLike :: MonadIO m => Maybe Int64 -> Maybe Int64 -> T.Text -> SqlPersistT m [(Key Groups, T.Text)]
+getGroupsLike (Just ofst) (Just lmt) name = do
+    results <- select $ from $ \group -> do
+               where_ $ group ^. GroupsName `like` val name
+               orderBy [asc (group ^. GroupsName)]
+               offset ofst
+               limit lmt
+               return  (group ^. GroupsId, group ^. GroupsName)
+    return $ map (bimap unValue unValue) results
+
+getGroupsLike _ _ name = do
     results <- select $ from $ \group -> do
                where_ $ group ^. GroupsName `like` val name
                orderBy [asc (group ^. GroupsName)]
                return  (group ^. GroupsId, group ^. GroupsName)
     return $ map (bimap unValue unValue) results
+
+-- | Return the total number of groups
+getGroupsTotal :: MonadIO m => SqlPersistT m Int64
+getGroupsTotal = do
+    results <- select . from $ \(_ :: SqlExpr (Entity Groups)) -> return countRows
+    return $ unValue $ head results
 
 groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
 groups = do
