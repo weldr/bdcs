@@ -47,6 +47,7 @@ import           BDCS.DB(Files)
 import           BDCS.Export.Directory(directorySink)
 import           BDCS.Export.Utils(runHacks)
 import           BDCS.Utils.Conduit(awaitWith)
+import           BDCS.Utils.Process(callProcessLogged)
 
 import           Paths_bdcs(getDataFileName)
 
@@ -80,9 +81,8 @@ ostreeSink outPath = do
 
             -- Compile the locale-archive file
             let localeDir = tmpDir </> "usr" </> "lib" </> "locale"
-            whenM (liftIO $ doesFileExist $ localeDir </> "locale-archive.tmpl") $ do
-                logDebugN "Calling build-locale-archive"
-                liftIO $ callProcess "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
+            whenM (liftIO $ doesFileExist $ localeDir </> "locale-archive.tmpl") $
+                callProcessLogged "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
 
             -- Add the kernel and initramfs
             installKernelInitrd tmpDir
@@ -123,11 +123,9 @@ ostreeSink outPath = do
             -- rpm-ostree moves /var/lib/rpm to /usr/share/rpm. We don't have a rpmdb to begin
             -- with, so create an empty one at /usr/share/rpm.
             -- rpmdb treats every path as absolute
-            logDebugN "Creating rpm database"
-            liftIO $ do
-                rpmdbDir <- makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
-                createDirectoryIfMissing True rpmdbDir
-                callProcess "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
+            rpmdbDir <- liftIO $ makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
+            liftIO $ createDirectoryIfMissing True rpmdbDir
+            callProcessLogged "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
 
             -- import the directory as a new commit
             logDebugN "Storing results as a new commit"
@@ -214,6 +212,10 @@ ostreeSink outPath = do
         logInfoN $ "Installing kernel " `T.append` T.pack kernel
         logInfoN $ "Installing initrd " `T.append` T.pack initramfs
 
+        -- FIXME:  This one isn't getting logged, but withTempDirectory makes that hard.  Using that
+        -- function means scattering MonadMask constraints around in bdcs and bdcs-api, which I'm not
+        -- sure if that's a good thing or not.  Rewriting withTempDirectory to avoid that means using
+        -- bracket and the IO monad, and the types become very complicated.
         liftIO $ withTempDirectory exportDir "dracut"
             (\tmpDir -> callProcess "chroot"
                 [exportDir,

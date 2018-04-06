@@ -17,19 +17,18 @@ module BDCS.Export.Qcow2(qcow2Sink)
  where
 
 import Control.Monad.Except(MonadError)
-import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
 import System.Directory(removePathForcibly)
 import System.FilePath(takeDirectory)
 import System.IO.Temp(createTempDirectory)
-import System.Process(callProcess)
 
 import qualified BDCS.CS as CS
 import           BDCS.DB(Files)
 import           BDCS.Export.Directory(directorySink)
 import           BDCS.Export.Utils(runHacks, runTmpfiles)
+import           BDCS.Utils.Process(callProcessLogged)
 
 -- | A 'Consumer' that writes objects into a temporary directory, and then converts that directory into
 -- a qcow2 image with virt-make-fs.
@@ -55,6 +54,5 @@ qcow2Sink outPath =
             runHacks tmpDir
 
             -- Run virt-make-fs to generate the qcow2
-            logDebugN "Calling virt-make-fs to generate qcow2 image"
-            liftIO $ callProcess "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
+            callProcessLogged "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
         )
