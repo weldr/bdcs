@@ -24,6 +24,7 @@ import           Control.Exception(SomeException, bracket_, catch)
 import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
+import           Control.Monad.Logger(MonadLoggerIO)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
@@ -56,7 +57,7 @@ import           Paths_bdcs(getDataFileName)
 -- required to make the destination a valid ostree repo is also done by this function - setting up
 -- symlinks and directories, pruning unneeded directories, installing an initrd, building an
 -- RPM database, and so forth.
-ostreeSink :: (MonadError String m, MonadIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
+ostreeSink :: (MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
 ostreeSink outPath = do
     -- While it's possible to copy objects from one OstreeRepo to another, we can't create our own objects, meaning
     -- we can't add the dirtree objects we would need to tie all of the files together. So to export to a new
@@ -66,64 +67,65 @@ ostreeSink outPath = do
     -- (e.g., /lib64/libaudit.so.1)
     dst_repo <- liftIO $ open outPath
 
-    bracketP (createTempDirectory (takeDirectory outPath) "export")
+    void $ bracketP (createTempDirectory (takeDirectory outPath) "export")
         removePathForcibly
         (\tmpDir -> do
             -- Run the sink to export to a directory
             directorySink tmpDir
 
+            -- Add the standard hacks
+            runHacks tmpDir
+
+            -- Compile the locale-archive file
+            let localeDir = tmpDir </> "usr" </> "lib" </> "locale"
+            liftIO $ whenM (doesFileExist $ localeDir </> "locale-archive.tmpl")
+                           (callProcess "chroot" [tmpDir, "/usr/sbin/build-locale-archive"])
+
+            -- Add the kernel and initramfs
+            installKernelInitrd tmpDir
+
+            -- Replace /etc/nsswitch.conf with the altfiles version
+            liftIO $ getDataFileName "data/nsswitch-altfiles.conf" >>= readFile >>= writeFile (tmpDir </> "etc" </> "nsswitch.conf")
+
+            -- Remove the fstab stub
+            liftIO $ removeFile $ tmpDir </> "etc" </> "fstab"
+
+            -- Move things around how rpm-ostree wants them
+            liftIO $ renameDirs tmpDir
+
+            -- Enable some systemd service
+            doSystemd tmpDir
+
+            -- Convert /var to a tmpfiles entry
+            liftIO $ convertVar tmpDir
+
+            -- Add more tmpfiles entries
+            let tmpfilesDir = tmpDir </> "usr" </> "lib" </> "tmpfiles.d"
+            liftIO $ getDataFileName "data/tmpfiles-ostree.conf" >>= readFile >>= writeFile (tmpfilesDir </> "weldr-ostree.conf")
+
+            -- Replace a bunch of top-level directories with symlinks
+            liftIO $ replaceDirs tmpDir
+
+            -- Create a /sysroot directory
+            liftIO $ createDirectory (tmpDir </> "sysroot")
+
+            -- Replace /usr/local with a symlink for some reason
             liftIO $ do
-                -- Add the standard hacks
-                runHacks tmpDir
-
-                -- Compile the locale-archive file
-                let localeDir = tmpDir </> "usr" </> "lib" </> "locale"
-                whenM (doesFileExist $ localeDir </> "locale-archive.tmpl")
-                      (callProcess "chroot" [tmpDir, "/usr/sbin/build-locale-archive"])
-
-                -- Add the kernel and initramfs
-                installKernelInitrd tmpDir
-
-                -- Replace /etc/nsswitch.conf with the altfiles version
-                getDataFileName "data/nsswitch-altfiles.conf" >>= readFile >>= writeFile (tmpDir </> "etc" </> "nsswitch.conf")
-
-                -- Remove the fstab stub
-                removeFile $ tmpDir </> "etc" </> "fstab"
-
-                -- Move things around how rpm-ostree wants them
-                renameDirs tmpDir
-
-                -- Enable some systemd service
-                doSystemd tmpDir
-
-                -- Convert /var to a tmpfiles entry
-                convertVar tmpDir
-
-                -- Add more tmpfiles entries
-                let tmpfilesDir = tmpDir </> "usr" </> "lib" </> "tmpfiles.d"
-                getDataFileName "data/tmpfiles-ostree.conf" >>= readFile >>= writeFile (tmpfilesDir </> "weldr-ostree.conf")
-
-                -- Replace a bunch of top-level directories with symlinks
-                replaceDirs tmpDir
-
-                -- Create a /sysroot directory
-                createDirectory (tmpDir </> "sysroot")
-
-                -- Replace /usr/local with a symlink for some reason
                 removePathForcibly $ tmpDir </> "usr" </> "local"
                 createSymbolicLink "../var/usrlocal" $ tmpDir </> "usr" </> "local"
 
-                -- rpm-ostree moves /var/lib/rpm to /usr/share/rpm. We don't have a rpmdb to begin
-                -- with, so create an empty one at /usr/share/rpm.
-                -- rpmdb treats every path as absolute
+            -- rpm-ostree moves /var/lib/rpm to /usr/share/rpm. We don't have a rpmdb to begin
+            -- with, so create an empty one at /usr/share/rpm.
+            -- rpmdb treats every path as absolute
+            liftIO $ do
                 rpmdbDir <- makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
                 createDirectoryIfMissing True rpmdbDir
                 callProcess "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
 
-                -- import the directory as a new commit
-                void $ withTransaction dst_repo $ \r -> do
-                    f <- storeDirectory r tmpDir
-                    commit r f "Export commit" Nothing)
+            -- import the directory as a new commit
+            liftIO $ withTransaction dst_repo $ \r -> do
+                f <- storeDirectory r tmpDir
+                commit r f "Export commit" Nothing)
 
     -- Regenerate the summary, necessary for mirroring
     repoRegenerateSummary dst_repo Nothing noCancellable
@@ -183,7 +185,7 @@ ostreeSink outPath = do
 
             yield $ printf "d %s %#o %d %d - -" baseDirPath mode userId groupId
 
-    installKernelInitrd :: FilePath -> IO ()
+    installKernelInitrd :: MonadLoggerIO m => FilePath -> m ()
     installKernelInitrd exportDir = do
         -- The kernel and initramfs need to be named /boot/vmlinuz-<CHECKSUM>
         -- and /boot/initramfs-<CHECKSUM>, where CHECKSUM is the sha256
@@ -192,7 +194,7 @@ ostreeSink outPath = do
         let bootDir = exportDir </> "boot"
 
         -- Find a vmlinuz- file.
-        kernelList <- filter ("vmlinuz-" `isPrefixOf`) <$> listDirectory bootDir
+        kernelList <- filter ("vmlinuz-" `isPrefixOf`) <$> liftIO (listDirectory bootDir)
         let (kernel, kver) = case kernelList of
                                  -- Using fromJust is fine here - we've ensured they all have that
                                  -- prefix with the filter above.
@@ -201,7 +203,7 @@ ostreeSink outPath = do
 
         -- Create the initramfs
         let initramfs = bootDir </> "initramfs-" ++ kver
-        withTempDirectory exportDir "dracut"
+        liftIO $ withTempDirectory exportDir "dracut"
             (\tmpDir -> callProcess "chroot"
                 [exportDir,
                  "dracut",
@@ -212,16 +214,16 @@ ostreeSink outPath = do
                  kver])
 
         -- Append the checksum to the filenames
-        kernelData <- BS.readFile kernel
-        initramfsData <- BS.readFile initramfs
+        kernelData <- liftIO $ BS.readFile kernel
+        initramfsData <- liftIO $ BS.readFile initramfs
 
         let ctx = hashInitWith SHA256
         let update1 = hashUpdate ctx kernelData
         let update2 = hashUpdate update1 initramfsData
         let digest = show $ hashFinalize update2
 
-        renameFile kernel (kernel ++ "-" ++ digest)
-        renameFile initramfs (initramfs ++ "-" ++ digest)
+        liftIO $ renameFile kernel (kernel ++ "-" ++ digest)
+        liftIO $ renameFile initramfs (initramfs ++ "-" ++ digest)
 
     renameDirs :: FilePath -> IO ()
     renameDirs exportDir = do
@@ -261,20 +263,21 @@ ostreeSink outPath = do
         createSymbolicLink "var/srv"        (exportDir </> "srv")
         createSymbolicLink "sysroot/tmp"    (exportDir </> "tmp")
 
-    doSystemd :: FilePath -> IO ()
+    doSystemd :: MonadLoggerIO m => FilePath -> m ()
     doSystemd exportDir = do
         let systemdDir = exportDir </> "usr" </> "etc" </> "systemd" </> "system"
-        createDirectoryIfMissing True systemdDir
+        liftIO $ createDirectoryIfMissing True systemdDir
 
         -- Set the default target to multi-user
-        createSymbolicLink "/usr/lib/systemd/system/multi-user.target" $ systemdDir </> "default.target"
+        liftIO $ createSymbolicLink "/usr/lib/systemd/system/multi-user.target" $ systemdDir </> "default.target"
 
         -- Add some services that look important
-        createDirectoryIfMissing True $ systemdDir </> "getty.target.wants"
-        createDirectoryIfMissing True $ systemdDir </> "local-fs.target.wants"
+        liftIO $ do
+            createDirectoryIfMissing True $ systemdDir </> "getty.target.wants"
+            createDirectoryIfMissing True $ systemdDir </> "local-fs.target.wants"
 
-        createSymbolicLink "/usr/lib/systemd/system/getty@.service" $ systemdDir </> "getty.target.wants" </> "getty@tty1.service"
-        createSymbolicLink "/usr/lib/systemd/system/ostree-remount.service" $ systemdDir </> "local-fs.target.wants" </> "ostree-remount.service"
+            createSymbolicLink "/usr/lib/systemd/system/getty@.service" $ systemdDir </> "getty.target.wants" </> "getty@tty1.service"
+            createSymbolicLink "/usr/lib/systemd/system/ostree-remount.service" $ systemdDir </> "local-fs.target.wants" </> "ostree-remount.service"
 
 -- Write the commit metadata object to an opened ostree repo, given the results of calling store.  This
 -- function also requires a commit subject and optionally a commit body.  The subject and body are

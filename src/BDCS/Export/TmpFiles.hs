@@ -33,6 +33,8 @@ module BDCS.Export.TmpFiles(
  where
 
 import           Control.Conditional(ifM)
+import           Control.Monad.IO.Class(liftIO)
+import           Control.Monad.Logger(MonadLoggerIO)
 import           Data.List(sort)
 import qualified Data.Text as T
 import           System.Directory(createDirectoryIfMissing, doesPathExist, removePathForcibly)
@@ -193,8 +195,8 @@ writeNewFile outPath TmpFileEntry{..} = do
 
 -- Create a new directory if there isn't already one present.
 -- Also sets the ownership and permissions
-applyEntry :: FilePath -> TmpFileEntry -> IO ()
-applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = do
+applyEntry :: MonadLoggerIO m => FilePath -> TmpFileEntry -> m ()
+applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = liftIO $ do
     createDirectoryIfMissing True dir
     setFileMode dir mode
     setOwnerAndGroup dir (owner tfeUid) (group tfeGid)
@@ -206,7 +208,7 @@ applyEntry outPath TmpFileEntry{tfeType=NewDirectory, ..} = do
 
 -- Create a new file with optional contents.
 -- Also sets the ownership and permissions
-applyEntry outPath entry@TmpFileEntry{tfeType=NewFile, ..} =
+applyEntry outPath entry@TmpFileEntry{tfeType=NewFile, ..} = liftIO $
     ifM (doesPathExist file)
         (printf "NewFile: %s already exists, skipping it." file)
         (writeNewFile outPath entry)
@@ -215,10 +217,10 @@ applyEntry outPath entry@TmpFileEntry{tfeType=NewFile, ..} =
 
 -- Create or Truncate a file with optional contents.
 -- Also sets the ownership and permissions
-applyEntry outPath entry@TmpFileEntry{tfeType=TruncateFile, ..} = writeNewFile outPath entry
+applyEntry outPath entry@TmpFileEntry{tfeType=TruncateFile, ..} = liftIO $ writeNewFile outPath entry
 
 -- Modify an existing directory's ownership and permissions>
-applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} =
+applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} = liftIO $
     ifM (doesPathExist dir)
         modify
         (printf "ModifyDirectory: %s doesn't exist, skipping it." dir)
@@ -235,7 +237,7 @@ applyEntry outPath TmpFileEntry{tfeType=ModifyDirectory, ..} =
 -- Create a new symlink.
 -- Does NOT create parents of the source file, they must already exist
 -- If no target arg is present it will link to the source filename under /usr/share/factory/
-applyEntry outPath TmpFileEntry{tfeType=NewSymlink, ..} =
+applyEntry outPath TmpFileEntry{tfeType=NewSymlink, ..} = liftIO $
     ifM (doesPathExist source)
         (printf "NewSymlink: %s exists, skipping." source)
         (createSymbolicLink target source)
@@ -247,7 +249,7 @@ applyEntry outPath TmpFileEntry{tfeType=NewSymlink, ..} =
 
 -- Replace a symlink, if it exists or create a new one.
 -- If no target arg is present it will link to the source filename under /usr/share/factory/
-applyEntry outPath TmpFileEntry{tfeType=ReplaceSymlink, ..} = do
+applyEntry outPath TmpFileEntry{tfeType=ReplaceSymlink, ..} = liftIO $ do
     removePathForcibly source
     createSymbolicLink target source
   where
@@ -260,10 +262,10 @@ applyEntry _ TmpFileEntry{tfeType=Unsupported, ..} = undefined
 
 
 -- | Read the tmpfiles.d snippet and apply it to the output directory
-setupFilesystem :: FilePath -> FilePath -> IO ()
+setupFilesystem :: MonadLoggerIO m => FilePath -> FilePath -> m ()
 setupFilesystem outPath tmpFileConf = do
-    createDirectoryIfMissing True outPath
-    tmpfiles <- parseConfString <$> readFile tmpFileConf
+    liftIO $ createDirectoryIfMissing True outPath
+    tmpfiles <- parseConfString <$> liftIO (readFile tmpFileConf)
     case tmpfiles of
         Right entries -> mapM_ (applyEntry outPath) $ sort entries
-        Left  err     -> print err
+        Left  err     -> liftIO $ print err

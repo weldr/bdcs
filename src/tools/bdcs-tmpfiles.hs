@@ -15,6 +15,7 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
+import Control.Monad.Logger(runNoLoggingT)
 import System.Directory(createDirectoryIfMissing)
 import System.Environment(getArgs)
 import System.Exit(exitFailure)
@@ -33,5 +34,5 @@ usage = do
 main :: IO ()
 main = getArgs >>= \case
     cfg:dir:_ -> do createDirectoryIfMissing True dir
-                    setupFilesystem dir cfg
+                    runNoLoggingT $ setupFilesystem dir cfg
     _         -> usage
