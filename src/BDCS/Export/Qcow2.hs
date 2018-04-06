@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 -- |
 -- Module: BDCS.Export.Qcow2
@@ -16,7 +17,8 @@ module BDCS.Export.Qcow2(qcow2Sink)
  where
 
 import Control.Monad.Except(MonadError)
-import Control.Monad.IO.Class(MonadIO, liftIO)
+import Control.Monad.IO.Class(liftIO)
+import Control.Monad.Logger(MonadLoggerIO)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
 import System.Directory(removePathForcibly)
@@ -31,7 +33,7 @@ import           BDCS.Export.Utils(runHacks, runTmpfiles)
 
 -- | A 'Consumer' that writes objects into a temporary directory, and then converts that directory into
 -- a qcow2 image with virt-make-fs.
-qcow2Sink :: (MonadResource m, MonadIO m, MonadError String m) => FilePath -> Consumer (Files, CS.Object) m ()
+qcow2Sink :: (MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
 qcow2Sink outPath =
     -- Writing and importing a tar file probably will not work, because some rpms contain paths
     -- with symlinks (e.g., /lib64/libaudit.so.1 is expected to be written to /usr/lib64).
@@ -41,13 +43,13 @@ qcow2Sink outPath =
         removePathForcibly
         (\tmpDir -> do
             -- Apply tmpfiles.d to the directory first
-            liftIO $ runTmpfiles tmpDir
+            runTmpfiles tmpDir
 
             -- Run the sink to create a directory export
             directorySink tmpDir
 
             -- Make the direcotry export something usable, hopefully
-            liftIO $ runHacks tmpDir
+            runHacks tmpDir
 
             -- Run virt-make-fs to generate the qcow2
             liftIO $ callProcess "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]

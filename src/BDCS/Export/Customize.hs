@@ -11,6 +11,7 @@ module BDCS.Export.Customize(CSOverlay,
 import           Control.Monad(foldM)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO)
+import           Control.Monad.Logger(MonadLogger, MonadLoggerIO)
 import           Crypto.Hash(Digest, hash)
 import           Crypto.Hash.Algorithms(Blake2b_256)
 import           Data.ByteArray(convert)
@@ -38,7 +39,7 @@ filesToObjectsC overlay repo = awaitForever $ \f@Files{..} ->
         Nothing  -> fileToObjectC repo f
         Just obj -> yield (f, obj)
 
-addToOverlay :: MonadError String m => CSOverlay -> FSTree -> Files -> Maybe BS.ByteString -> m (CSOverlay, FSTree)
+addToOverlay :: (MonadError String m, MonadLogger m) => CSOverlay -> FSTree -> Files -> Maybe BS.ByteString -> m (CSOverlay, FSTree)
 addToOverlay overlay tree file content = do
     -- If the file has content, create a hash of it and add the content to the overlay.
     -- The digest type doesn't need to match the content store, it just needs to be something we can
@@ -58,8 +59,8 @@ addToOverlay overlay tree file content = do
         let digest = hash input :: Digest Blake2b_256
         in  convert digest
 
-runCustomizations :: (MonadError String m, MonadIO m) => CSOverlay -> ContentStore -> FSTree -> [Customization] -> m (CSOverlay, FSTree)
+runCustomizations :: (MonadError String m, MonadLoggerIO m) => CSOverlay -> ContentStore -> FSTree -> [Customization] -> m (CSOverlay, FSTree)
 runCustomizations overlay _repo tree customizations = foldM runCustomization (overlay, tree) customizations
  where
-    runCustomization :: MonadError String m => (CSOverlay, FSTree) -> Customization -> m (CSOverlay, FSTree)
+    runCustomization :: (MonadError String m, MonadLoggerIO m) => (CSOverlay, FSTree) -> Customization -> m (CSOverlay, FSTree)
     runCustomization (o, t) (WriteFile file content) = addToOverlay o t file content
