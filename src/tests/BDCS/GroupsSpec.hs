@@ -71,16 +71,16 @@ spec = describe "BDCS.Groups Tests" $ do
       withNevras (groupIdToNevra $ toSqlKey 2) >>= (`shouldBe` Just "noEpoch-1.0-1.el7.x86_64")
 
     it "getGroupsLike with % wildcard" $
-      withNevras (getGroupsLike Nothing Nothing "%Epoch%") >>= (`shouldBe` [(toSqlKey 1, "hasEpoch"), (toSqlKey 2, "noEpoch")])
+      withNevras (getGroupsLike Nothing Nothing "%Epoch%") >>= (`shouldBe` ([(toSqlKey 1, "hasEpoch"), (toSqlKey 2, "noEpoch")], 2))
 
     it "getGroupsLike without % wildcard returns empty list" $
-      withNevras (getGroupsLike Nothing Nothing "Epoch") >>= (`shouldBe` [])
+      withNevras (getGroupsLike Nothing Nothing "Epoch") >>= (`shouldBe` ([], 0))
 
     it "getGroupsLike with % and limited to 2" $
-      withNevras (getGroupsLike (Just 0) (Just 1) "%") >>= (`shouldBe` [(toSqlKey 1, "hasEpoch")])
+      withNevras (getGroupsLike (Just 0) (Just 1) "%") >>= (`shouldBe` ([(toSqlKey 1, "hasEpoch")], 2))
 
     it "getGroupsLike with % and offset of 1" $
-      withNevras (getGroupsLike (Just 1) (Just 10) "%") >>= (`shouldBe` [(toSqlKey 2, "noEpoch")])
+      withNevras (getGroupsLike (Just 1) (Just 10) "%") >>= (`shouldBe` ([(toSqlKey 2, "noEpoch")], 2))
 
     it "groups returns all existing records" $
       withNevras groups >>= (`shouldBe` [(toSqlKey 1, "hasEpoch"), (toSqlKey 2, "noEpoch")])

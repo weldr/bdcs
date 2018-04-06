@@ -107,7 +107,8 @@ getGroup key = firstEntityResult $
 
 -- | Get the groups matching a name
 -- Optionally limit the results with limit and offset
-getGroupsLike :: MonadIO m => Maybe Int64 -> Maybe Int64 -> T.Text -> SqlPersistT m [(Key Groups, T.Text)]
+-- Also returns the total number of results, before offset and limit are applied
+getGroupsLike :: MonadIO m => Maybe Int64 -> Maybe Int64 -> T.Text -> SqlPersistT m ([(Key Groups, T.Text)], Int64)
 getGroupsLike (Just ofst) (Just lmt) name = do
     results <- select $ from $ \group -> do
                where_ $ group ^. GroupsName `like` val name
@@ -115,14 +116,22 @@ getGroupsLike (Just ofst) (Just lmt) name = do
                offset ofst
                limit lmt
                return  (group ^. GroupsId, group ^. GroupsName)
-    return $ map (bimap unValue unValue) results
+    total <- firstListResult $
+             select $ from $ \group -> do
+             where_ $ group ^. GroupsName `like` val name
+             return countRows
+    return (map (bimap unValue unValue) results, total)
 
 getGroupsLike _ _ name = do
     results <- select $ from $ \group -> do
                where_ $ group ^. GroupsName `like` val name
                orderBy [asc (group ^. GroupsName)]
                return  (group ^. GroupsId, group ^. GroupsName)
-    return $ map (bimap unValue unValue) results
+    total <- firstListResult $
+             select $ from $ \group -> do
+             where_ $ group ^. GroupsName `like` val name
+             return countRows
+    return (map (bimap unValue unValue) results, total)
 
 -- | Return the total number of groups
 getGroupsTotal :: MonadIO m => SqlPersistT m Int64
