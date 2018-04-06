@@ -126,9 +126,8 @@ getGroupsLike _ _ name = do
 
 -- | Return the total number of groups
 getGroupsTotal :: MonadIO m => SqlPersistT m Int64
-getGroupsTotal = do
-    results <- select . from $ \(_ :: SqlExpr (Entity Groups)) -> return countRows
-    return $ unValue $ head results
+getGroupsTotal = firstListResult $
+    select . from $ \(_ :: SqlExpr (Entity Groups)) -> return countRows
 
 groups :: MonadIO m => SqlPersistT m [(Key Groups, T.Text)]
 groups = do

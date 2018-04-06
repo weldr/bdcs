@@ -229,6 +229,12 @@ firstKeyResult :: Monad m => m [Value a] -> m (Maybe a)
 firstKeyResult query =
     listToMaybe . map unValue <$> query
 
+-- | Run an SQL query, returning the first value from the result list.
+-- Use this when you want a single index out of the database and it is guaranteed not to be empty.
+firstListResult :: Monad m => m [Value a] -> m a
+firstListResult query =
+    head . map unValue <$> query
+
 -- | Like 'maybe', but for keys.  If the key is nothing, return the default value.  Otherwise,
 -- run the function on the key and return that value.
 maybeKey :: MonadIO m =>
