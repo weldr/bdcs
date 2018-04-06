@@ -20,7 +20,7 @@ import           Control.Conditional(whenM)
 import           Control.Exception(tryJust)
 import           Control.Monad(guard)
 import           Control.Monad.IO.Class(liftIO)
-import           Control.Monad.Logger(MonadLoggerIO)
+import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import           Data.List(intercalate)
 import           Data.List.Split(splitOn)
 import qualified Data.Text as T
@@ -40,6 +40,7 @@ runHacks :: MonadLoggerIO m => FilePath -> m ()
 runHacks exportPath = do
     -- set a root password
     -- pre-crypted from "redhat"
+    logDebugN "Setting root password"
     liftIO $ do
         shadowRecs <- map (splitOn ":") <$> lines <$> readFile (exportPath </> "etc" </> "shadow")
         let newRecs = map (\rec -> case rec of
@@ -50,9 +51,11 @@ runHacks exportPath = do
         renameFile (exportPath </> "etc" </> "shadow.new") (exportPath </> "etc" </> "shadow")
 
     -- create an empty machine-id
+    logDebugN "Creating empty /etc/machine-id"
     liftIO $ writeFile (exportPath </> "etc" </> "machine-id") ""
 
     -- Install a sysusers.d config file, and run systemd-sysusers to implement it
+    logDebugN "Running systemd-sysusers"
     liftIO $ do
         let sysusersDir = exportPath </> "usr" </> "lib" </> "sysusers.d"
         createDirectoryIfMissing True sysusersDir
@@ -60,22 +63,26 @@ runHacks exportPath = do
         callProcess "systemd-sysusers" ["--root", exportPath]
 
     -- Run depmod on any kernel modules that might be present
+    logDebugN "Running depmod for kernel modules"
     liftIO $ do
         let modDir = exportPath </> "usr" </> "lib" </> "modules"
         modVers <- tryJust (guard . isDoesNotExistError) (listDirectory modDir)
         mapM_ (\ver -> callProcess "depmod" ["-b", exportPath, "-a", ver]) $ either (const []) id modVers
 
     -- Create a fstab stub
+    logDebugN "Creating stub /etc/fstab"
     liftIO $ writeFile (exportPath </> "etc" </> "fstab") "LABEL=composer / ext2 defaults 0 0"
 
     -- Clean up /run
     -- Some packages create directories in /var/run, which a symlink to /run, which is a tmpfs.
+    logDebugN "Removing directories in /run"
     liftIO $ (map ((exportPath </> "run") </>) <$> listDirectory (exportPath </> "run")) >>= mapM_ removePathForcibly
 
     -- EXTRA HACKY: turn off mod_ssl
     let sslConf = exportPath </> "etc" </> "httpd" </> "conf.d" </> "ssl.conf"
-    liftIO $ whenM (doesFileExist sslConf)
-                   (renameFile sslConf (sslConf ++ ".off"))
+    whenM (liftIO $ doesFileExist sslConf) $ do
+        logDebugN "Disabling mod_ssl"
+        liftIO $ renameFile sslConf (sslConf ++ ".off")
 
 -- | Run tmpfiles.d snippet on the new directory.  Most exporters should call this function.  Otherwise,
 -- it is not generally useful and should be avoided.

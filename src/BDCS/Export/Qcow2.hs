@@ -18,7 +18,7 @@ module BDCS.Export.Qcow2(qcow2Sink)
 
 import Control.Monad.Except(MonadError)
 import Control.Monad.IO.Class(liftIO)
-import Control.Monad.Logger(MonadLoggerIO)
+import Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import Control.Monad.Trans.Resource(MonadResource)
 import Data.Conduit(Consumer, bracketP)
 import System.Directory(removePathForcibly)
@@ -43,14 +43,18 @@ qcow2Sink outPath =
         removePathForcibly
         (\tmpDir -> do
             -- Apply tmpfiles.d to the directory first
+            logDebugN "Running tmpfiles"
             runTmpfiles tmpDir
 
             -- Run the sink to create a directory export
+            logDebugN "Exporting to directory"
             directorySink tmpDir
 
             -- Make the direcotry export something usable, hopefully
+            logDebugN "Running standard hacks"
             runHacks tmpDir
 
             -- Run virt-make-fs to generate the qcow2
+            logDebugN "Calling virt-make-fs to generate qcow2 image"
             liftIO $ callProcess "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
         )

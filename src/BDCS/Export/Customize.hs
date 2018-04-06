@@ -11,7 +11,7 @@ module BDCS.Export.Customize(CSOverlay,
 import           Control.Monad(foldM)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO)
-import           Control.Monad.Logger(MonadLogger, MonadLoggerIO)
+import           Control.Monad.Logger(MonadLogger, MonadLoggerIO, logDebugN)
 import           Crypto.Hash(Digest, hash)
 import           Crypto.Hash.Algorithms(Blake2b_256)
 import           Data.ByteArray(convert)
@@ -19,6 +19,7 @@ import qualified Data.ByteString as BS
 import           Data.Conduit(Conduit, awaitForever, yield)
 import           Data.ContentStore(ContentStore)
 import qualified Data.Map.Strict as Map
+import qualified Data.Text as T
 
 import BDCS.CS(Object(..), fileToObjectC)
 import BDCS.DB(Files(..))
@@ -41,6 +42,8 @@ filesToObjectsC overlay repo = awaitForever $ \f@Files{..} ->
 
 addToOverlay :: (MonadError String m, MonadLogger m) => CSOverlay -> FSTree -> Files -> Maybe BS.ByteString -> m (CSOverlay, FSTree)
 addToOverlay overlay tree file content = do
+    logDebugN $ T.pack "Adding to overlay: " `T.append` filesPath file
+
     -- If the file has content, create a hash of it and add the content to the overlay.
     -- The digest type doesn't need to match the content store, it just needs to be something we can
     -- use as a hash key.
@@ -60,7 +63,9 @@ addToOverlay overlay tree file content = do
         in  convert digest
 
 runCustomizations :: (MonadError String m, MonadLoggerIO m) => CSOverlay -> ContentStore -> FSTree -> [Customization] -> m (CSOverlay, FSTree)
-runCustomizations overlay _repo tree customizations = foldM runCustomization (overlay, tree) customizations
+runCustomizations overlay _repo tree customizations = do
+    logDebugN $ T.pack "Running customizations"
+    foldM runCustomization (overlay, tree) customizations
  where
     runCustomization :: (MonadError String m, MonadLoggerIO m) => (CSOverlay, FSTree) -> Customization -> m (CSOverlay, FSTree)
     runCustomization (o, t) (WriteFile file content) = addToOverlay o t file content

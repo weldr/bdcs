@@ -20,7 +20,7 @@ module BDCS.Export(export,
 
 import           Control.Conditional(cond)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
-import           Control.Monad.Logger(MonadLoggerIO)
+import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import qualified Data.Conduit.List as CL
@@ -69,9 +69,11 @@ exportAndCustomize repo out_path things custom | kernelMissing out_path things =
     directoryOutput :: (MonadError String m, MonadLoggerIO m) => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
         -- Apply tmpfiles.d to the directory first
+        logDebugN "Running tmpfiles"
         runTmpfiles path
 
         Directory.directorySink path
+        logDebugN "Running standard hacks"
         runHacks path
 
     kernelMissing :: FilePath -> [T.Text] -> Bool
