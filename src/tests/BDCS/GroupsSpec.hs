@@ -20,7 +20,7 @@ module BDCS.GroupsSpec(spec)
  where
 
 import BDCS.DB(Groups(..))
-import BDCS.Groups(groupIdToNevra, nevraToGroupId)
+import BDCS.Groups(groupIdToNevra, nevraToGroupId, getGroupsLike, getGroupsTotal, groups)
 import BDCS.GroupKeyValue(insertGroupKeyValue)
 import BDCS.KeyType(KeyType(..))
 
@@ -69,6 +69,24 @@ spec = describe "BDCS.Groups Tests" $ do
 
     it "groupIdToNevra, no epoch" $
       withNevras (groupIdToNevra $ toSqlKey 2) >>= (`shouldBe` Just "noEpoch-1.0-1.el7.x86_64")
+
+    it "getGroupsLike with % wildcard" $
+      withNevras (getGroupsLike Nothing Nothing "%Epoch%") >>= (`shouldBe` [(toSqlKey 1, "hasEpoch"), (toSqlKey 2, "noEpoch")])
+
+    it "getGroupsLike without % wildcard returns empty list" $
+      withNevras (getGroupsLike Nothing Nothing "Epoch") >>= (`shouldBe` [])
+
+    it "getGroupsLike with % and limited to 2" $
+      withNevras (getGroupsLike (Just 0) (Just 1) "%") >>= (`shouldBe` [(toSqlKey 1, "hasEpoch")])
+
+    it "getGroupsLike with % and offset of 1" $
+      withNevras (getGroupsLike (Just 1) (Just 10) "%") >>= (`shouldBe` [(toSqlKey 2, "noEpoch")])
+
+    it "groups returns all existing records" $
+      withNevras groups >>= (`shouldBe` [(toSqlKey 1, "hasEpoch"), (toSqlKey 2, "noEpoch")])
+
+    it "getGroupsTotal" $
+      withNevras getGroupsTotal >>= (`shouldBe` 2)
 
  where
     addNevras :: MonadIO m => SqlPersistT m ()
