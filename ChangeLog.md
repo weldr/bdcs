@@ -1,3 +1,16 @@
+## 0.3.0
+
+* Add BDCS.Groups.getGroupsLike, which returns groups whose names match the
+  % and _ SQL wildcards.
+* Add BDCS.Groups.getGroupsTotal, which returns the number of groups in the
+  database.
+* Add BDCS.DB.firstListResult, which returns the first value from the
+  non-empty result list of an SQL query.
+* The types of many export-related functions have been modified to include a
+  constraint on MonadLoggerIO.
+* Debug logging added to exportAndCustomize, runCustomizations, ostreeSink,
+  qcow2Sink, and runHacks.
+
 ## 0.2.4
 
 * Allow building with aeson-1.3 and unordered-containers-0.2.9.
