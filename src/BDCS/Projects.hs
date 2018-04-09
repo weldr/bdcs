@@ -14,18 +14,55 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module BDCS.Projects(findProject,
                      getProject,
+                     getProjectsLike,
+                     getProjectsTotal,
                      insertProject,
                      projects)
  where
 
 import           Control.Monad.IO.Class(MonadIO)
+import           Data.Int(Int64)
 import qualified Data.Text as T
 import           Database.Esqueleto
 
 import BDCS.DB
+
+-- | Get the projects matching a name
+-- Optionally limit the results with limit and offset
+-- Also returns the total number of results, before offset and limit are applied
+getProjectsLike :: MonadIO m => Maybe Int64 -> Maybe Int64 -> T.Text -> SqlPersistT m ([Projects], Int64)
+getProjectsLike (Just ofst) (Just lmt) name = do
+    results <- select $ from $ \project -> do
+               where_ $ project ^. ProjectsName `like` val name
+               orderBy [asc (project ^. ProjectsName)]
+               offset ofst
+               limit lmt
+               return project
+    total <- firstListResult $
+             select $ from $ \project -> do
+             where_ $ project ^. ProjectsName `like` val name
+             return countRows
+    return (map entityVal results, total)
+
+getProjectsLike _ _ name = do
+    results <- select $ from $ \project -> do
+               where_ $ project ^. ProjectsName `like` val name
+               orderBy [asc (project ^. ProjectsName)]
+               return project
+    total <- firstListResult $
+             select $ from $ \project -> do
+             where_ $ project ^. ProjectsName `like` val name
+             return countRows
+    return (map entityVal results, total)
+
+-- | Return the total number of projects
+getProjectsTotal :: MonadIO m => SqlPersistT m Int64
+getProjectsTotal = firstListResult $
+    select . from $ \(_ :: SqlExpr (Entity Projects)) -> return countRows
 
 projects :: MonadIO m => SqlPersistT m [Projects]
 projects = do
