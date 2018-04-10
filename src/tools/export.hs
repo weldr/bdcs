@@ -15,8 +15,9 @@
 
 {-# LANGUAGE LambdaCase #-}
 
-import           Control.Conditional(ifM)
+import           Control.Conditional(cond, ifM)
 import           Control.Monad.Except(runExceptT)
+import           Data.List(isSuffixOf)
 import qualified Data.Text as T
 import           System.Directory(doesFileExist, removePathForcibly)
 import           System.Environment(getArgs)
@@ -24,6 +25,7 @@ import           System.Exit(exitFailure, exitSuccess)
 
 import BDCS.DB(checkAndRunSqlite)
 import BDCS.Export(export)
+import BDCS.Export.Types(ExportType(..))
 import BDCS.Utils.Monad(concatMapM)
 import BDCS.Version
 
@@ -57,7 +59,13 @@ usage = do
 main :: IO ()
 main = commandLineArgs <$> getArgs >>= \case
     Just (db, repo, out_path:things) -> do things' <- map T.pack <$> expandFileThings things
-                                           result  <- runExceptT $ checkAndRunSqlite (T.pack db) $ export repo out_path things'
+
+                                           let ty = cond [(".tar" `isSuffixOf` out_path,   ExportTar),
+                                                          (".qcow2" `isSuffixOf` out_path, ExportQcow2),
+                                                          (".repo" `isSuffixOf` out_path,  ExportOstree),
+                                                          (otherwise,                      ExportDirectory)]
+
+                                           result  <- runExceptT $ checkAndRunSqlite (T.pack db) $ export repo out_path ty things'
                                            case result of
                                                Left err -> removePathForcibly out_path >> print err >> exitFailure
                                                Right _  -> exitSuccess

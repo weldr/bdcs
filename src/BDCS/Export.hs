@@ -18,14 +18,12 @@ module BDCS.Export(export,
                    exportAndCustomize)
  where
 
-import           Control.Conditional(cond)
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import qualified Data.Conduit.List as CL
 import           Data.ContentStore(openContentStore)
-import           Data.List(isSuffixOf)
 import qualified Data.Map.Strict as Map
 import qualified Data.Text as T
 import           Database.Esqueleto(SqlPersistT)
@@ -38,20 +36,33 @@ import           BDCS.Export.FSTree(filesToTree, fstreeSource)
 import qualified BDCS.Export.Ostree as Ostree
 import qualified BDCS.Export.Qcow2 as Qcow2
 import qualified BDCS.Export.Tar as Tar
+import           BDCS.Export.Types(ExportType(..))
 import           BDCS.Export.Utils(runHacks, runTmpfiles)
 import           BDCS.Files(groupIdToFilesC)
 import           BDCS.Groups(getGroupIdC)
 
-export :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> SqlPersistT m ()
-export repo out_path things = exportAndCustomize repo out_path things []
+export :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m, MonadResource m) =>
+          FilePath
+       -> FilePath
+       -> ExportType
+       -> [T.Text]
+       -> SqlPersistT m ()
+export repo out_path ty things = exportAndCustomize repo out_path ty things []
 
-exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> FilePath -> [T.Text] -> [Customization] -> SqlPersistT m ()
-exportAndCustomize repo out_path things custom | kernelMissing out_path things = throwError "ERROR: ostree exports need a kernel package included"
-                                               | otherwise                     = do
-    let objectSink = cond [(".tar" `isSuffixOf` out_path,   CS.objectToTarEntry .| Tar.tarSink out_path),
-                           (".qcow2" `isSuffixOf` out_path, Qcow2.qcow2Sink out_path),
-                           (".repo" `isSuffixOf` out_path,  Ostree.ostreeSink out_path),
-                           (otherwise,                      directoryOutput out_path)]
+exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m, MonadResource m) =>
+                      FilePath
+                   -> FilePath
+                   -> ExportType
+                   -> [T.Text]
+                   -> [Customization]
+                   -> SqlPersistT m ()
+exportAndCustomize repo out_path ty things custom | kernelMissing ty things = throwError "ERROR: ostree exports need a kernel package included"
+                                                  | otherwise               = do
+    let objectSink = case ty of
+                         ExportTar       -> CS.objectToTarEntry .| Tar.tarSink out_path
+                         ExportQcow2     -> Qcow2.qcow2Sink out_path
+                         ExportOstree    -> Ostree.ostreeSink out_path
+                         ExportDirectory -> directoryOutput out_path
 
     runExceptT (openContentStore repo) >>= \case
         Left e   -> throwError $ show e
@@ -76,5 +87,5 @@ exportAndCustomize repo out_path things custom | kernelMissing out_path things =
         logDebugN "Running standard hacks"
         runHacks path
 
-    kernelMissing :: FilePath -> [T.Text] -> Bool
-    kernelMissing out lst = ".repo" `isSuffixOf` out && not (any ("kernel-" `T.isPrefixOf`) lst)
+    kernelMissing :: ExportType -> [T.Text] -> Bool
+    kernelMissing exportTy lst = exportTy == ExportOstree && not (any ("kernel-" `T.isPrefixOf`) lst)
