@@ -64,6 +64,7 @@ library
                         BDCS.Export.Ostree,
                         BDCS.Export.Tar,
                         BDCS.Export.TmpFiles,
+                        BDCS.Export.Types,
                         BDCS.Export.Utils,
                         BDCS.Files,
                         BDCS.GroupKeyValue,
