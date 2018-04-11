@@ -12,8 +12,7 @@
 -- Miscellaneous utilities useful in exporting objects.
 
 module BDCS.Export.Utils(runHacks,
-                         runTmpfiles,
-                         supportedOutputs)
+                         runTmpfiles)
  where
 
 import           Control.Conditional(whenM)
@@ -88,10 +87,3 @@ runTmpfiles :: MonadLoggerIO m => FilePath -> m ()
 runTmpfiles exportPath = do
     configPath <- liftIO $ getDataFileName "data/tmpfiles-default.conf"
     setupFilesystem exportPath configPath
-
--- | List the supported output formats.
--- Note that any time a new output format file is added in BDCS/Export (and thus to
--- the runCommand block in tools/export.hs), it should also be added here.  There's
--- not really any better way to accomplish this.
-supportedOutputs :: [T.Text]
-supportedOutputs = ["directory", "ostree", "qcow2", "tar"]
