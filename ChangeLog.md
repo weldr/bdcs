@@ -1,3 +1,20 @@
+## 0.4.0
+
+* Add BDCS.Projects.getProjectsLike, which returns projects whose names match
+  the % and _ SQL wildcards.
+* Add BDCS.Projects.getProjectsTotal, which returns the number of projects in
+  the database.
+* Add the BDCS.Export.Types module, which is useful for specifying what form
+  the export artifact will take.
+* BDCS.Export.export and BDCS.Export.exportAndCustomize now require an
+  ExportType parameter.
+* Remove BDCS.Export.Utils.supportedOutputs.  The supportedExportTypes and
+  exportTypeText functions in BDCS.Export.Types can be used to produce the
+  same result.
+* The bdcs command line tool's export subcommand now requires a -t argument for
+  specifying the form of the export artifact.  The destination argument is now
+  also given with -d, instead of just bare on the command line.
+
 ## 0.3.0
 
 * Add BDCS.Groups.getGroupsLike, which returns groups whose names match the
