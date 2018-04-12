@@ -22,7 +22,6 @@ import           Control.Monad.IO.Class(liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
 import           Data.List(intercalate)
 import           Data.List.Split(splitOn)
-import qualified Data.Text as T
 import           System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
 import           System.FilePath((</>))
 import           System.IO.Error(isDoesNotExistError)
