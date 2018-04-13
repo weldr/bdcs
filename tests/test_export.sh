@@ -99,11 +99,11 @@ rlJournalStart
 
     rlPhaseStartTest "when executed without parameters shows usage"
         OUTPUT=`$BDCS export | head -n 2 | tail -n 1`
-        rlAssertEquals "Usage header as expected" "$OUTPUT" "Usage: export metadata.db repo dest thing [thing ...]"
+        rlAssertEquals "Usage header as expected" "$OUTPUT" "Usage: export metadata.db repo -t [export type] -d [dest] thing [thing ...]"
     rlPhaseEnd
 
     rlPhaseStartTest "When exporting a non-existing package returns an error"
-        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 NON-EXISTING`
+        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO -d $EXPORT_DIR -t directory filesystem-3.2-21.el7.x86_64 NON-EXISTING`
         rlAssertNotEquals "On error exit code should not be zero" $? 0
         rlAssertEquals "On error output is as expected" "$OUTPUT" '"No such group NON-EXISTING"'
 
@@ -112,13 +112,13 @@ rlJournalStart
 
 
     rlPhaseStartTest "When exporting existing package exported contents match what's inside the RPM"
-        rlRun "$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
+        rlRun "$BDCS export $METADATA_DB $CS_REPO -d $EXPORT_DIR -t directory filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
         compare_with_rpm $EXPORT_DIR filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
         sudo rm -rf $EXPORT_DIR
     rlPhaseEnd
 
     rlPhaseStartTest "When exporting existing package into .tar image untarred contents match the contents of RPM"
-        rlRun "$BDCS export $METADATA_DB $CS_REPO exported.tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
+        rlRun "$BDCS export $METADATA_DB $CS_REPO -d exported.tar -t tar filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch yum-rhn-plugin-2.0.1-9.el7.noarch"
 
         mkdir tar_contents && pushd tar_contents/ && tar xf ../exported.tar && popd
         compare_with_rpm tar_contents/ filesystem-3.2-21.el7.x86_64.rpm setup-2.8.71-7.el7.noarch.rpm yum-rhn-plugin-2.0.1-9.el7.noarch.rpm
@@ -132,7 +132,7 @@ rlJournalStart
 
         # in tog-pegasus-libs:
         # libcmpiCppImpl.so is a symlink to libcmpiCppImpl.so.1
-        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO $EXPORT_DIR filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64`
+        OUTPUT=`$BDCS export $METADATA_DB $CS_REPO -d $EXPORT_DIR -t directory filesystem-3.2-21.el7.x86_64 setup-2.8.71-7.el7.noarch libcmpiCppImpl0-2.0.3-5.el7.x86_64 tog-pegasus-libs-2:2.14.1-5.el7.x86_64`
         rlAssertNotEquals "On error exit code should not be zero" $? 0
         rlAssertEquals "On error output is as expected" "$OUTPUT" '"Unable to add /usr/lib64/libcmpiCppImpl.so, symlink already added at this location"'
 
