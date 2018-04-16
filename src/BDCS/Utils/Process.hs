@@ -15,6 +15,7 @@
 module BDCS.Utils.Process(callProcessLogged)
  where
 
+import           Control.Monad(unless)
 import           Control.Monad.IO.Class(liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logInfoN, logErrorN)
 import qualified Data.Text as T
@@ -27,7 +28,9 @@ callProcessLogged :: MonadLoggerIO m => String -> [String] -> m ()
 callProcessLogged cmd args = do
     logInfoN $ T.intercalate " " $ T.pack cmd : map T.pack args
     (rc, stdout, stderr) <- liftIO $ readProcessWithExitCode cmd args ""
-    logInfoN $ T.pack stdout
+
+    unless (T.null $ T.strip $ T.pack stdout) $
+        logInfoN $ T.pack stdout
 
     case rc of
         ExitFailure x -> do logErrorN $ T.pack stderr
