@@ -57,8 +57,9 @@ exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO
                    -> [T.Text]
                    -> [Customization]
                    -> SqlPersistT m ()
-exportAndCustomize repo out_path ty things custom | kernelMissing ty things = throwError "ERROR: ostree exports need a kernel package included"
-                                                  | otherwise               = do
+exportAndCustomize repo out_path ty things custom | kernelMissing ty things  = throwError "ERROR: ostree exports need a kernel package included"
+                                                  | filesystemMissing things = throwError "ERROR: exports need a filesystem package included"
+                                                  | otherwise                = do
     let objectSink = case ty of
                          ExportTar       -> CS.objectToTarEntry .| Tar.tarSink out_path
                          ExportQcow2     -> Qcow2.qcow2Sink out_path
@@ -90,3 +91,6 @@ exportAndCustomize repo out_path ty things custom | kernelMissing ty things = th
 
     kernelMissing :: ExportType -> [T.Text] -> Bool
     kernelMissing exportTy lst = exportTy == ExportOstree && not (any ("kernel-" `T.isPrefixOf`) lst)
+
+    filesystemMissing :: [T.Text] -> Bool
+    filesystemMissing lst = not (any ("filesystem-" `T.isPrefixOf`) lst)
