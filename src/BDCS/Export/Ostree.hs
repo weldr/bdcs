@@ -25,6 +25,8 @@ import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN, logInfoN)
+import           Control.Monad.Trans(lift)
+import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
@@ -58,7 +60,7 @@ import           Paths_bdcs(getDataFileName)
 -- required to make the destination a valid ostree repo is also done by this function - setting up
 -- symlinks and directories, pruning unneeded directories, installing an initrd, building an
 -- RPM database, and so forth.
-ostreeSink :: (MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
+ostreeSink :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m, MonadResource m) => FilePath -> Consumer (Files, CS.Object) m ()
 ostreeSink outPath = do
     -- While it's possible to copy objects from one OstreeRepo to another, we can't create our own objects, meaning
     -- we can't add the dirtree objects we would need to tie all of the files together. So to export to a new
@@ -77,7 +79,7 @@ ostreeSink outPath = do
 
             -- Add the standard hacks
             logDebugN "Running standard hacks"
-            runHacks tmpDir
+            lift $ runHacks tmpDir
 
             -- Compile the locale-archive file
             let localeDir = tmpDir </> "usr" </> "lib" </> "locale"

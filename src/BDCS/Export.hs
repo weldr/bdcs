@@ -20,6 +20,7 @@ module BDCS.Export(export,
 
 import           Control.Monad.Except(MonadError, runExceptT, throwError)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
+import           Control.Monad.Trans(lift)
 import           Control.Monad.Trans.Resource(MonadBaseControl, MonadResource)
 import           Data.Conduit(Consumer, (.|), runConduit, runConduitRes)
 import qualified Data.Conduit.List as CL
@@ -77,15 +78,15 @@ exportAndCustomize repo out_path ty things custom | kernelMissing ty things = th
 
             runConduitRes $ fstreeSource fstree' .| filesToObjectsC overlay' cs .| objectSink
  where
-    directoryOutput :: (MonadError String m, MonadLoggerIO m) => FilePath -> Consumer (Files, CS.Object) m ()
+    directoryOutput :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m) => FilePath -> Consumer (Files, CS.Object) m ()
     directoryOutput path = do
         -- Apply tmpfiles.d to the directory first
         logDebugN "Running tmpfiles"
-        runTmpfiles path
+        lift $ runTmpfiles path
 
         Directory.directorySink path
         logDebugN "Running standard hacks"
-        runHacks path
+        lift $ runHacks path
 
     kernelMissing :: ExportType -> [T.Text] -> Bool
     kernelMissing exportTy lst = exportTy == ExportOstree && not (any ("kernel-" `T.isPrefixOf`) lst)
