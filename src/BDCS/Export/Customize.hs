@@ -8,10 +8,12 @@ module BDCS.Export.Customize(CSOverlay,
                              runCustomizations)
  where
 
+import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(foldM)
-import           Control.Monad.Except(MonadError)
+import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Logger(MonadLogger, MonadLoggerIO, logDebugN)
+import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Crypto.Hash(Digest, hash)
 import           Crypto.Hash.Algorithms(Blake2b_256)
 import           Data.ByteArray(convert)
@@ -62,10 +64,15 @@ addToOverlay overlay tree file content = do
         let digest = hash input :: Digest Blake2b_256
         in  convert digest
 
-runCustomizations :: (MonadError String m, MonadLoggerIO m) => CSOverlay -> ContentStore -> FSTree -> [Customization] -> m (CSOverlay, FSTree)
+runCustomizations :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m) =>
+                     CSOverlay
+                  -> ContentStore
+                  -> FSTree
+                  -> [Customization]
+                  -> m (CSOverlay, FSTree)
 runCustomizations overlay _repo tree customizations = do
     logDebugN $ T.pack "Running customizations"
-    foldM runCustomization (overlay, tree) customizations
+    foldM runCustomization (overlay, tree) customizations `CEL.catch` \e -> throwError $ show (e :: CEL.IOException)
  where
     runCustomization :: (MonadError String m, MonadLoggerIO m) => (CSOverlay, FSTree) -> Customization -> m (CSOverlay, FSTree)
     runCustomization (o, t) (WriteFile file content) = addToOverlay o t file content
