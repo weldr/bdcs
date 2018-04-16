@@ -16,7 +16,7 @@ module BDCS.Export.Utils(runHacks,
                          runTmpfiles)
  where
 
-import           Control.Conditional(whenM)
+import           Control.Conditional(ifM, whenM)
 import           Control.Exception(tryJust)
 import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(guard)
@@ -52,7 +52,9 @@ runHacks' exportPath = do
     -- pre-crypted from "redhat"
     logDebugN "Setting root password"
     liftIO $ do
-        shadowRecs <- map (splitOn ":") <$> lines <$> readFile (exportPath </> "etc" </> "shadow")
+        shadowRecs <- map (splitOn ":") <$> lines <$> ifM (doesFileExist (exportPath </> "etc" </> "shadow"))
+                                                          (readFile (exportPath </> "etc" </> "shadow"))
+                                                          (return "")
         let newRecs = map (\rec -> case rec of
                                        "root":_:rest -> ["root", "$6$3VLMX3dyCGRa.JX3$RpveyimtrKjqcbZNTanUkjauuTRwqAVzRK8GZFkEinbjzklo7Yj9Z6FqXNlyajpgCdsLf4FEQQKH6tTza35xs/"] ++ rest
                                        _             -> rec)
