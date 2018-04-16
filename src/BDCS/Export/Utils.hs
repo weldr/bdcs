@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 -- |
@@ -17,9 +18,12 @@ module BDCS.Export.Utils(runHacks,
 
 import           Control.Conditional(whenM)
 import           Control.Exception(tryJust)
+import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(guard)
+import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN)
+import           Control.Monad.Trans.Control(MonadBaseControl)
 import           Data.List(intercalate)
 import           Data.List.Split(splitOn)
 import           System.Directory(createDirectoryIfMissing, doesFileExist, listDirectory, removePathForcibly, renameFile)
@@ -34,8 +38,16 @@ import Paths_bdcs(getDataFileName)
 -- | Run filesystem hacks needed to make a directory tree bootable.  Any exporter that produces a
 -- finished image should call this function.  Otherwise, it is not generally useful and should be
 -- avoided.  The exact hacks required is likely to change over time.
-runHacks :: MonadLoggerIO m => FilePath -> m ()
-runHacks exportPath = do
+--
+-- Any exceptions from 'Control.Exception' will be convered into 'Control.Monad.Except' style
+-- exceptions, which can then be handled via catchError from that module.
+runHacks :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m) => FilePath -> m ()
+runHacks exportPath = runHacks' exportPath `CEL.catch` \e -> throwError $ show (e :: CEL.IOException)
+
+-- This is a helper for runHacks that does all the hard work.  It exists separately so the main
+-- function can handle any exceptions without making a mess of the code.
+runHacks' :: MonadLoggerIO m => FilePath -> m ()
+runHacks' exportPath = do
     -- set a root password
     -- pre-crypted from "redhat"
     logDebugN "Setting root password"
@@ -82,7 +94,15 @@ runHacks exportPath = do
 
 -- | Run tmpfiles.d snippet on the new directory.  Most exporters should call this function.  Otherwise,
 -- it is not generally useful and should be avoided.
-runTmpfiles :: MonadLoggerIO m => FilePath -> m ()
-runTmpfiles exportPath = do
+--
+-- Any exceptions from 'Control.Exception' will be convered into 'Control.Monad.Except' style
+-- exceptions, which can then be handled via catchError from that module.
+runTmpfiles :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m) => FilePath -> m ()
+runTmpfiles exportPath = runTmpfiles' exportPath `CEL.catch` \e -> throwError $ show (e :: CEL.IOException)
+
+-- This is a helper for runTmpfiles that does all the hard work.  It exists separately so the main
+-- function can handle any exceptions without making a mess of the code.
+runTmpfiles' :: MonadLoggerIO m => FilePath -> m ()
+runTmpfiles' exportPath =  do
     configPath <- liftIO $ getDataFileName "data/tmpfiles-default.conf"
     setupFilesystem exportPath configPath
