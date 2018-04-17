@@ -19,11 +19,13 @@ module BDCS.Export.Directory(directorySink)
  where
 
 import           Control.Conditional(unlessM)
+import           Control.Exception(IOException)
 import           Control.Monad.Except(MonadError, throwError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Logger(MonadLoggerIO)
+import           Control.Monad.Trans.Control(MonadBaseControl)
 import qualified Data.ByteString as BS
-import           Data.Conduit(Consumer, awaitForever)
+import           Data.Conduit(Consumer, awaitForever, handleC)
 import qualified Data.Text as T
 import           Data.Time.Clock.POSIX(posixSecondsToUTCTime)
 import           System.Directory(createDirectoryIfMissing, setModificationTime)
@@ -41,8 +43,8 @@ import           BDCS.Utils.Filesystem(doesPathExist)
 --
 -- It is expected that the caller will decide whether the destination directory should be empty
 -- or not.  This function does nothing to enforce that.
-directorySink :: (MonadError String m, MonadLoggerIO m) => FilePath -> Consumer (Files, CS.Object) m ()
-directorySink outPath = awaitForever $ \case
+directorySink :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO m) => FilePath -> Consumer (Files, CS.Object) m ()
+directorySink outPath =  handleC (\e -> throwError $ show (e :: IOException)) $ awaitForever $ \case
     (f, CS.SpecialObject) -> checkoutSpecial f
     (f, CS.FileObject bs) -> checkoutFile f bs
  where
