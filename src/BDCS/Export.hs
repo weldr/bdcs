@@ -58,6 +58,7 @@ exportAndCustomize :: (MonadBaseControl IO m, MonadError String m, MonadLoggerIO
                    -> [Customization]
                    -> SqlPersistT m ()
 exportAndCustomize repo out_path ty things custom | kernelMissing ty things  = throwError "ERROR: ostree exports need a kernel package included"
+                                                  | dracutMissing ty things  = throwError "ERROR: ostree exports need a dract package included"
                                                   | filesystemMissing things = throwError "ERROR: exports need a filesystem package included"
                                                   | otherwise                = do
     let objectSink = case ty of
@@ -91,6 +92,9 @@ exportAndCustomize repo out_path ty things custom | kernelMissing ty things  = t
 
     kernelMissing :: ExportType -> [T.Text] -> Bool
     kernelMissing exportTy lst = exportTy == ExportOstree && not (any ("kernel-" `T.isPrefixOf`) lst)
+
+    dracutMissing :: ExportType -> [T.Text] -> Bool
+    dracutMissing exportTy lst = exportTy == ExportOstree && not (any ("dracut-" `T.isPrefixOf`) lst)
 
     filesystemMissing :: [T.Text] -> Bool
     filesystemMissing lst = not (any ("filesystem-" `T.isPrefixOf`) lst)
