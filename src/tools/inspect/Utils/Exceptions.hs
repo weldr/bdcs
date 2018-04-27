@@ -3,7 +3,7 @@ module Utils.Exceptions(InspectErrors(..))
 
 import Control.Exception(Exception)
 
-data InspectErrors = InvalidLabelError String
+data InspectErrors = InvalidLabelError
                    | MissingCSError
                    | MissingDBError
  deriving(Eq, Show)

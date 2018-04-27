@@ -5,15 +5,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Conditional(unlessM)
-import           Control.Exception(Handler(..), catches, throw)
+import           Control.Exception(Handler(..), catches, throwIO)
 import           Control.Monad(forM_)
-import           Control.Monad.Except(runExceptT)
+import           Control.Monad.Except(runExceptT, when)
 import           Data.Aeson((.=), ToJSON, object, toJSON)
 import           Data.Aeson.Encode.Pretty(encodePretty)
 import           Data.ByteString.Lazy(toStrict)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
-import           Data.Maybe(catMaybes, fromMaybe, isJust, mapMaybe)
+import           Data.Maybe(catMaybes, fromMaybe, isJust, isNothing, mapMaybe)
 import qualified Data.Text as T
 import           Data.Text.Encoding(decodeUtf8)
 import           Data.Time.Clock.POSIX(getCurrentTime, posixSecondsToUTCTime)
@@ -23,6 +23,7 @@ import           System.Directory(doesFileExist)
 import           System.Environment(getArgs)
 import           System.Exit(exitFailure)
 import           Text.Printf(printf)
+import           Text.Read(readMaybe)
 import           Text.Regex.PCRE((=~))
 
 import BDCS.DB(Files(..), KeyVal(..), checkAndRunSqlite)
@@ -116,6 +117,9 @@ runCommand :: T.Text -> [String] -> IO (Either String ())
 runCommand db args = do
     (opts, _) <- compilerOpts options defaultLsOptions args "ls"
 
+    when (isNothing $ lsLabelMatches opts) $
+        throwIO InvalidLabelError
+
     printer <- if | lsJSONOutput opts -> return $ liftedPutStrLn . jsonPrinter
                   | lsVerbose opts -> do currentYear <- formatTime defaultTimeLocale "%Y" <$> getCurrentTime
                                          return $ liftedPutStrLn . verbosePrinter currentYear
@@ -158,9 +162,7 @@ runCommand db args = do
                (NoArg (\opts -> opts { lsVerbose = True }))
                "use a long listing format",
         Option [] ["label"]
-               (ReqArg (\d opts -> case reads d :: [(Label, String)] of
-                                       [(lbl, _)] -> opts { lsLabelMatches = Just lbl }
-                                       _          -> throw $ InvalidLabelError d) "LABEL")
+               (ReqArg (\d opts -> opts { lsLabelMatches = readMaybe d }) "LABEL")
                "return only results with the given LABEL",
         Option ['m'] ["matches"]
                (ReqArg (\d opts -> opts { lsMatches = d }) "REGEX")
@@ -203,7 +205,7 @@ runMain = do
         Nothing               -> usage
         Just (db, _, args) -> do
             unlessM (doesFileExist db) $
-                throw MissingDBError
+                throwIO MissingDBError
 
             result <- runCommand (T.pack db) args
             whenLeft result print
@@ -215,8 +217,8 @@ main =
  where
     -- And then add handlers for the various kinds of InspectErrors here.
     handleInspectErrors :: InspectErrors -> IO ()
-    handleInspectErrors (InvalidLabelError lbl) = do
-        putStrLn $ lbl ++ " is not a recognized file label\n"
+    handleInspectErrors InvalidLabelError = do
+        putStrLn "Unrecognized file label given.\n"
         putStrLn "Recognized labels:\n"
         forM_ labelDescriptions $ \(l, d) ->
             putStrLn $ "      " ++ l ++ " - " ++ d

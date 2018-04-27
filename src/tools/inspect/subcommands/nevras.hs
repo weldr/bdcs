@@ -1,7 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 
 import           Control.Conditional(unlessM)
-import           Control.Exception(Handler(..), catches, throw)
+import           Control.Exception(Handler(..), catches, throwIO)
 import           Control.Monad.Except(runExceptT)
 import           Data.Conduit((.|), runConduit)
 import qualified Data.Conduit.List as CL
@@ -65,7 +65,7 @@ runMain = do
         Nothing               -> usage
         Just (db, repo, args) -> do
             unlessM (doesFileExist db) $
-                throw MissingDBError
+                throwIO MissingDBError
 
             result <- runCommand (T.pack db) repo args
             whenLeft result (\e -> print $ "error: " ++ e)
