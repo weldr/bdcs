@@ -27,7 +27,7 @@ import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logDebugN, logInfoN)
 import           Control.Monad.Trans(lift)
-import           Control.Monad.Trans.Control(MonadBaseControl)
+import           Control.Monad.Trans.Control(MonadBaseControl, liftBaseOp)
 import           Control.Monad.Trans.Resource(MonadResource, runResourceT)
 import           Crypto.Hash(SHA256(..), hashInitWith, hashFinalize, hashUpdate)
 import qualified Data.ByteString as BS (readFile)
@@ -239,9 +239,9 @@ ostreeSink outPath = do
     -- MonadThrow and MonadMask.  This allows logging the call to dracut like we do everything
     -- else without having to think about adding those constraints to quite a lot of code.
     withTempDirectory' :: (MonadBaseControl IO m, MonadLoggerIO m) => FilePath -> String -> (FilePath -> m a) -> m a
-    withTempDirectory' target template =
-        CEL.bracket (liftIO $ createTempDirectory target template)
-                    (\path -> liftIO (removePathForcibly path) `CEL.catch` (\(_ :: CEL.SomeException) -> return ()))
+    withTempDirectory' target template = liftBaseOp $
+        CEL.bracket (createTempDirectory target template)
+                    (\path -> removePathForcibly path `CEL.catch` (\(_ :: CEL.SomeException) -> return ()))
 
     renameDirs :: FilePath -> IO ()
     renameDirs exportDir = do
