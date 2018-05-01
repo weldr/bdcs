@@ -21,6 +21,7 @@ module BDCS.Export.Ostree(ostreeSink)
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
 import           Control.Conditional(condM, otherwiseM, whenM)
 import           Control.Exception(SomeException, bracket_, catch)
+import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
 import           Control.Monad.IO.Class(MonadIO, liftIO)
@@ -36,9 +37,8 @@ import           Data.Maybe(fromJust)
 import qualified Data.Text as T
 import           System.Directory
 import           System.FilePath((</>), takeDirectory, takeFileName)
-import           System.IO.Temp(createTempDirectory, withTempDirectory)
+import           System.IO.Temp(createTempDirectory)
 import           System.Posix.Files(createSymbolicLink, fileGroup, fileMode, fileOwner, getFileStatus, readSymbolicLink)
-import           System.Process(callProcess)
 import           Text.Printf(printf)
 
 import           GI.Gio(File, fileNewForPath, noCancellable)
@@ -87,7 +87,7 @@ ostreeSink outPath = do
                 callProcessLogged "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
 
             -- Add the kernel and initramfs
-            installKernelInitrd tmpDir
+            lift $ installKernelInitrd tmpDir
 
             -- Replace /etc/nsswitch.conf with the altfiles version
             logDebugN "Modifying /etc files"
@@ -193,7 +193,7 @@ ostreeSink outPath = do
 
             yield $ printf "d %s %#o %d %d - -" baseDirPath mode userId groupId
 
-    installKernelInitrd :: MonadLoggerIO m => FilePath -> m ()
+    installKernelInitrd :: (MonadBaseControl IO m, MonadLoggerIO m) => FilePath -> m ()
     installKernelInitrd exportDir = do
         -- The kernel and initramfs need to be named /boot/vmlinuz-<CHECKSUM>
         -- and /boot/initramfs-<CHECKSUM>, where CHECKSUM is the sha256
@@ -214,19 +214,14 @@ ostreeSink outPath = do
         logInfoN $ "Installing kernel " `T.append` T.pack kernel
         logInfoN $ "Installing initrd " `T.append` T.pack initramfs
 
-        -- FIXME:  This one isn't getting logged, but withTempDirectory makes that hard.  Using that
-        -- function means scattering MonadMask constraints around in bdcs and bdcs-api, which I'm not
-        -- sure if that's a good thing or not.  Rewriting withTempDirectory to avoid that means using
-        -- bracket and the IO monad, and the types become very complicated.
-        liftIO $ withTempDirectory exportDir "dracut"
-            (\tmpDir -> callProcess "chroot"
-                [exportDir,
-                 "dracut",
-                 "--add", "ostree",
-                 "--no-hostonly",
-                 "--tmpdir=/" ++ takeFileName tmpDir,
-                 "-f", "/boot/" ++ takeFileName initramfs,
-                 kver])
+        withTempDirectory' exportDir "dracut" $ \tmpDir ->
+            callProcessLogged "chroot" [exportDir,
+                                        "dracut",
+                                        "--add", "ostree",
+                                        "--no-hostonly",
+                                        "--tmpdir=/" ++ takeFileName tmpDir,
+                                        "-f", "/boot/" ++ takeFileName initramfs,
+                                        kver]
 
         -- Append the checksum to the filenames
         kernelData <- liftIO $ BS.readFile kernel
@@ -239,6 +234,14 @@ ostreeSink outPath = do
 
         liftIO $ renameFile kernel (kernel ++ "-" ++ digest)
         liftIO $ renameFile initramfs (initramfs ++ "-" ++ digest)
+
+    -- This is like withTempDirectory from the temporary package, but without the requirement on
+    -- MonadThrow and MonadMask.  This allows logging the call to dracut like we do everything
+    -- else without having to think about adding those constraints to quite a lot of code.
+    withTempDirectory' :: (MonadBaseControl IO m, MonadLoggerIO m) => FilePath -> String -> (FilePath -> m a) -> m a
+    withTempDirectory' target template =
+        CEL.bracket (liftIO $ createTempDirectory target template)
+                    (\path -> liftIO (removePathForcibly path) `CEL.catch` (\(_ :: CEL.SomeException) -> return ()))
 
     renameDirs :: FilePath -> IO ()
     renameDirs exportDir = do
