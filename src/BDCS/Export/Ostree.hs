@@ -20,7 +20,6 @@ module BDCS.Export.Ostree(ostreeSink)
 
 import           Conduit(Conduit, Consumer, Producer, (.|), bracketP, runConduit, sourceDirectory, yield)
 import           Control.Conditional(condM, otherwiseM, whenM)
-import           Control.Exception(SomeException, bracket_, catch)
 import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(void)
 import           Control.Monad.Except(MonadError)
@@ -325,8 +324,8 @@ open fp = do
 -- Given a commit, return the parent of it or Nothing if no parent exists.
 parentCommit :: IsRepo a => a -> T.Text -> IO (Maybe T.Text)
 parentCommit repo commitSum =
-    catch (Just <$> repoResolveRev repo commitSum False)
-          (\(_ :: SomeException) -> return Nothing)
+    CEL.catch (Just <$> repoResolveRev repo commitSum False)
+              (\(_ :: CEL.SomeException) -> return Nothing)
 
 -- Same as store, but takes a path to a directory to import
 storeDirectory :: IsRepo a => a -> FilePath -> IO File
@@ -341,6 +340,6 @@ storeDirectory repo path = do
 -- Returns the checksum of the commit.
 withTransaction :: IsRepo a => a -> (a -> IO b) -> IO b
 withTransaction repo fn =
-    bracket_ (repoPrepareTransaction repo noCancellable)
-             (repoCommitTransaction repo noCancellable)
-             (fn repo)
+    CEL.bracket_ (repoPrepareTransaction repo noCancellable)
+                 (repoCommitTransaction repo noCancellable)
+                 (fn repo)
