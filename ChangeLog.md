@@ -1,3 +1,14 @@
+## 0.5.0
+
+* Add logging of exceptions in directorySink, runCustomizations, runHacks,
+  and runTmpfiles.  This requires adding MonadBaseControl constraints to
+  all these functions and MonadError constrains to those functions that
+  did not already have it.
+* Require a filesystem package in the list of things to export.
+* Require a dracut package in the list of things to export for ostree.
+* Don't assume /etc/shadow exists in the output artifact.
+* Log the call to dracut in ostreeSink.
+
 ## 0.4.0
 
 * Add BDCS.Projects.getProjectsLike, which returns projects whose names match
