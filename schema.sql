@@ -304,26 +304,4 @@ create table group_requirements (
 create index group_requirements_group_id_idx on group_requirements(group_id);
 create index group_requirements_req_id_idx on group_requirements(req_id);
 
--- These things are temporary and should not be relied upon.  We will be getting
--- rid of them once we have an idea how common scriptlets are.
-
-create table scripts (
-    id integer primary key,
-    ty text not null,
-    body text not null,
-    trigger_prog text,
-    trigger_index integer,
-    trigger_name text,
-    trigger_version text,
-    trigger_flags integer
-);
-
-create table group_scripts (
-    id integer primary key,
-    group_id integer references groups(id) not null,
-    script_id integer references scripts(id) not null
-);
-create index group_scripts_group_id_idx on group_scripts(group_id);
-create index group_scripts_script_id_idx on group_scripts(script_id);
-
 .quit

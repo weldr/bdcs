@@ -174,19 +174,6 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     group_id GroupsId
     req_id RequirementsId
     deriving Eq Show
- Scripts
-    ty T.Text
-    body T.Text
-    trigger_prog T.Text Maybe
-    trigger_index Int Maybe
-    trigger_name T.Text Maybe
-    trigger_version T.Text Maybe
-    trigger_flags Int Maybe
-    deriving Eq Show
- GroupScripts
-    group_id GroupsId
-    script_id ScriptsId
-    deriving Eq Show
  |]
 
 -- Implement JSON functions for Projects
