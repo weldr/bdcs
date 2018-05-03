@@ -1,5 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE RecordWildCards #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 -- |
 -- Module: BDCS.Utils.Process
@@ -15,25 +17,38 @@
 module BDCS.Utils.Process(callProcessLogged)
  where
 
+import qualified Control.Exception.Lifted as CEL
 import           Control.Monad(unless)
 import           Control.Monad.IO.Class(liftIO)
 import           Control.Monad.Logger(MonadLoggerIO, logInfoN, logErrorN)
+import           Control.Monad.Trans.Control(MonadBaseControl)
+import           Data.String.Conversions(cs)
 import qualified Data.Text as T
 import           GHC.IO.Exception(IOErrorType(..))
-import           System.Exit(ExitCode(..))
 import           System.IO.Error(mkIOError)
-import           System.Process(readProcessWithExitCode)
+import           System.Process.Typed(ExitCodeException(..), proc, readProcess_)
 
-callProcessLogged :: MonadLoggerIO m => String -> [String] -> m ()
-callProcessLogged cmd args = do
-    logInfoN $ T.intercalate " " $ T.pack cmd : map T.pack args
-    (rc, stdout, stderr) <- liftIO $ readProcessWithExitCode cmd args ""
+callProcessLogged :: (MonadBaseControl IO m, MonadLoggerIO m) => String -> [String] -> m ()
+callProcessLogged cmd args =
+    doit `CEL.catches` [CEL.Handler (\(e :: ExitCodeException) -> handleProcessFailed e),
+                        CEL.Handler (\(e :: CEL.SomeException) -> handleOtherErrors e)]
+ where
+    handleProcessFailed :: (MonadBaseControl IO m, MonadLoggerIO m) => ExitCodeException -> m ()
+    handleProcessFailed ExitCodeException{..} = do
+        logErrorN $ cs eceStderr
+        liftIO $ ioError (mkIOError OtherError (cmd ++ unwords args ++ " (" ++ show eceExitCode ++ ")")
+                                    Nothing Nothing)
 
-    unless (T.null $ T.strip $ T.pack stdout) $
-        logInfoN $ T.pack stdout
+    handleOtherErrors :: (MonadBaseControl IO m, MonadLoggerIO m, CEL.Exception e) => e -> m ()
+    handleOtherErrors e = do
+        logErrorN $ cs $ show e
+        liftIO $ ioError (mkIOError OtherError (cmd ++ unwords args ++ " (" ++ show e ++ ")")
+                                    Nothing Nothing)
 
-    case rc of
-        ExitFailure x -> do logErrorN $ T.pack stderr
-                            liftIO $ ioError (mkIOError OtherError (cmd ++ unwords args ++ " (" ++ show x ++ ")")
-                                                        Nothing Nothing)
-        _             -> return ()
+    doit :: (MonadBaseControl IO m, MonadLoggerIO m) => m ()
+    doit = do
+        logInfoN $ T.intercalate " " $ T.pack cmd : map T.pack args
+        (stdout, _) <- liftIO $ readProcess_ (proc cmd args)
+
+        unless (T.null $ T.strip $ cs stdout) $
+            logInfoN $ cs stdout

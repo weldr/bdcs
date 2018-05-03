@@ -83,7 +83,7 @@ ostreeSink outPath = do
             -- Compile the locale-archive file
             let localeDir = tmpDir </> "usr" </> "lib" </> "locale"
             whenM (liftIO $ doesFileExist $ localeDir </> "locale-archive.tmpl") $
-                callProcessLogged "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
+                lift $ callProcessLogged "chroot" [tmpDir, "/usr/sbin/build-locale-archive"]
 
             -- Add the kernel and initramfs
             lift $ installKernelInitrd tmpDir
@@ -126,7 +126,7 @@ ostreeSink outPath = do
             -- rpmdb treats every path as absolute
             rpmdbDir <- liftIO $ makeAbsolute $ tmpDir </> "usr" </> "share" </> "rpm"
             liftIO $ createDirectoryIfMissing True rpmdbDir
-            callProcessLogged "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
+            lift $ callProcessLogged "rpmdb" ["--initdb", "--dbpath=" ++ rpmdbDir]
 
             -- import the directory as a new commit
             logDebugN "Storing results as a new commit"

@@ -56,5 +56,5 @@ qcow2Sink outPath =
             lift $ runHacks tmpDir
 
             -- Run virt-make-fs to generate the qcow2
-            callProcessLogged "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
+            lift $ callProcessLogged "virt-make-fs" [tmpDir, outPath, "--format=qcow2", "--label=composer"]
         )
