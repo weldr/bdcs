@@ -179,7 +179,7 @@ loadIntoMDDB PackageJSON{..} files = do
     -- Create the project/source/build entries from the package.json data
     -- npm doesn't provide separate descriptions and summaries, so just leave projects.description blank
     -- upstream_vcs is usually the same as homepage, but we can't tell automatically so leave that blank too
-    projectId <- insertProject $ Projects packageName description "" homepage ""
+    projectId <- insertProject $ Projects packageName description "" homepage Nothing
     sourceId  <- insertSource $ Sources projectId license packageVersion ""
 
     fileIds <- insertFiles files

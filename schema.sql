@@ -53,7 +53,7 @@ create table projects (
     summary text not null,
     description text not null,
     homepage text,
-    upstream_vcs text not null
+    upstream_vcs text
 );
 
 -- A source represents a release of a single upstream project (hence the

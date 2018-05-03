@@ -84,7 +84,7 @@ share [mkPersist sqlSettings, mkMigrate "migrateAll"] [persistLowerCase|
     summary T.Text
     description T.Text
     homepage T.Text Maybe
-    upstream_vcs T.Text
+    upstream_vcs T.Text Maybe
     NameKey name
     deriving Eq Show
  Sources
@@ -196,7 +196,7 @@ instance Aeson.ToJSON Projects where
     , "summary"      .= projectsSummary
     , "description"  .= projectsDescription
     , "homepage"     .= fromMaybe "" projectsHomepage
-    , "upstream_vcs" .= projectsUpstream_vcs ]
+    , "upstream_vcs" .= fromMaybe "" projectsUpstream_vcs ]
 
 instance Aeson.FromJSON Projects where
   parseJSON = Aeson.withObject "Projects" $ \o -> do

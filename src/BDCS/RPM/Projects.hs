@@ -36,11 +36,8 @@ mkProject tags = let
                                           (MissingRPMTag "Description")
                                           decodeUtf8
     homepage    = fmap T.pack (findStringTag "URL" tags)
-
-    -- FIXME:  Where to get this from?
-    upstream_vcs = "UPSTREAM_VCS"
  in
-    Projects projectName summary description homepage upstream_vcs
+    Projects projectName summary description homepage Nothing
  where
     -- the closest to a project name we have is the srpm name, e.g., pykickstart-2.32-1.fc26.src.rpm
     -- This is essentially N-V-R.A.rpm. rpm does not allow hyphens in version of release, and epoch is
