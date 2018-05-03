@@ -46,7 +46,7 @@ runHacks exportPath = runHacks' exportPath `CEL.catch` \e -> throwError $ show (
 
 -- This is a helper for runHacks that does all the hard work.  It exists separately so the main
 -- function can handle any exceptions without making a mess of the code.
-runHacks' :: MonadLoggerIO m => FilePath -> m ()
+runHacks' :: (MonadBaseControl IO m, MonadLoggerIO m) => FilePath -> m ()
 runHacks' exportPath = do
     -- set a root password
     -- pre-crypted from "redhat"

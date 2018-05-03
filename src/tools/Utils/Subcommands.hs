@@ -5,15 +5,15 @@
 module Utils.Subcommands(runSubcommand)
  where
 
-import Control.Conditional(condM, ifM, otherwiseM)
-import Control.Exception(SomeException, catch)
-import Control.Monad.Loops(firstM)
-import Data.Text(pack, splitOn, unpack)
-import System.Directory(doesFileExist)
-import System.Environment(lookupEnv)
-import System.Exit(exitFailure)
-import System.FilePath((</>))
-import System.Process(callProcess)
+import           Control.Conditional(condM, ifM, otherwiseM)
+import qualified Control.Exception.Lifted as CEL
+import           Control.Monad.Loops(firstM)
+import           Data.Text(pack, splitOn, unpack)
+import           System.Directory(doesFileExist)
+import           System.Environment(lookupEnv)
+import           System.Exit(exitFailure)
+import           System.FilePath((</>))
+import           System.Process.Typed(proc, runProcess_)
 
 import Paths_bdcs(getLibexecDir)
 
@@ -61,10 +61,10 @@ runSubcommand basecmdPrefix subcmd subcmdArgs knownSubcommands usage = do
                        (tryCallProcess cmd1 subcmdArgs)
                        (putStrLn ("subcommand " ++ subcmd ++ " does not exist\n") >> usage)
  where
-     tryCallProcess cmd args = catch (callProcess cmd args)
-                                     -- We handled the case where an unknown subcommand was
-                                     -- given on the command line.  For now, the only other
-                                     -- errors possible are when the subcommand ran, but
-                                     -- failed for some reason.  Those are handled inside
-                                     -- the subcommand.  Just quit.
-                                     (\(_ :: SomeException) -> exitFailure)
+     tryCallProcess cmd args = CEL.catch (runProcess_ (proc cmd args))
+                                         -- We handled the case where an unknown subcommand was
+                                         -- given on the command line.  For now, the only other
+                                         -- errors possible are when the subcommand ran, but
+                                         -- failed for some reason.  Those are handled inside
+                                         -- the subcommand.  Just quit.
+                                         (\(_ :: CEL.SomeException) -> exitFailure)
