@@ -67,11 +67,6 @@ import BDCS.Signatures(insertBuildSignatures)
 import BDCS.Sources(insertSource)
 import BDCS.Utils.Error(mapError)
 
-#ifdef SCRIPTS
-import BDCS.RPM.Scripts(mkScripts, mkTriggerScripts)
-import BDCS.Scripts(insertScript)
-#endif
-
 {-# ANN buildImported ("HLint: ignore Use ." :: String) #-}
 
 buildImported :: MonadResource m => [Tag] ->  SqlPersistT m Bool
@@ -178,16 +173,7 @@ unsafeLoadIntoMDDB RPM{rpmSignatures=fstSignature:_, rpmHeaders=fstHeader:_, ..}
     void $ associateFilesWithPackage filesIds pkgNameId
     void $ associateBuildWithPackage buildId pkgNameId
 
-#ifdef SCRIPTS
-    -- groups and reqs
-    groupId <- createGroup filesIds tagHeaders
-
-    -- scripts - These are here temporarily, just so we can figure out how widely they are
-    -- used.  Once we are done, they are going away.
-    mapM_ (insertScript groupId) (mkScripts tagHeaders ++ mkTriggerScripts tagHeaders)
-#else
     void $ createGroup filesIds tagHeaders
-#endif
 
     return True
 

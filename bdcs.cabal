@@ -42,10 +42,6 @@ source-repository       head
     type:               git
     location:           https://github.com/weldr/bdcs
 
-flag scripts
-    description:        Enable importing package scripts to the database
-    default:            False
-
 library
     hs-source-dirs:     src
 
@@ -97,13 +93,11 @@ library
                         BDCS.RPM.Groups,
                         BDCS.RPM.Projects,
                         BDCS.RPM.Requirements,
-                        BDCS.RPM.Scripts,
                         BDCS.RPM.Signatures,
                         BDCS.RPM.Sources,
                         BDCS.RPM.Utils,
                         BDCS.ReqType,
                         BDCS.Requirements,
-                        BDCS.Scripts,
                         BDCS.Signatures,
                         BDCS.Sources,
                         BDCS.Utils.Conduit,
@@ -167,12 +161,7 @@ library
     other-modules:      Paths_bdcs
     default-language:   Haskell2010
 
-    if flag(scripts)
-        cpp-options:    -DSCRIPTS
-        cc-options:     "-DSCRIPTS"
-        ghc-options:    -Wall
-    else
-        ghc-options:    -Wall
+    ghc-options:    -Wall
 
 executable bdcs
     main-is:            bdcs.hs
