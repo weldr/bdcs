@@ -1,3 +1,10 @@
+## 0.6.0
+
+* Use the typed-process module instead of process.
+* Build all programs with -threaded.  All users of bdcs will need to do the same.
+* Remove script support from the database.  This wasn't being used anyway.
+* Make the upstream_vcs field in the projects table optional.
+
 ## 0.5.0
 
 * Add logging of exceptions in directorySink, runCustomizations, runHacks,
