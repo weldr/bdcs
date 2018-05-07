@@ -30,10 +30,10 @@ import           Control.Monad.IO.Class(MonadIO)
 import           Control.Monad.Logger(NoLoggingT)
 import           Control.Monad.Trans.Resource(MonadBaseControl, ResourceT)
 import qualified Data.Aeson as Aeson
-import           Data.Aeson((.:), (.=))
+import           Data.Aeson((.:), (.:?), (.=))
 import           Data.ByteString(ByteString)
 import           Data.Int(Int64)
-import           Data.Maybe(fromMaybe, listToMaybe)
+import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
 import           Database.Esqueleto(Esqueleto, Entity, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
@@ -195,16 +195,16 @@ instance Aeson.ToJSON Projects where
       "name"         .= projectsName
     , "summary"      .= projectsSummary
     , "description"  .= projectsDescription
-    , "homepage"     .= fromMaybe "" projectsHomepage
-    , "upstream_vcs" .= fromMaybe "" projectsUpstream_vcs ]
+    , "homepage"     .= projectsHomepage
+    , "upstream_vcs" .= projectsUpstream_vcs ]
 
 instance Aeson.FromJSON Projects where
   parseJSON = Aeson.withObject "Projects" $ \o -> do
     projectsName         <- o .: "name"
     projectsSummary      <- o .: "summary"
     projectsDescription  <- o .: "description"
-    projectsHomepage     <- o .: "homepage"
-    projectsUpstream_vcs <- o .: "upstream_vcs"
+    projectsHomepage     <- o .:? "homepage"
+    projectsUpstream_vcs <- o .:? "upstream_vcs"
     return Projects{..}
 
 instance Aeson.ToJSON KeyVal where
