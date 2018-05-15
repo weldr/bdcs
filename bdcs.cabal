@@ -12,8 +12,8 @@ author:                 Chris Lumens
 maintainer:             clumens@redhat.com
 license:                LGPL-2.1
 license-file:           LICENSE
-build-type:             Custom
-cabal-version:          >= 1.10
+build-type:             Simple
+cabal-version:          >= 2.0
 
 data-files:             schema.sql,
                         data/*.conf
@@ -32,11 +32,6 @@ extra-source-files:     ChangeLog.md,
                         src/tests/BDCS/Export/*.hs,
                         src/tests/BDCS/RPM/*.hs,
                         tests/*.sh
-
-custom-setup
-    setup-depends:      base,
-                        Cabal >= 1.10 && < 2.1,
-                        filepath
 
 source-repository       head
     type:               git
@@ -158,6 +153,7 @@ library
 
     pkgconfig-depends:  ostree-1 >= 2017.8
 
+    autogen-modules:    Paths_bdcs
     other-modules:      Paths_bdcs
     default-language:   Haskell2010
 
@@ -167,6 +163,7 @@ executable bdcs
     main-is:            bdcs.hs
     hs-source-dirs:     src/tools
 
+    autogen-modules:    Paths_bdcs
     other-modules:      Utils.GetOpt,
                         Utils.Subcommands,
                         Paths_bdcs
@@ -187,6 +184,7 @@ executable bdcs
 
 executable bdcs-import
     main-is:            import.hs
+    scope:              private
     hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
@@ -206,9 +204,11 @@ executable bdcs-import
 
 executable bdcs-inspect
     main-is:            inspect.hs
+    scope:              private
     hs-source-dirs:     src/tools/inspect,
                         src/tools
 
+    autogen-modules:    Paths_bdcs
     other-modules:      Utils.GetOpt,
                         Utils.IO,
                         Utils.Subcommands,
@@ -230,6 +230,7 @@ executable bdcs-inspect
 
 executable inspect-groups
     main-is:            groups.hs
+    scope:              private
     hs-source-dirs:     src/tools/inspect/subcommands,
                         src/tools/inspect,
                         src/tools
@@ -257,6 +258,7 @@ executable inspect-groups
 
 executable inspect-ls
     main-is:            ls.hs
+    scope:              private
     hs-source-dirs:     src/tools/inspect/subcommands,
                         src/tools/inspect,
                         src/tools
@@ -284,6 +286,7 @@ executable inspect-ls
 
 executable inspect-nevras
     main-is:            nevras.hs
+    scope:              private
     hs-source-dirs:     src/tools/inspect/subcommands,
                         src/tools/inspect,
                         src/tools
@@ -306,6 +309,7 @@ executable inspect-nevras
 
 executable bdcs-export
     main-is:            export.hs
+    scope:              private
     hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
@@ -325,6 +329,7 @@ executable bdcs-export
 
 executable bdcs-tmpfiles
     main-is:            bdcs-tmpfiles.hs
+    scope:              private
     hs-source-dirs:     src/tools
 
     build-depends:      bdcs,
@@ -338,6 +343,7 @@ executable bdcs-tmpfiles
 
 executable bdcs-depsolve
     main-is:            depsolve.hs
+    scope:              private
     hs-source-dirs:     src/tools
 
     other-modules:      Utils.GetOpt
