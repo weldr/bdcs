@@ -45,10 +45,9 @@ api-mddb:
 	fi; \
 	cd ${d}/api-rpms; \
 	wget -c http://mirror.centos.org/centos/7/os/x86_64/Packages/basesystem-10.0-7.el7.centos.noarch.rpm \
-	    http://mirror.centos.org/centos/7/os/x86_64/Packages/filesystem-3.2-21.el7.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/os/x86_64/Packages/httpd-2.4.6-67.el7.centos.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-28.el7.x86_64.rpm \
-	    http://mirror.centos.org/centos/7/updates/x86_64/Packages/bash-4.2.46-29.el7_4.x86_64.rpm
+	    http://mirror.centos.org/centos/7/os/x86_64/Packages/filesystem-3.2-25.el7.x86_64.rpm \
+	    http://mirror.centos.org/centos/7/os/x86_64/Packages/httpd-2.4.6-80.el7.centos.x86_64.rpm \
+	    http://mirror.centos.org/centos/7/os/x86_64/Packages/bash-4.2.46-30.el7.x86_64.rpm \
 	sudo docker volume create -d local --name api-test-mddb-volume
 	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" welder/bdcs-import-img
 
