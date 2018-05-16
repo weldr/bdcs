@@ -1,3 +1,9 @@
+## 0.6.1
+
+* Only support building with cabal-2.x.  This is needed for private scope
+  support on executables, which is needed for packaging.
+* Update URLs to RPMs used in testing.
+
 ## 0.6.0
 
 * Use the typed-process module instead of process.
