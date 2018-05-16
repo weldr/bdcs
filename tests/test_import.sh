@@ -25,8 +25,8 @@ rlJournalStart
 #    rlPhaseEnd
 
     rlPhaseStartTest "Can import a single RPM from local disk"
-        rlRun -t -c "wget http://mirror.centos.org/centos/7/os/x86_64/Packages/setup-2.8.71-7.el7.noarch.rpm"
-        rlRun -t -c "$BDCS import $METADATA_DB $CENTOS_REPO file://`pwd`/setup-2.8.71-7.el7.noarch.rpm"
+        rlRun -t -c "wget http://mirror.centos.org/centos/7/os/x86_64/Packages/setup-2.8.71-9.el7.noarch.rpm"
+        rlRun -t -c "$BDCS import $METADATA_DB $CENTOS_REPO file://`pwd`/setup-2.8.71-9.el7.noarch.rpm"
     rlPhaseEnd
 
     rlPhaseStartTest "Can import a single RPM from HTTPS URL"
