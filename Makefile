@@ -16,10 +16,6 @@ build-and-test: Dockerfile.build
 	sudo docker build -t welder/bdcs-build-img -f $< .
 	sudo docker run --rm --security-opt label=disable -v `pwd`:/bdcs/ welder/bdcs-build-img
 
-importer: build-and-test
-	sudo docker build -t welder/bdcs-import-img .
-
-
 # NOTE: The mddb and content store under ./mddb/ will be removed
 #       Unless KEEP_STORE=1 and KEEP_MDDB=1 are set.
 mddb:
@@ -52,7 +48,7 @@ api-mddb:
 	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" welder/bdcs-import-img
 
 
-.PHONY: importer mddb api-mddb ci
+.PHONY: mddb api-mddb ci
 
 ci: build-and-test
 
