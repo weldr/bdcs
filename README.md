@@ -27,26 +27,6 @@ $ sqlite3 metadata.db < schema.sql
 $ for f in ${PWD}/Packages/*rpm; do dist/build/bdcs-import/bdcs-import metadata.db cs.repo file://${f}; done
 ```
 
-Running with docker
-===================
-
-Running with docker is a two step process, as indicated by Dockerfile.build
-and Dockerfile.  Dockerfile.build is used to compile the program needed to
-build an mddb and produces an image with that program.  Dockerfile then runs
-that image and produces the mddb.
-
-The Dockerfile depends on a base image, named welder/fedora:latest, which needs have
-been previously built. If it is not available it can be built from the
-welder-deployment repository by running `make weld-fedora`.
-
-The Makefile lays out the exact steps and can be used to simplify all this -
-just run `make importer mddb`.  If make is unavailable, just copy the steps
-out of there and run them manually.
-
-The Makefile expects that the RPMs are in $PWD/rpms.
-
-After completion, the mddb and content store will be in a bdcs-mddb-volume
-docker volume.
 
 Preparing local development environment for Haskell
 ===================================================
