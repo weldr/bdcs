@@ -19,6 +19,7 @@ data-files:             schema.sql,
                         data/*.conf
 
 extra-source-files:     ChangeLog.md,
+                        DEVELOPMENT.md,
                         Dockerfile.build,
                         entrypoint-integration-test.sh,
                         cabal.config,
