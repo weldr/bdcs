@@ -1,4 +1,4 @@
-The bdcs project is the main backend component of welder.  It is responsible for
+The bdcs project is the main backend component of Weldr.  It is responsible for
 managing two major sets of data:  A metadata database (the MDDB) and the content
 store.  Collectively, these two are referred to as the BDCS.  This project provides
 a set of tools that can be used to generate, add to, and inspect the BDCS.  It
