@@ -3,7 +3,7 @@ FROM fedora:latest
 RUN dnf --setopt=deltarpm=0 --verbose install -y dnf-plugins-core gnupg tar git sudo curl \
     file gcc-c++ gcc gdb glibc-devel openssl-devel make xz sqlite-devel cmake libcurl-devel \
     openssl-devel xz-devel zlib-devel sqlite glib2-devel gobject-introspection-devel ostree-devel \
-    cabal-install wget diffutils beakerlib ghc-vector-th-unbox-devel && \
+    cabal-install wget diffutils beakerlib ghc-vector-th-unbox-devel hlint happy bind-utils && \
     dnf clean all
 
 ENV PATH /root/.cabal/bin:$PATH

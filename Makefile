@@ -64,10 +64,13 @@ sandbox:
 	cabal update
 	cabal sandbox init
 
-hlint: sandbox
-	[ -x .cabal-sandbox/bin/happy ] || cabal install happy
-	[ -x .cabal-sandbox/bin/hlint ] || cabal install hlint
-	cabal exec hlint .
+hlint:
+	if [ -z "$$(which hlint)" ]; then \
+	    echo "hlint not found in PATH - install it"; \
+	    exit 1; \
+	else \
+	    hlint .; \
+	fi
 
 tests: sandbox
 	cabal install --dependencies-only --enable-tests --force-reinstall
