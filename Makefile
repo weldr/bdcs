@@ -48,7 +48,7 @@ api-mddb:
 	sudo docker run -v ${d}/api-mddb:/mddb:z -v ${d}/api-rpms:/rpms:z,ro --security-opt="label:disable" welder/bdcs-import-img
 
 
-.PHONY: mddb api-mddb ci
+.PHONY: mddb api-mddb ci sandbox tests
 
 ci: build-and-test
 
@@ -61,8 +61,7 @@ coveralls: sandbox
 	.cabal-sandbox/bin/hpc-coveralls --display-report test-bdcs bdcs
 
 sandbox:
-	cabal update
-	cabal sandbox init
+	[ -d .cabal-sandbox ] || cabal sandbox init && cabal update
 
 hlint:
 	if [ -z "$$(which hlint)" ]; then \
