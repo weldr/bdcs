@@ -23,7 +23,7 @@ import           Test.Hspec
 
 import BDCS.Depsolve
 
-{-# ANN module "HLint: ignore Reduce duplication" #-}
+{-# ANN module ("HLint: ignore Reduce duplication" :: String) #-}
 
 spec :: Spec
 spec = do
