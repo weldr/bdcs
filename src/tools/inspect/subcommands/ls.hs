@@ -36,7 +36,7 @@ import BDCS.Utils.Mode(modeAsText)
 import BDCS.Version
 
 import Utils.Exceptions(InspectErrors(..))
-import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
+import Utils.GetOpt(commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 import Utils.KeyVal(formatKeyValList)
 
@@ -45,8 +45,6 @@ data LsOptions = LsOptions { lsJSONOutput :: Bool,
                              lsLabelMatches :: Maybe Label,
                              lsMatches :: String,
                              lsVerbose :: Bool }
-
-instance OptClass LsOptions
 
 defaultLsOptions :: LsOptions
 defaultLsOptions = LsOptions { lsJSONOutput = False,

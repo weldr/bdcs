@@ -18,7 +18,7 @@ import BDCS.Utils.Either(whenLeft)
 import BDCS.Version
 
 import Utils.Exceptions(InspectErrors(..))
-import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
+import Utils.GetOpt(commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 
 -- These warnings are coming from options records that only have one field.
@@ -27,8 +27,6 @@ import Utils.IO(liftedPutStrLn)
 {-# ANN module "HLint: ignore Use newtype instead of data" #-}
 
 data NevrasOptions = NevrasOptions { nevraMatches :: String }
-
-instance OptClass NevrasOptions
 
 defaultNevrasOptions :: NevrasOptions
 defaultNevrasOptions = NevrasOptions { nevraMatches = ".*" }

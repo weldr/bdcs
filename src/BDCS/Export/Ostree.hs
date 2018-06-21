@@ -237,7 +237,7 @@ ostreeSink outPath = do
     -- This is like withTempDirectory from the temporary package, but without the requirement on
     -- MonadThrow and MonadMask.  This allows logging the call to dracut like we do everything
     -- else without having to think about adding those constraints to quite a lot of code.
-    withTempDirectory' :: (MonadBaseControl IO m, MonadLoggerIO m) => FilePath -> String -> (FilePath -> m a) -> m a
+    withTempDirectory' :: MonadBaseControl IO m => FilePath -> String -> (FilePath -> m a) -> m a
     withTempDirectory' target template = liftBaseOp $
         CEL.bracket (createTempDirectory target template)
                     (\path -> removePathForcibly path `CEL.catch` (\(_ :: CEL.SomeException) -> return ()))
