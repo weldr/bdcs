@@ -28,15 +28,13 @@ import BDCS.Utils.Either(whenLeft)
 import BDCS.Version
 
 import Utils.Exceptions(InspectErrors(..))
-import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
+import Utils.GetOpt(commandLineArgs, compilerOpts)
 import Utils.IO(liftedPutStrLn)
 import Utils.KeyVal(formatKeyValList)
 
 data GroupsOptions = GroupsOptions { grpJSONOutput :: Bool,
                                      grpKeyVals :: Bool,
                                      grpMatches :: String }
-
-instance OptClass GroupsOptions
 
 defaultGroupsOptions :: GroupsOptions
 defaultGroupsOptions = GroupsOptions { grpJSONOutput = False,

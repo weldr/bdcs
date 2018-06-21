@@ -292,7 +292,7 @@ loadFromURI uri@URI{..} = do
 
  where
     -- TODO handle TarExceptions
-    tarEntryToFile :: (MonadError String m, MonadThrow m, MonadResource m) => ContentStore -> Conduit CT.TarChunk m Files
+    tarEntryToFile :: (MonadError String m, MonadResource m) => ContentStore -> Conduit CT.TarChunk m Files
     tarEntryToFile cs =
         -- Run the tar processing in a state with a map from FilePath to (ObjectDigest, CT.Size),
         -- so hardlinks can get the data they need from earlier entries.
@@ -345,7 +345,7 @@ loadFromURI uri@URI{..} = do
 
             yield file
 
-        handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadError String m, MonadResource m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
+        handleRegularFile :: (MonadState (HM.HashMap FilePath (ObjectDigest, CT.Size)) m, MonadResource m) => Files -> FilePath -> CT.Size -> Consumer BS.ByteString m Files
         handleRegularFile baseFile entryPath size = do
             digest <- toConsumer $ storeByteStringSink cs
             modify (HM.insert entryPath (digest, size))

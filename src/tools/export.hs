@@ -34,12 +34,10 @@ import BDCS.Export.Types(exportTypeText, exportTypeFromText, supportedExportType
 import BDCS.Utils.Monad(concatMapM)
 import BDCS.Version
 
-import Utils.GetOpt(OptClass, commandLineArgs, compilerOpts)
+import Utils.GetOpt(commandLineArgs, compilerOpts)
 
 data ExportOpts = ExportOpts { optDest :: FilePath,
                                optExportType :: T.Text }
-
-instance OptClass ExportOpts
 
 defaultExportOpts :: ExportOpts
 defaultExportOpts = ExportOpts { optDest = "",

@@ -36,7 +36,7 @@ import           Data.Int(Int64)
 import           Data.Maybe(listToMaybe)
 import qualified Data.Text as T
 import           Data.Time(UTCTime)
-import           Database.Esqueleto(Esqueleto, Entity, Key, PersistEntity, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
+import           Database.Esqueleto(Esqueleto, Entity, Key, PersistField, SqlBackend, SqlPersistT, ToBackendKey, Value,
                                     (==.), entityVal, insert, isNothing, val, unValue)
 import           Database.Persist.Sql(rawSql, unSingle)
 import           Database.Persist.Sqlite(runSqlite)
@@ -259,6 +259,6 @@ orDo findFn doFn =
 
 -- | Attempt to find a record in some table of the database.  If it exists, return its key.
 -- If it doesn't exist, insert the given object and return its key.
-orInsert :: (MonadIO m, PersistEntity a, ToBackendKey SqlBackend a) => SqlPersistT m (Maybe (Key a)) -> a -> SqlPersistT m (Key a)
+orInsert :: (MonadIO m, ToBackendKey SqlBackend a) => SqlPersistT m (Maybe (Key a)) -> a -> SqlPersistT m (Key a)
 orInsert findFn obj =
     findFn >>= maybe (insert obj) return

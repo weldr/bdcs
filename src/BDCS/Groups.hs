@@ -145,7 +145,7 @@ groups = do
                return  (group ^. GroupsId, group ^. GroupsName)
     return $ map (bimap unValue unValue) results
 
-groupsC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) (Key Groups, T.Text)
+groupsC :: MonadResource m => Source (SqlPersistT m) (Key Groups, T.Text)
 groupsC = do
     let source = selectSource $ from $ \group -> do
                  orderBy      [asc (group ^. GroupsName)]

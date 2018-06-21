@@ -209,7 +209,7 @@ solveCNF formula = solveCNF' Map.empty formula
         else
             simplify upAssignments upFormula
 
-    assignmentsToList :: Ord a => AssignmentMap a -> [DepAssignment a]
+    assignmentsToList :: AssignmentMap a -> [DepAssignment a]
     assignmentsToList assignments = let
         -- start by getting everything out of the map as a list of (CNFLiteral, Bool)
         literalList = Map.assocs assignments

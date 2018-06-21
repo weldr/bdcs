@@ -68,7 +68,7 @@ files = do
                return  file
     return $ map entityVal results
 
-filesC :: (MonadResource m, MonadIO m) => Source (SqlPersistT m) Files
+filesC :: MonadResource m => Source (SqlPersistT m) Files
 filesC = do
     let source = selectSource $ from $ \file -> do
                  orderBy      [asc (file ^. FilesPath)]
