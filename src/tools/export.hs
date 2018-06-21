@@ -13,11 +13,6 @@
 -- You should have received a copy of the GNU Lesser General Public
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
-
 import           Control.Conditional(ifM)
 import           Control.Monad.Except(runExceptT)
 import           Data.Maybe(fromJust, isNothing)

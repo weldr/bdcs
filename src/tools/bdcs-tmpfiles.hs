@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- Copyright (C) 2017 Red Hat, Inc.
 --
 -- This library is free software; you can redistribute it and/or

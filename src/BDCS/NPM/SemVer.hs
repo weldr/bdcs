@@ -14,9 +14,6 @@
 -- License along with this library; if not, see <http://www.gnu.org/licenses/>.
 
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module BDCS.NPM.SemVer(SemVer(..),
                        SemVerIdentifier(..),

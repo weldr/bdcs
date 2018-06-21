@@ -1,5 +1,4 @@
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RecordWildCards #-}
 
 module BDCS.Export.Customize(CSOverlay,
                              Customization(..),
@@ -30,12 +29,12 @@ import BDCS.Export.FSTree(FSTree, addFileToTree)
 type CSOverlay = Map.Map BS.ByteString Object
 
 -- Just one type of customization for now, more to come later
-{-# ANN module "HLint: ignore Use newtype instead of data" #-}
+{-# ANN module ("HLint: ignore Use newtype instead of data" :: String) #-}
 data Customization = WriteFile Files (Maybe BS.ByteString)
  deriving (Eq, Show)
 
 -- Not everything looks good as an operator, hlint
-{-# ANN filesToObjectsC "HLint: ignore Use section" #-}
+{-# ANN filesToObjectsC ("HLint: ignore Use section" :: String) #-}
 filesToObjectsC :: (MonadError String m, MonadIO m) => CSOverlay -> ContentStore -> Conduit Files m (Files, Object)
 filesToObjectsC overlay repo = awaitForever $ \f@Files{..} ->
     case maybe Nothing (flip Map.lookup overlay) filesCs_object of

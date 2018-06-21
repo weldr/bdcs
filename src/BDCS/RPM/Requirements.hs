@@ -19,7 +19,7 @@ import qualified Data.Text as T
 import           BDCS.DB(GroupRequirements(..), Groups(..), Requirements(..))
 import qualified BDCS.ReqType as RT
 
-{-# ANN module "HLint: ignore Eta reduce" #-}
+{-# ANN module ("HLint: ignore Eta reduce" :: String) #-}
 
 -- | Return a 'GroupRequirements' record for the RPM package.
 mkGroupRequirement :: Key Groups -> Key Requirements -> GroupRequirements
