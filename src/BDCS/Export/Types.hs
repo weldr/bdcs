@@ -9,8 +9,6 @@
 --
 -- Types related to exporting.
 
-{-# LANGUAGE OverloadedStrings #-}
-
 module BDCS.Export.Types(ExportType(..),
                          exportTypeText,
                          exportTypeFromText,

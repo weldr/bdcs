@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 -- |
 -- Module: BDCS.RPM.Utils
 -- Copyright: (c) 2016-2017 Red Hat, Inc.

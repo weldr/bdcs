@@ -18,7 +18,7 @@ module BDCS.ReqType(ReqContext(..),
 
 import Database.Persist.TH
 
-{-# ANN module "HLint: ignore Use module export list" #-}
+{-# ANN module ("HLint: ignore Use module export list" :: String) #-}
 
 -- | The type of a requirements language - this basically maps to a packaging
 -- system.  For now, only RPM is supported.

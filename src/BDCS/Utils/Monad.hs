@@ -1,5 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
-
 -- |
 -- Module: BDCS.Utils.Monad
 -- Copyright: (c) 2016-2017 Red Hat, Inc.

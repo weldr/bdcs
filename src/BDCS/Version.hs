@@ -23,7 +23,7 @@ import Paths_bdcs (version)
 -- | Given the name of a bdcs tool, print its version number.
 printVersion :: String -> IO ()
 printVersion toolName = do
-    let git_version = $(gitDescribe)
+    let git_version = $(gitDescribe) :: String
     if git_version == "UNKNOWN" then
         printf "%s v%s\n" toolName $ showVersion version
     else

@@ -1,5 +1,3 @@
-{-# LANGUAGE RecordWildCards #-}
-
 -- |
 -- Module: BDCS.Builds
 -- Copyright: (c) 2016-2017 Red Hat, Inc.

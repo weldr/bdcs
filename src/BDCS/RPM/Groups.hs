@@ -1,6 +1,3 @@
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE OverloadedStrings #-}
-
 -- |
 -- Module: BDCS.RPM.Groups
 -- Copyright: (c) 2016-2017 Red Hat, Inc.
