@@ -32,6 +32,7 @@ extra-source-files:     ChangeLog.md,
                         src/tests/BDCS/Export/*.hs,
                         src/tests/BDCS/RPM/*.hs,
                         tests/*.sh
+                        .jenkins/configure-pre-release-dependencies
 
 source-repository       head
     type:               git
