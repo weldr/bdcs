@@ -1,4 +1,4 @@
-#!/bin.bash
+#!/bin/bash
 # This script will configure the cabal sandbox to
 # use pre-release versions of codec-rpm/content-store tarballs
 # instead of downloading from Hackage.
