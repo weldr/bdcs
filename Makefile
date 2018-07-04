@@ -61,7 +61,7 @@ coveralls: sandbox
 	.cabal-sandbox/bin/hpc-coveralls --display-report test-bdcs bdcs
 
 sandbox:
-	[ -d .cabal-sandbox ] || cabal sandbox init && cabal update
+	cabal sandbox init && cabal update && .jenkins/configure-pre-release-dependencies
 
 hlint:
 	if [ -z "$$(which hlint)" ]; then \
