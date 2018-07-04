@@ -5,14 +5,10 @@
 #
 # It must be executed from the main project directory!
 #
-# This script is executed by Jenkins when an upstream artifact
-# is present.
+# Jenkins is responsible for downloading all the upstream
+# artifacts to the local directory.
 #
 # For bdcs upstream dependencies are codec-rpm and content-store!
-
-cabal update
-cabal sandbox init
-
 
 for dependency in codec-rpm content-store; do
     tarball="$dependency-latest.tar.gz"
