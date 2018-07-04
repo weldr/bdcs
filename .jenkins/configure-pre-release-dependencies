@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -x
 # This script will configure the cabal sandbox to
 # use pre-release versions of codec-rpm/content-store tarballs
 # instead of downloading from Hackage.
@@ -17,7 +17,7 @@ cabal sandbox init
 for dependency in codec-rpm content-store; do
     tarball="$dependency-latest.tar.gz"
     if [ -f "$tarball" ]; then
-        tar -xzvf tarball
+        tar -xzvf $tarball
         dir_name=`readlink -f $dependency-*/`
         cabal sandbox add-source $dir_name
     fi
